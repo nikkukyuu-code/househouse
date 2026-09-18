@@ -8,10 +8,10 @@ import {
   createBlueprint, createEmptyHouseData, isWalkable, isPlaceable,
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
-} from './house.js?v=20260919x';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260919x';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260919x';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260919x';
+} from './house.js?v=20260919y';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260919y';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260919y';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260919y';
 
 const blueprint = createBlueprint();
 
@@ -317,15 +317,24 @@ function placeAt(floor, x, y) {
     }
     const kind = S.setupTool === 'trap-pit' ? TRAP_PIT : TRAP_BOMB;
     house.traps.push({ floor, x, y, kind });
+    const filled = house.traps.length >= MAX_TRAPS;
     setStatus(
       $('setup-status'),
-      kind === TRAP_PIT ? '落とし穴を配置しました' : '爆弾を配置しました',
+      filled
+        ? `罠 ${MAX_TRAPS}/${MAX_TRAPS} — 仕掛け完了！`
+        : (kind === TRAP_PIT ? '落とし穴を配置しました' : '爆弾を配置しました'),
       'ok'
     );
-    if (house.traps.length >= MAX_TRAPS) {
-      setStatus($('setup-status'), `罠 ${MAX_TRAPS}/${MAX_TRAPS} — 枠が埋まりました！準備完了へ`, 'ok');
-    }
     sfx('place');
+    updateSetupHud();
+    drawSetup();
+    if (filled) {
+      showSetupDone(
+        `最後の罠を設置！\n${setupDoneSummary(house)}\n準備完了で対戦へ`,
+        null
+      );
+    }
+    return;
   } else {
     setStatus($('setup-status'), '上のボタンで宝箱か罠を選んでから床をタップ', 'warn');
     return;
@@ -1062,6 +1071,8 @@ function setupDoneSummary(house) {
 function showSetupDone(detail, thenFn) {
   const banner = $('setup-done-banner');
   const detailEl = $('setup-done-detail');
+  const titleEl = banner && banner.querySelector('.setup-done-title');
+  if (titleEl) titleEl.textContent = '仕掛け完了！';
   if (detailEl) detailEl.textContent = detail || '';
   if (banner) {
     banner.classList.remove('fade-out');
@@ -1075,7 +1086,7 @@ function showSetupDone(detail, thenFn) {
       setTimeout(() => banner.classList.remove('show', 'fade-out'), 320);
     }
     if (typeof thenFn === 'function') thenFn();
-  }, 1500);
+  }, 1600);
 }
 
 function onReadySetup() {
@@ -1086,45 +1097,39 @@ function onReadySetup() {
     return;
   }
 
-  const summary = setupDoneSummary(house);
-  $('btn-ready').disabled = true;
-
   if (S.mode === 'com') {
-    showSetupDone(summary, () => {
-      S.theirHouse = generateComHouse(blueprint);
-      setStatus($('setup-status'), 'COMが家を設計しました…', 'ok');
-      startMatch();
-    });
+    S.theirHouse = generateComHouse(blueprint);
+    setStatus($('setup-status'), 'COMが家を設計しました…', 'ok');
+    try { sfx('ready'); } catch (_) {}
+    startMatch();
     return;
   }
 
   if (S.mode === 'local') {
     if (S.setupWhich === 'mine') {
-      showSetupDone('あなたの家\n' + summary, () => {
-        $('btn-ready').disabled = false;
-        S.setupWhich = 'theirs';
-        S.localStep = 1;
-        S.setupFloor = 0;
-        S.setupTool = 'chest';
-        updateSetupHud();
-        drawSetup();
-        setStatus($('setup-status'), '次に相手（練習用）の家を設計してください', 'ok');
-      });
+      S.setupWhich = 'theirs';
+      S.localStep = 1;
+      S.setupFloor = 0;
+      S.setupTool = 'chest';
+      updateSetupHud();
+      drawSetup();
+      setStatus($('setup-status'), '次に相手（練習用）の家を設計してください', 'ok');
       return;
     }
-    showSetupDone('対戦スタート\n' + summary, () => startMatch());
+    try { sfx('ready'); } catch (_) {}
+    startMatch();
     return;
   }
 
-  showSetupDone(summary, () => {
-    S.iAmReady = true;
-    if (S.net) {
-      S.net.send({ type: 'house', house: S.myHouse });
-      S.net.send({ type: 'ready' });
-    }
-    setStatus($('setup-status'), '準備完了 — 相手を待っています…', 'ok');
-    maybeStartOnlineMatch();
-  });
+  S.iAmReady = true;
+  if (S.net) {
+    S.net.send({ type: 'house', house: S.myHouse });
+    S.net.send({ type: 'ready' });
+  }
+  setStatus($('setup-status'), '準備完了 — 相手を待っています…', 'ok');
+  $('btn-ready').disabled = true;
+  try { sfx('ready'); } catch (_) {}
+  maybeStartOnlineMatch();
 }
 
 function startMatch() {
