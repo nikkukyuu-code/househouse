@@ -733,7 +733,7 @@ function handleNetMessage(msg) {
       break;
     case 'chest':
       if (msg.who === 'me') {
-        endGame('foe');
+        endGame('foe', 'chest_foe');
       }
       break;
     case 'gameover':
