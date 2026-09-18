@@ -8,10 +8,10 @@ import {
   createBlueprint, createEmptyHouseData, isWalkable, isPlaceable,
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
-} from './house.js?v=20260919j';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260919j';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260919j';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260919j';
+} from './house.js?v=20260919k';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260919k';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260919k';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260919k';
 
 const blueprint = createBlueprint();
 
@@ -627,7 +627,7 @@ function endGame(winner, reason) {
   if (isLethalTrap) {
     if (S.heroFocus && S.heroFocus.kind === 'trap') {
       S.heroFocus.lethal = true;
-      S.heroFocus.until = performance.now() + 4200;
+      S.heroFocus.until = performance.now() + 6500;
       S.heroFocus.view = focusView;
     } else if (S.lastTrapHit) {
       const t = S.lastTrapHit;
@@ -639,7 +639,7 @@ function endGame(winner, reason) {
         floor: t.floor,
         trapKind: t.kind,
         lethal: true,
-        ms: 4200,
+        ms: 6500,
       });
     }
   }
@@ -676,11 +676,12 @@ function endGame(winner, reason) {
   clearTimeout(S._bannerTimer);
 
   if (isLethalTrap) {
-    // Phase 1: watch giant trap + char in slow-mo (no big card yet)
-    // Phase 2: climax card, then result
+    // Phase 1: enlarge trap+char (~3.2s)
+    // Phase 2: climax card hold (~3s)
+    // Phase 3: result
     S._bannerTimer = setTimeout(() => {
       showClimaxBanner(iWon, reasonText, eventTitle, bannerIcon);
-    }, 2000);
+    }, 3200);
     S._slowTimer = setTimeout(() => {
       S.slowMo = false;
       S.timeScale = 1;
@@ -691,7 +692,7 @@ function endGame(winner, reason) {
         setTimeout(() => banner.classList.remove('show', 'fade-out', 'win', 'lose'), 350);
       }
       showResultScreen(iWon, reasonText);
-    }, 4000);
+    }, 6200);
   } else {
     showClimaxBanner(iWon, reasonText, eventTitle, bannerIcon);
     S._slowTimer = setTimeout(() => {
@@ -769,7 +770,7 @@ function onTrapHit(who, tr) {
     px: ex ? ex.x : tr.x,
     py: ex ? ex.y : tr.y,
     lethal: willEnd,
-    ms: willEnd ? 4200 : 1400,
+    ms: willEnd ? 6500 : 1400,
   });
 
   if (who === 'me') {
@@ -789,7 +790,7 @@ function onTrapHit(who, tr) {
             hp: S.myHp,
           });
         }
-      }, willEnd ? 2200 : 900);
+      }, willEnd ? 2800 : 900);
       addFx('bot', '落とし穴！', '#aa66ff');
       flashOverlay($('flash-bot'), '🕳 落とし穴！', 700);
       if (S.myHp > 0) sfx('pit');
@@ -806,7 +807,7 @@ function onTrapHit(who, tr) {
       const victim = S.foe;
       S._pitTimer = setTimeout(() => {
         if (victim) applyPitfallDrop(victim);
-      }, willEnd ? 2200 : 900);
+      }, willEnd ? 2800 : 900);
       addFx('top', '落とし穴作動！', '#aa66ff');
       flashOverlay($('flash-top'), '🕳 落とし穴！', 700);
       if (S.foeHp > 0) sfx('pit');
@@ -974,7 +975,7 @@ function handleNetMessage(msg) {
           floor: msg.floor,
           trapKind: msg.kind === TRAP_PIT ? TRAP_PIT : TRAP_NORMAL,
           lethal: willEnd,
-          ms: willEnd ? 4200 : 1400,
+          ms: willEnd ? 6500 : 1400,
         });
         if (msg.kind === TRAP_PIT) {
           addFx('top', '落とし穴作動！', '#aa66ff');
