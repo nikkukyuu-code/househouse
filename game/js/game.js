@@ -8,10 +8,10 @@ import {
   createBlueprint, createEmptyHouseData, isWalkable, isPlaceable,
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
-} from './house.js?v=20260920j';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920j';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920j';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920j';
+} from './house.js?v=20260920k';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920k';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920k';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920k';
 
 const blueprint = createBlueprint();
 
@@ -215,6 +215,48 @@ function checkHazards(ex, triggeredSet, onTrap, onChest) {
   }
 }
 
+
+/* ---------- Cross-match player trap heat (localStorage) ---------- */
+const TRAP_HEAT_KEY = 'househouse-player-trap-heat-v1';
+const TRAP_HEAT_CELL_CAP = 14;
+
+function loadTrapHeat() {
+  try {
+    const raw = localStorage.getItem(TRAP_HEAT_KEY);
+    if (!raw) return {};
+    const o = JSON.parse(raw);
+    return o && typeof o === 'object' && !Array.isArray(o) ? o : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveTrapHeat(heat) {
+  try {
+    localStorage.setItem(TRAP_HEAT_KEY, JSON.stringify(heat));
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+/** Record where the player placed traps this match (COM explores myHouse). */
+function recordPlayerTrapHeat(house) {
+  if (!house || !Array.isArray(house.traps) || !house.traps.length) return;
+  const heat = loadTrapHeat();
+  for (const raw of house.traps) {
+    const tr = normalizeTrap(raw);
+    if (!tr) continue;
+    const k = `${tr.floor},${tr.x},${tr.y}`;
+    heat[k] = Math.min(TRAP_HEAT_CELL_CAP, (heat[k] || 0) + 1);
+  }
+  saveTrapHeat(heat);
+}
+
+function trapHeatAt(floor, x, y) {
+  const heat = S._trapHeat || {};
+  return heat[`${floor},${x},${y}`] || 0;
+}
+
 /* ---------- COM / AI explorer (BFS floor-clearing) ---------- */
 const AI_DIRS = [[0, -1], [0, 1], [-1, 0], [1, 0]];
 
@@ -244,14 +286,38 @@ function aiFloorUnvisited(floor, visited) {
  * Cost to enter (floor,x,y). Prefer already-triggered (known-safe) cells.
  * Mild weights: short unknown paths still win; equal-length prefers triggered.
  * Door/spawn caution is a tiny tie-break only (do not trap COM in spawn).
+ * Past trap-heat + same-match dangerHeat bias unknowns (no live maphack).
  */
+function aiTriggeredCount(ex) {
+  if (!ex) return 0;
+  if (ex.memory && typeof ex.memory.trapsHit === 'number') return ex.memory.trapsHit;
+  let n = 0;
+  if (ex.triggered) n = Math.max(n, ex.triggered.size);
+  if (ex === S.foe && S.foeTriggered) n = Math.max(n, S.foeTriggered.size);
+  return n;
+}
+
 function aiEnterCost(ex, floor, x, y) {
-  if (aiIsCellTriggered(ex, floor, x, y)) return 0.75; // spent trap — safe corridor
+  if (aiIsCellTriggered(ex, floor, x, y)) {
+    // Strengthen mid-match: more triggered → safer highways (cheaper)
+    const trigN = aiTriggeredCount(ex);
+    return Math.max(0.52, 0.75 - Math.min(trigN, 10) * 0.022);
+  }
   const key = `${floor},${x},${y}`;
   const visited = ex && ex.visited && ex.visited.has(key);
   let c = visited ? 1.0 : 1.3;
   if (!visited && (aiIsDoorAdjacent(floor, x, y) || aiNearSpawnExit(floor, x, y))) {
     c += 0.05;
+  }
+  // Cross-match heat: moderate extra cost on unknown high-heat cells (capped)
+  if (!visited) {
+    const past = trapHeatAt(floor, x, y);
+    if (past > 0) c += Math.min(0.32, past * 0.055);
+  }
+  // Same-match learning: temporary danger bias near recent hits
+  if (ex && ex.memory && ex.memory.dangerHeat) {
+    const dh = ex.memory.dangerHeat[key] || 0;
+    if (dh > 0) c += Math.min(0.38, dh);
   }
   return c;
 }
@@ -489,11 +555,44 @@ function aiTakeStairsIfNeeded(ex, targetFloor) {
   return false;
 }
 
+
+/**
+ * After COM triggers a trap: mark nearby caution for this match only.
+ * Adjacent cells + other door-adjacent cells on same floor.
+ * Does not read live untriggered traps — hit location only.
+ */
+function aiBoostDangerAround(ex, floor, x, y) {
+  if (!ex) return;
+  if (!ex.memory) {
+    ex.memory = { stuck: 0, phase: 0, lastDx: 0, lastDy: 0, recent: [], escapeGoal: null, dangerHeat: {}, trapsHit: 0 };
+  }
+  if (!ex.memory.dangerHeat) ex.memory.dangerHeat = {};
+  const bump = (f, cx, cy, amt) => {
+    if (!isWalkable(tileAt(blueprint, f, cx, cy))) return;
+    if (aiIsCellTriggered(ex, f, cx, cy)) return;
+    const k = `${f},${cx},${cy}`;
+    ex.memory.dangerHeat[k] = Math.min(0.42, (ex.memory.dangerHeat[k] || 0) + amt);
+  };
+  for (const [dx, dy] of AI_DIRS) {
+    bump(floor, x + dx, y + dy, 0.24);
+  }
+  // Mild bias on other door-adjacent walkables (common trap spots) — capped lightly
+  for (let yy = 0; yy < ROWS; yy++) {
+    for (let xx = 0; xx < COLS; xx++) {
+      if (xx === x && yy === y) continue;
+      if (!aiIsDoorAdjacent(floor, xx, yy)) continue;
+      bump(floor, xx, yy, 0.1);
+    }
+  }
+  ex.memory.trapsHit = (ex.memory.trapsHit || 0) + 1;
+}
+
 function aiStep(ex) {
   if (!ex.visited) ex.visited = new Set();
   if (!ex.memory) {
-    ex.memory = { stuck: 0, phase: 0, lastDx: 0, lastDy: 0, recent: [], escapeGoal: null };
+    ex.memory = { stuck: 0, phase: 0, lastDx: 0, lastDy: 0, recent: [], escapeGoal: null, dangerHeat: {}, trapsHit: 0 };
   }
+  if (!ex.memory.dangerHeat) ex.memory.dangerHeat = {};
   ex.memory.phase = (ex.memory.phase || 0) + 1;
   const key = `${ex.floor},${ex.x},${ex.y}`;
   ex.visited.add(key);
@@ -662,8 +761,15 @@ function aiWanderStep(ex, lastDx, lastDy) {
     if (t === T.STAIRS_UP || t === T.STAIRS_DOWN) s += 0.5;
     const nk = `${ex.floor},${n.x},${n.y}`;
     if (!ex.visited.has(nk)) s += 10;
-    if (aiIsCellTriggered(ex, ex.floor, n.x, n.y)) s += 8; // known-safe corridor (strong when revisiting)
-    else s -= aiCautionCost(ex, ex.floor, n.x, n.y);
+    if (aiIsCellTriggered(ex, ex.floor, n.x, n.y)) {
+      s += 8 + Math.min(4, aiTriggeredCount(ex) * 0.4); // stronger highway bias mid-match
+    } else {
+      s -= aiCautionCost(ex, ex.floor, n.x, n.y);
+      const dh = (ex.memory.dangerHeat && ex.memory.dangerHeat[nk]) || 0;
+      s -= dh * 4;
+      const past = trapHeatAt(ex.floor, n.x, n.y);
+      if (past > 0 && !ex.visited.has(nk)) s -= Math.min(2.5, past * 0.35);
+    }
     // If only one neighbor (dead end / corridor), don't let caution block
     if (neighbors.length <= 1) s += 5;
     if (lastDx === -n.dx && lastDy === -n.dy) s -= 3;
@@ -1286,6 +1392,8 @@ function onTrapHit(who, tr) {
     if (S.myHp <= 0) endGame('foe', 'hp_me');
   } else {
     S.foeHp = Math.max(0, Math.round((S.foeHp - dmg) * 2) / 2);
+    // Same-match learning: caution around hit + door-adjacent bias (this match only)
+    if (S.foe) aiBoostDangerAround(S.foe, tr.floor, tr.x, tr.y);
     if (isPit && S.foe) {
       clearTimeout(S._pitTimer);
       const victim = S.foe;
@@ -1378,6 +1486,20 @@ function syncPos() {
 }
 
 let aiTimer = 0;
+/** COM step interval: slightly faster late if healthy (smarter paths do most work). */
+function aiStepIntervalMs() {
+  if (S.mode !== 'com') return 380;
+  const ex = S.foe;
+  if (!ex || !ex.memory) return 270;
+  const phase = ex.memory.phase || 0;
+  const visited = ex.visited ? ex.visited.size : 0;
+  const healthy = (S.foeHp || 0) >= MAX_HP * 0.6;
+  if (healthy && (phase > 80 || visited >= 48)) return 200;
+  if (healthy && phase > 55) return 235;
+  return 270;
+}
+
+
 
 function tick(ts) {
   animId = requestAnimationFrame(tick);
@@ -1396,7 +1518,7 @@ function tick(ts) {
 
     if ((S.mode === 'local' || S.mode === 'com') && S.foe) {
       aiTimer += dt;
-      if (aiTimer > (S.mode === 'com' ? 270 : 380)) {
+      if (aiTimer > aiStepIntervalMs()) {
         aiTimer = 0;
         aiStep(S.foe);
         checkHazards(S.foe, S.foeTriggered, (tr) => onTrapHit('foe', tr), () => onChestFound('foe'));
@@ -1648,6 +1770,20 @@ function startMatch() {
 
   S.me = makeExplorer(S.theirHouse, 'me');
   S.foe = makeExplorer(S.myHouse, 'foe');
+
+  // Pathfinding uses PAST heat only (no current-layout maphack).
+  // Persist this match's placements afterward for the next match.
+  S._trapHeat = loadTrapHeat();
+  if ((S.mode === 'com' || S.mode === 'local') && S.myHouse && S.myHouse.traps) {
+    recordPlayerTrapHeat(S.myHouse);
+  }
+  if (S.foe) {
+    if (!S.foe.memory) {
+      S.foe.memory = { stuck: 0, phase: 0, lastDx: 0, lastDy: 0, recent: [], escapeGoal: null, dangerHeat: {}, trapsHit: 0 };
+    }
+    S.foe.memory.dangerHeat = {};
+    S.foe.memory.trapsHit = 0;
+  }
 
   showScreen('screen-match');
   $('result-overlay').classList.remove('show', 'win', 'lose');
