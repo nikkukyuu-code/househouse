@@ -16,8 +16,12 @@ export const T = {
   STAIRS_DOWN: 4,
 };
 
-export const MAX_TRAPS = 5;
-export const MAX_HP = 3;
+export const MAX_TRAPS = 10;
+export const MAX_HP = 10;
+/** Bomb damage in hearts (shown with half-hearts) */
+export const BOMB_DAMAGE = 1.5;
+/** Pitfall damage in hearts */
+export const PIT_DAMAGE = 1;
 
 export const TRAP_BOMB = 'bomb';
 /** @deprecated alias — old saves used 'normal' */

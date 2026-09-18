@@ -3,15 +3,15 @@
  */
 
 import {
-  TILE, FLOORS, COLS, ROWS, T, MAX_TRAPS, MAX_HP,
+  TILE, FLOORS, COLS, ROWS, T, MAX_TRAPS, MAX_HP, BOMB_DAMAGE, PIT_DAMAGE,
   TRAP_BOMB, TRAP_PIT, normalizeTrap,
   createBlueprint, createEmptyHouseData, isWalkable, isPlaceable,
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
-} from './house.js?v=20260919t';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260919t';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260919t';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260919t';
+} from './house.js?v=20260919w';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260919w';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260919w';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260919w';
 
 const blueprint = createBlueprint();
 
@@ -322,6 +322,9 @@ function placeAt(floor, x, y) {
       kind === TRAP_PIT ? '落とし穴を配置しました' : '爆弾を配置しました',
       'ok'
     );
+    if (house.traps.length >= MAX_TRAPS) {
+      setStatus($('setup-status'), `罠 ${MAX_TRAPS}/${MAX_TRAPS} — 枠が埋まりました！準備完了へ`, 'ok');
+    }
     sfx('place');
   } else {
     setStatus($('setup-status'), '上のボタンで宝箱か罠を選んでから床をタップ', 'warn');
@@ -754,9 +757,10 @@ function showResultScreen(iWon, reasonText) {
 function onTrapHit(who, tr) {
   const kind = tr.kind === TRAP_PIT ? TRAP_PIT : TRAP_BOMB;
   const isPit = kind === TRAP_PIT;
+  const dmg = isPit ? PIT_DAMAGE : BOMB_DAMAGE;
   const view = who === 'me' ? 'bot' : 'top';
   const ex = who === 'me' ? S.me : S.foe;
-  const willEnd = who === 'me' ? S.myHp <= 1 : S.foeHp <= 1;
+  const willEnd = who === 'me' ? S.myHp <= dmg : S.foeHp <= dmg;
 
   S.lastTrapHit = { who, floor: tr.floor, x: tr.x, y: tr.y, kind };
 
@@ -774,7 +778,7 @@ function onTrapHit(who, tr) {
   });
 
   if (who === 'me') {
-    S.myHp = Math.max(0, S.myHp - 1);
+    S.myHp = Math.max(0, Math.round((S.myHp - dmg) * 2) / 2);
     if (isPit) {
       // Delay drop so the enlarge shot shows char + pit together
       clearTimeout(S._pitTimer);
@@ -801,7 +805,7 @@ function onTrapHit(who, tr) {
     }
     if (S.myHp <= 0) endGame('foe', 'hp_me');
   } else {
-    S.foeHp = Math.max(0, S.foeHp - 1);
+    S.foeHp = Math.max(0, Math.round((S.foeHp - dmg) * 2) / 2);
     if (isPit && S.foe) {
       clearTimeout(S._pitTimer);
       const victim = S.foe;
@@ -958,7 +962,7 @@ function handleNetMessage(msg) {
         // Peer hit a trap in our house
         const key = `${msg.floor},${msg.x},${msg.y}`;
         S.foeTriggered.add(key);
-        S.foeHp = typeof msg.myHp === 'number' ? msg.myHp : Math.max(0, S.foeHp - 1);
+        S.foeHp = typeof msg.myHp === 'number' ? msg.myHp : Math.max(0, Math.round((S.foeHp - (msg.kind === TRAP_PIT ? PIT_DAMAGE : BOMB_DAMAGE)) * 2) / 2);
         const willEnd = S.foeHp <= 0;
         S.lastTrapHit = {
           who: 'foe',
@@ -1043,6 +1047,37 @@ function startSetup() {
   setStatus($('setup-status'), 'マスをタップして配置。宝箱1つ必須。罠は爆弾／落とし穴。', '');
 }
 
+function setupDoneSummary(house) {
+  const traps = (house && house.traps) ? house.traps.length : 0;
+  const bombs = (house && house.traps) ? house.traps.filter((t) => t.kind !== TRAP_PIT).length : 0;
+  const pits = traps - bombs;
+  const parts = [];
+  if (house && house.chest) parts.push('宝箱OK');
+  parts.push(`罠 ${traps}/${MAX_TRAPS}`);
+  if (bombs) parts.push(`爆弾${bombs}`);
+  if (pits) parts.push(`落とし穴${pits}`);
+  return parts.join(' ／ ');
+}
+
+function showSetupDone(detail, thenFn) {
+  const banner = $('setup-done-banner');
+  const detailEl = $('setup-done-detail');
+  if (detailEl) detailEl.textContent = detail || '';
+  if (banner) {
+    banner.classList.remove('fade-out');
+    banner.classList.add('show');
+  }
+  try { sfx('ready'); } catch (_) {}
+  clearTimeout(S._setupDoneTimer);
+  S._setupDoneTimer = setTimeout(() => {
+    if (banner) {
+      banner.classList.add('fade-out');
+      setTimeout(() => banner.classList.remove('show', 'fade-out'), 320);
+    }
+    if (typeof thenFn === 'function') thenFn();
+  }, 1500);
+}
+
 function onReadySetup() {
   const house = S.setupWhich === 'mine' ? S.myHouse : S.theirHouse;
   const v = validateHouse(house, blueprint);
@@ -1051,37 +1086,45 @@ function onReadySetup() {
     return;
   }
 
+  const summary = setupDoneSummary(house);
+  $('btn-ready').disabled = true;
+
   if (S.mode === 'com') {
-    S.theirHouse = generateComHouse(blueprint);
-    setStatus($('setup-status'), 'COMが家を設計しました…', 'ok');
-    sfx('ready');
-    startMatch();
+    showSetupDone(summary, () => {
+      S.theirHouse = generateComHouse(blueprint);
+      setStatus($('setup-status'), 'COMが家を設計しました…', 'ok');
+      startMatch();
+    });
     return;
   }
 
   if (S.mode === 'local') {
     if (S.setupWhich === 'mine') {
-      S.setupWhich = 'theirs';
-      S.localStep = 1;
-      S.setupFloor = 0;
-      S.setupTool = 'chest';
-      updateSetupHud();
-      drawSetup();
-      setStatus($('setup-status'), '次に相手（練習用）の家を設計してください', 'ok');
+      showSetupDone('あなたの家\n' + summary, () => {
+        $('btn-ready').disabled = false;
+        S.setupWhich = 'theirs';
+        S.localStep = 1;
+        S.setupFloor = 0;
+        S.setupTool = 'chest';
+        updateSetupHud();
+        drawSetup();
+        setStatus($('setup-status'), '次に相手（練習用）の家を設計してください', 'ok');
+      });
       return;
     }
-    startMatch();
+    showSetupDone('対戦スタート\n' + summary, () => startMatch());
     return;
   }
 
-  S.iAmReady = true;
-  if (S.net) {
-    S.net.send({ type: 'house', house: S.myHouse });
-    S.net.send({ type: 'ready' });
-  }
-  setStatus($('setup-status'), '準備完了 — 相手を待っています…', 'ok');
-  $('btn-ready').disabled = true;
-  maybeStartOnlineMatch();
+  showSetupDone(summary, () => {
+    S.iAmReady = true;
+    if (S.net) {
+      S.net.send({ type: 'house', house: S.myHouse });
+      S.net.send({ type: 'ready' });
+    }
+    setStatus($('setup-status'), '準備完了 — 相手を待っています…', 'ok');
+    maybeStartOnlineMatch();
+  });
 }
 
 function startMatch() {
@@ -1117,6 +1160,7 @@ function startMatch() {
   S.lastTrapHit = null;
   clearTimeout(S._pitTimer);
   clearTimeout(S._bannerTimer);
+  clearTimeout(S._setupDoneTimer);
   const matchEl = $('screen-match');
   if (matchEl) matchEl.classList.remove('slow-mo', 'slow-mo-bot', 'slow-mo-top');
   $('btn-ready').disabled = false;

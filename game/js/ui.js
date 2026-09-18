@@ -18,10 +18,19 @@ export function setStatus(el, text, kind = '') {
   el.className = 'status-msg' + (kind ? ' ' + kind : '');
 }
 
+/** hp may be fractional (e.g. 8.5) for half-heart display */
 export function heartsHtml(hp, max) {
+  const n = Number(hp);
   let s = '';
   for (let i = 0; i < max; i++) {
-    s += `<span class="heart ${i < hp ? 'full' : 'empty'}">${i < hp ? '♥' : '♡'}</span>`;
+    const fill = n - i;
+    if (fill >= 0.999) {
+      s += '<span class="heart full" aria-hidden="true">♥</span>';
+    } else if (fill >= 0.4) {
+      s += '<span class="heart half" aria-hidden="true"><span class="heart-half-fill">♥</span>♡</span>';
+    } else {
+      s += '<span class="heart empty" aria-hidden="true">♡</span>';
+    }
   }
   return s;
 }

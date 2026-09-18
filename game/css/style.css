@@ -423,8 +423,32 @@ a.btn.link-btn {
 }
 .match-hud .label { font-size: clamp(0.65rem, 1.8vh, 0.75rem); color: #cbb896; }
 .hearts { letter-spacing: 2px; font-size: clamp(0.95rem, 2.4vh, 1.1rem); }
+.hearts {
+  letter-spacing: 1px;
+  font-size: clamp(0.72rem, 1.9vh, 0.95rem);
+  flex-wrap: wrap;
+  max-width: 70%;
+  justify-content: flex-end;
+  display: inline-flex;
+}
 .heart.full { color: #ff4d6a; text-shadow: 0 0 6px rgba(255, 77, 106, 0.5); }
 .heart.empty { color: #554444; }
+.heart.half {
+  position: relative;
+  display: inline-block;
+  color: #554444;
+  width: 0.95em;
+}
+.heart.half .heart-half-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 50%;
+  overflow: hidden;
+  color: #ff4d6a;
+  text-shadow: 0 0 6px rgba(255, 77, 106, 0.5);
+  pointer-events: none;
+}
 
 .match-canvas-wrap {
   flex: 1 1 auto;
@@ -773,3 +797,52 @@ a.btn.link-btn {
   margin-top: 2px;
   letter-spacing: 0.04em;
 }
+
+/* Setup complete celebration */
+#setup-done-banner {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 20px;
+  background: rgba(8, 6, 12, 0.82);
+  text-align: center;
+  pointer-events: none;
+}
+#setup-done-banner.show { display: flex; animation: setupDoneIn 0.35s ease-out; }
+#setup-done-banner.fade-out { animation: setupDoneOut 0.3s ease-in forwards; }
+.setup-done-chip {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: #1a1008;
+  background: linear-gradient(180deg, #ffe08a, #c9a227);
+  padding: 4px 12px;
+  border-radius: 999px;
+}
+.setup-done-icon { font-size: clamp(2.2rem, 8vh, 3rem); line-height: 1; }
+.setup-done-title {
+  font-size: clamp(1.5rem, 5.5vh, 2rem);
+  font-weight: 900;
+  color: #ffe08a;
+  text-shadow: 0 2px 0 #8b5a1a, 0 0 24px rgba(255, 200, 80, 0.45);
+}
+.setup-done-detail {
+  font-size: clamp(0.85rem, 2.4vh, 1rem);
+  color: #e8dcc8;
+  white-space: pre-line;
+  line-height: 1.45;
+  max-width: 280px;
+}
+@keyframes setupDoneIn {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes setupDoneOut {
+  to { opacity: 0; transform: scale(1.04); }
+}
+#screen-setup { position: relative; }
