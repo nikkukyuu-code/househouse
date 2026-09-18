@@ -531,3 +531,23 @@ body {
   }
   .tool-btn { font-size: clamp(0.6rem, 1.6vh, 0.75rem); padding-left: 2px; padding-right: 2px; }
 }
+
+
+.floor-tab.floor-1f { border-color: rgba(240,180,41,0.55); }
+.floor-tab.floor-2f { border-color: rgba(106,168,232,0.55); }
+.floor-tab.floor-3f { border-color: rgba(232,136,160,0.55); }
+.floor-tab.floor-1f.active {
+  background: linear-gradient(180deg, #f0c860, #d4a020);
+  color: #1a1008;
+  border-color: #ffe08a;
+}
+.floor-tab.floor-2f.active {
+  background: linear-gradient(180deg, #8ec0f0, #4a88c8);
+  color: #0a1520;
+  border-color: #b8d8ff;
+}
+.floor-tab.floor-3f.active {
+  background: linear-gradient(180deg, #f0a0b4, #c86880);
+  color: #1a0810;
+  border-color: #ffc0d0;
+}

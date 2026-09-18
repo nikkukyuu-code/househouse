@@ -172,78 +172,204 @@ export const COLORS = {
   roomLabel: 'rgba(0,0,0,0.15)',
 };
 
-function drawWoodFloor(ctx, px, py, cellSize, x, y) {
-  const alt = (x + y) % 2 === 0;
-  ctx.fillStyle = alt ? COLORS.floor : COLORS.floorAlt;
-  ctx.fillRect(px, py, cellSize, cellSize);
-  // Grain hint lines
-  ctx.strokeStyle = COLORS.floorGrain;
-  ctx.lineWidth = 1;
-  const g1 = py + cellSize * 0.28;
-  const g2 = py + cellSize * 0.62;
-  ctx.beginPath();
-  ctx.moveTo(px + 2, g1);
-  ctx.lineTo(px + cellSize - 2, g1 + ((x + y) % 3) - 1);
-  ctx.moveTo(px + 3, g2);
-  ctx.lineTo(px + cellSize - 3, g2 - ((x * 2 + y) % 3) + 1);
-  ctx.stroke();
-  // Soft inner glow
-  ctx.fillStyle = 'rgba(255,240,200,0.06)';
-  ctx.fillRect(px + 1, py + 1, cellSize - 2, cellSize * 0.35);
+/**
+ * Per-floor house look — distinct floor/wall tints so players know which floor they're on.
+ * 0=1F warm oak, 1=2F cool blue-gray wood, 2=3F rosy attic.
+ */
+export const FLOOR_THEMES = [
+  {
+    name: '1F',
+    floor: '#e8c98a',
+    floorAlt: '#d9b56e',
+    floorGrain: 'rgba(110,70,25,0.18)',
+    wall: '#6b4430',
+    wallTop: '#8a5a3c',
+    wallEdge: '#3a2418',
+    baseboard: '#4a2e1c',
+    door: '#a07028',
+    doorDark: '#6a4410',
+    doorLight: '#e8c060',
+    rug: 'rgba(180,60,50,0.22)',
+    glow: 'rgba(255,210,140,0.10)',
+    badge: '#f0b429',
+  },
+  {
+    name: '2F',
+    floor: '#b8c8d8',
+    floorAlt: '#a0b4c8',
+    floorGrain: 'rgba(40,60,90,0.16)',
+    wall: '#4a5568',
+    wallTop: '#627088',
+    wallEdge: '#2a3340',
+    baseboard: '#343e4c',
+    door: '#6a7a98',
+    doorDark: '#3a4860',
+    doorLight: '#c0d0e8',
+    rug: 'rgba(70,110,180,0.22)',
+    glow: 'rgba(160,200,255,0.10)',
+    badge: '#6aa8e8',
+  },
+  {
+    name: '3F',
+    floor: '#e8b8b0',
+    floorAlt: '#d8a098',
+    floorGrain: 'rgba(120,50,45,0.16)',
+    wall: '#7a4a55',
+    wallTop: '#9a606c',
+    wallEdge: '#4a2830',
+    baseboard: '#5a3038',
+    door: '#a06068',
+    doorDark: '#6a3840',
+    doorLight: '#f0c0c0',
+    rug: 'rgba(200,80,120,0.2)',
+    glow: 'rgba(255,180,190,0.10)',
+    badge: '#e888a0',
+  },
+];
+
+export function themeForFloor(floor) {
+  return FLOOR_THEMES[Math.max(0, Math.min(FLOORS - 1, floor | 0))];
 }
 
-function drawWallTile(ctx, px, py, cellSize) {
-  ctx.fillStyle = COLORS.wall;
+function drawWoodFloor(ctx, px, py, cellSize, x, y, floor = 0) {
+  const th = themeForFloor(floor);
+  const alt = (x + y) % 2 === 0;
+  ctx.fillStyle = alt ? th.floor : th.floorAlt;
   ctx.fillRect(px, py, cellSize, cellSize);
-  // Top highlight strip
-  ctx.fillStyle = COLORS.wallTop;
-  ctx.fillRect(px, py, cellSize, Math.max(3, cellSize * 0.18));
-  // Bottom shadow
-  ctx.fillStyle = COLORS.wallShadow;
-  ctx.fillRect(px, py + cellSize - 4, cellSize, 4);
-  // Brick-ish edge
-  ctx.fillStyle = COLORS.wallEdge;
+  // Plank lines (more house-like)
+  ctx.strokeStyle = th.floorGrain;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(px + 1, py + cellSize * 0.33);
+  ctx.lineTo(px + cellSize - 1, py + cellSize * 0.33 + ((x + y) % 2));
+  ctx.moveTo(px + 1, py + cellSize * 0.66);
+  ctx.lineTo(px + cellSize - 1, py + cellSize * 0.66 - ((x * 3 + y) % 2));
+  // Vertical seam every other tile
+  if (x % 2 === 0) {
+    ctx.moveTo(px + cellSize * 0.5, py + 1);
+    ctx.lineTo(px + cellSize * 0.5, py + cellSize - 1);
+  }
+  ctx.stroke();
+  ctx.fillStyle = th.glow;
+  ctx.fillRect(px + 1, py + 1, cellSize - 2, cellSize * 0.28);
+}
+
+function drawWallTile(ctx, px, py, cellSize, floor = 0) {
+  const th = themeForFloor(floor);
+  ctx.fillStyle = th.wall;
+  ctx.fillRect(px, py, cellSize, cellSize);
+  // Plaster / panel top
+  ctx.fillStyle = th.wallTop;
+  ctx.fillRect(px, py, cellSize, Math.max(3, cellSize * 0.2));
+  // Baseboard
+  ctx.fillStyle = th.baseboard;
+  ctx.fillRect(px, py + cellSize - Math.max(4, cellSize * 0.16), cellSize, Math.max(4, cellSize * 0.16));
+  // Edge
+  ctx.fillStyle = th.wallEdge;
   ctx.fillRect(px, py, cellSize, 2);
   ctx.fillRect(px, py, 2, cellSize);
+  // Tiny wall panel line
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(px + 3, py + cellSize * 0.22, cellSize - 6, cellSize * 0.5);
 }
 
-function drawDoorTile(ctx, px, py, cellSize) {
-  drawWoodFloor(ctx, px, py, cellSize, 0, 0);
-  const m = Math.max(3, cellSize * 0.12);
-  // Door panel
-  ctx.fillStyle = COLORS.doorDark;
+function drawDoorTile(ctx, px, py, cellSize, floor = 0) {
+  const th = themeForFloor(floor);
+  drawWoodFloor(ctx, px, py, cellSize, 0, 0, floor);
+  const m = Math.max(3, cellSize * 0.1);
+  // Door frame (house trim)
+  ctx.fillStyle = th.baseboard;
+  ctx.fillRect(px + m - 2, py + m - 2, cellSize - (m - 2) * 2, cellSize - (m - 2) * 2);
+  ctx.fillStyle = th.doorDark;
   ctx.fillRect(px + m, py + m, cellSize - m * 2, cellSize - m * 2);
-  ctx.fillStyle = COLORS.door;
+  ctx.fillStyle = th.door;
   ctx.fillRect(px + m + 2, py + m + 2, cellSize - m * 2 - 4, cellSize - m * 2 - 4);
-  // Frame highlight
-  ctx.strokeStyle = COLORS.doorLight;
+  // Panels
+  const pw = (cellSize - m * 2 - 8) / 2 - 1;
+  const ph = (cellSize - m * 2 - 10) / 2 - 1;
+  ctx.fillStyle = 'rgba(255,255,255,0.12)';
+  ctx.fillRect(px + m + 4, py + m + 4, pw, ph);
+  ctx.fillRect(px + m + 5 + pw, py + m + 4, pw, ph);
+  ctx.fillRect(px + m + 4, py + m + 6 + ph, pw, ph);
+  ctx.fillRect(px + m + 5 + pw, py + m + 6 + ph, pw, ph);
+  ctx.strokeStyle = th.doorLight;
   ctx.lineWidth = 1.5;
   ctx.strokeRect(px + m + 1, py + m + 1, cellSize - m * 2 - 2, cellSize - m * 2 - 2);
   // Knob
-  ctx.fillStyle = COLORS.doorLight;
+  ctx.fillStyle = th.doorLight;
   ctx.beginPath();
-  ctx.arc(px + cellSize * 0.72, py + cellSize * 0.52, cellSize * 0.08, 0, Math.PI * 2);
+  ctx.arc(px + cellSize * 0.74, py + cellSize * 0.52, cellSize * 0.07, 0, Math.PI * 2);
   ctx.fill();
 }
 
-function drawStairsTile(ctx, px, py, cellSize, up) {
-  const base = up ? COLORS.stairsUp : COLORS.stairsDown;
-  const hi = up ? COLORS.stairsUpHi : COLORS.stairsDownHi;
-  ctx.fillStyle = base;
-  ctx.fillRect(px, py, cellSize, cellSize);
-  const steps = 4;
+/** Clear stairwell: perspective steps + rail + destination label */
+function drawStairsTile(ctx, px, py, cellSize, up, floor = 0) {
+  const th = themeForFloor(floor);
+  // Landing floor under stairs
+  drawWoodFloor(ctx, px, py, cellSize, 1, 1, floor);
+
+  const steps = 5;
+  const left = px + cellSize * 0.12;
+  const right = px + cellSize * 0.88;
+  const topY = py + cellSize * 0.12;
+  const botY = py + cellSize * 0.88;
+
   for (let i = 0; i < steps; i++) {
-    const t = i / steps;
-    ctx.fillStyle = i % 2 === 0 ? hi : base;
-    const sy = py + cellSize * (up ? 0.15 + t * 0.7 : 0.15 + (1 - t) * 0.55);
-    const sw = cellSize * (0.55 + t * 0.35);
-    ctx.fillRect(px + (cellSize - sw) / 2, sy, sw, cellSize * 0.14);
+    const t0 = i / steps;
+    const t1 = (i + 1) / steps;
+    // Rising stairs widen toward bottom; descending toward top feels like going down
+    const y0 = up ? topY + (botY - topY) * t0 : botY - (botY - topY) * t0;
+    const y1 = up ? topY + (botY - topY) * t1 : botY - (botY - topY) * t1;
+    const inset0 = up ? cellSize * 0.08 * (1 - t0) : cellSize * 0.08 * t0;
+    const inset1 = up ? cellSize * 0.08 * (1 - t1) : cellSize * 0.08 * t1;
+    const x0 = left + inset0;
+    const x1 = right - inset0;
+    const treadH = Math.abs(y1 - y0);
+
+    // Riser
+    ctx.fillStyle = i % 2 === 0 ? '#8a7355' : '#7a6348';
+    ctx.fillRect(x0, Math.min(y0, y1), x1 - x0, treadH);
+    // Tread highlight
+    ctx.fillStyle = i % 2 === 0 ? '#c4a882' : '#b89870';
+    ctx.fillRect(x0, Math.min(y0, y1), x1 - x0, Math.max(2, treadH * 0.35));
+    // Edge shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.fillRect(x0, Math.max(y0, y1) - 1, x1 - x0, 2);
   }
+
+  // Side rails
+  ctx.strokeStyle = '#5c4030';
+  ctx.lineWidth = Math.max(2, cellSize * 0.06);
+  ctx.beginPath();
+  if (up) {
+    ctx.moveTo(left, botY);
+    ctx.lineTo(left + cellSize * 0.06, topY);
+    ctx.moveTo(right, botY);
+    ctx.lineTo(right - cellSize * 0.06, topY);
+  } else {
+    ctx.moveTo(left, topY);
+    ctx.lineTo(left + cellSize * 0.06, botY);
+    ctx.moveTo(right, topY);
+    ctx.lineTo(right - cellSize * 0.06, botY);
+  }
+  ctx.stroke();
+
+  // Banner: 階段 + destination floor (1-based labels)
+  const destLabel = up ? `${floor + 2}Fへ` : `${floor}Fへ`;
+  const bannerY = py + cellSize * 0.08;
+  ctx.fillStyle = up ? 'rgba(40,120,60,0.92)' : 'rgba(40,90,140,0.92)';
+  ctx.fillRect(px + 2, bannerY, cellSize - 4, cellSize * 0.28);
   ctx.fillStyle = '#fff';
-  ctx.font = `bold ${Math.floor(cellSize * 0.32)}px sans-serif`;
+  ctx.font = `bold ${Math.max(8, Math.floor(cellSize * 0.22))}px "Hiragino Sans","Noto Sans JP",sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(up ? '▲' : '▼', px + cellSize / 2, py + cellSize * 0.42);
+  ctx.fillText(`階段 ${destLabel}`, px + cellSize / 2, bannerY + cellSize * 0.14);
+
+  // Big arrow
+  ctx.font = `bold ${Math.floor(cellSize * 0.28)}px sans-serif`;
+  ctx.fillStyle = up ? '#b8ffb8' : '#b8d8ff';
+  ctx.fillText(up ? '▲' : '▼', px + cellSize / 2, py + cellSize * 0.72);
 }
 
 /** Draw a trap sprite (normal spike / pit hole) */
@@ -390,31 +516,69 @@ export function drawHouse(ctx, blueprint, houseData, floor, opts = {}) {
       const py = oy + y * cellSize;
 
       if (t === T.WALL) {
-        drawWallTile(ctx, px, py, cellSize);
+        drawWallTile(ctx, px, py, cellSize, floor);
       } else if (t === T.DOOR) {
-        drawDoorTile(ctx, px, py, cellSize);
+        drawDoorTile(ctx, px, py, cellSize, floor);
       } else if (t === T.STAIRS_UP) {
-        drawStairsTile(ctx, px, py, cellSize, true);
+        drawStairsTile(ctx, px, py, cellSize, true, floor);
       } else if (t === T.STAIRS_DOWN) {
-        drawStairsTile(ctx, px, py, cellSize, false);
+        drawStairsTile(ctx, px, py, cellSize, false, floor);
       } else {
-        drawWoodFloor(ctx, px, py, cellSize, x, y);
+        drawWoodFloor(ctx, px, py, cellSize, x, y, floor);
       }
     }
   }
 
-  // Soft floor ambient glow in center
+  // Soft rugs in room centers (house feel)
+  const th = themeForFloor(floor);
+  const rugCells = [
+    [2, 2], [6, 2], [10, 2],
+    [2, 6], [6, 6], [10, 6],
+  ];
+  for (const [rx, ry] of rugCells) {
+    if (blueprint[floor][ry][rx] !== T.FLOOR) continue;
+    const rpx = ox + rx * cellSize;
+    const rpy = oy + ry * cellSize;
+    ctx.fillStyle = th.rug;
+    const rr = cellSize * 0.08;
+    const rx0 = rpx + cellSize * 0.15;
+    const ry0 = rpy + cellSize * 0.15;
+    const rw = cellSize * 0.7;
+    const rh = cellSize * 0.7;
+    ctx.beginPath();
+    ctx.moveTo(rx0 + rr, ry0);
+    ctx.arcTo(rx0 + rw, ry0, rx0 + rw, ry0 + rh, rr);
+    ctx.arcTo(rx0 + rw, ry0 + rh, rx0, ry0 + rh, rr);
+    ctx.arcTo(rx0, ry0 + rh, rx0, ry0, rr);
+    ctx.arcTo(rx0, ry0, rx0 + rw, ry0, rr);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Soft floor ambient glow in center (tinted per floor)
   if (vignette) {
     const grd = ctx.createRadialGradient(
       ox + mapW / 2, oy + mapH / 2, mapW * 0.15,
       ox + mapW / 2, oy + mapH / 2, mapW * 0.72
     );
-    grd.addColorStop(0, 'rgba(255,230,180,0.07)');
+    grd.addColorStop(0, th.glow);
     grd.addColorStop(0.55, 'rgba(0,0,0,0)');
     grd.addColorStop(1, 'rgba(0,0,0,0.28)');
     ctx.fillStyle = grd;
     ctx.fillRect(ox, oy, mapW, mapH);
   }
+
+  // Floor badge (1F/2F/3F) — always visible
+  const badge = th.name;
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  const bw = Math.max(36, cellSize * 1.4);
+  const bh = Math.max(16, cellSize * 0.55);
+  ctx.fillRect(ox + 4, oy + 4, bw, bh);
+  ctx.fillStyle = th.badge;
+  ctx.font = `bold ${Math.max(11, Math.floor(cellSize * 0.38))}px "Hiragino Sans","Noto Sans JP",sans-serif`;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(badge, ox + 10, oy + 4 + bh / 2);
 
   if (showTraps && houseData) {
     for (const raw of houseData.traps) {
