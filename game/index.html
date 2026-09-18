@@ -8,7 +8,7 @@
   <meta http-equiv="Cache-Control" content="no-cache" />
   <meta name="theme-color" content="#120e18" />
   <title>ハウスと罠</title>
-  <link rel="stylesheet" href="css/style.css?v=20260919g" />
+  <link rel="stylesheet" href="css/style.css?v=20260919h" />
 </head>
 <body>
   <div id="app">
@@ -122,7 +122,9 @@
       </div>
 
       <div id="end-banner" aria-live="polite">
+        <div id="end-banner-chip">決定打</div>
         <div id="end-banner-icon"></div>
+        <div id="end-banner-event"></div>
         <div id="end-banner-text"></div>
         <div id="end-banner-detail"></div>
       </div>
@@ -140,7 +142,7 @@
   </div>
 
   <script type="module">
-    import { init } from './js/game.js?v=20260919g';
+    import { init } from './js/game.js?v=20260919h';
     init().catch((e) => {
       console.error(e);
       const n = document.getElementById('peer-note');

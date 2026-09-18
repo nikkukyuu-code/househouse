@@ -8,10 +8,10 @@ import {
   createBlueprint, createEmptyHouseData, isWalkable, isPlaceable,
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
-} from './house.js?v=20260919g';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260919g';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260919g';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260919g';
+} from './house.js?v=20260919h';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260919h';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260919h';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260919h';
 
 const blueprint = createBlueprint();
 
@@ -501,6 +501,16 @@ function updateHpBars() {
  * @param {'me'|'foe'} winner
  * @param {'chest_me'|'chest_foe'|'hp_me'|'hp_foe'|string} reason
  */
+function climaxEventTitle(reason) {
+  switch (reason) {
+    case 'chest_me': return '宝箱ゲット！';
+    case 'chest_foe': return '宝箱を取られた！';
+    case 'hp_foe': return '罠で撃破！';
+    case 'hp_me': return '体力ゼロ！';
+    default: return '対戦終了';
+  }
+}
+
 function endGame(winner, reason) {
   if (S.ended) return;
   S.ended = true;
@@ -511,13 +521,30 @@ function endGame(winner, reason) {
 
   const iWon = winner === 'me';
   const reasonText = endReasonLabel(reason, iWon);
+  const eventTitle = climaxEventTitle(reason);
   const bannerIcon = reasonIcon(reason);
   const flashBot = reason === 'chest_me' || reason === 'hp_me';
   const focusView = flashBot ? 'bot' : 'top';
 
-  // Phase 0: SLOW-MO climax — freeze play, stretch the moment
+  // Immediate BIG climax card (clear what just happened)
+  const banner = $('end-banner');
+  const overlay = $('result-overlay');
+  if (overlay) overlay.classList.remove('show', 'win', 'lose');
+  if (banner) {
+    banner.classList.remove('fade-out');
+    banner.classList.add('show', iWon ? 'win' : 'lose');
+    const chip = $('end-banner-chip');
+    if (chip) chip.textContent = iWon ? 'あなたの勝ち' : 'あなたの負け';
+    $('end-banner-icon').textContent = bannerIcon;
+    const ev = $('end-banner-event');
+    if (ev) ev.textContent = eventTitle;
+    $('end-banner-text').textContent = iWon ? '勝ち！' : '負け…';
+    $('end-banner-detail').textContent = reasonText;
+  }
+
+  // Slow-mo behind the card
   S.slowMo = true;
-  S.timeScale = 0.18;
+  S.timeScale = 0.15;
   S.slowMoFocus = focusView;
   S.slowMoPulse = 0;
   sfx('slowMo');
@@ -530,14 +557,8 @@ function endGame(winner, reason) {
     match.classList.toggle('slow-mo-top', !flashBot);
   }
 
-  // Long-lived FX that drift slowly while timeScale is low
-  addFx(focusView, reason === 'chest_me' || reason === 'chest_foe' ? '宝箱！' : '体力ゼロ！', '#ffe08a', 2800);
-  addFx(focusView, reasonText, iWon ? '#8ddea0' : '#ff8a7a', 2800);
-  flashOverlay(
-    $(flashBot ? 'flash-bot' : 'flash-top'),
-    bannerIcon + ' ' + reasonText,
-    2400
-  );
+  addFx(focusView, eventTitle, '#ffe08a', 3000);
+  flashOverlay($(flashBot ? 'flash-bot' : 'flash-top'), eventTitle, 2000);
 
   if (S.mode && S.mode.startsWith('online') && S.net) {
     S.net.send({
@@ -551,33 +572,19 @@ function endGame(winner, reason) {
   clearTimeout(S._endTimer);
   clearTimeout(S._slowTimer);
 
-  // Phase 1: after slow-mo, show win/lose banner
+  // Hold climax card, then result (skip weak middle phase)
   S._slowTimer = setTimeout(() => {
     S.slowMo = false;
     S.timeScale = 1;
     if (match) match.classList.remove('slow-mo', 'slow-mo-bot', 'slow-mo-top');
-
-    const banner = $('end-banner');
-    const overlay = $('result-overlay');
-    if (overlay) overlay.classList.remove('show', 'win', 'lose');
-    if (banner) {
-      banner.classList.remove('fade-out', 'win', 'lose');
-      banner.classList.add('show', iWon ? 'win' : 'lose');
-      $('end-banner-icon').textContent = bannerIcon;
-      $('end-banner-text').textContent = iWon ? '勝ち！' : '負け…';
-      $('end-banner-detail').textContent = reasonText;
-    }
     sfx(iWon ? 'win' : 'lose');
 
-    // Phase 2: result screen
-    S._endTimer = setTimeout(() => {
-      if (banner) {
-        banner.classList.add('fade-out');
-        setTimeout(() => banner.classList.remove('show', 'fade-out', 'win', 'lose'), 380);
-      }
-      showResultScreen(iWon, reasonText);
-    }, 2000);
-  }, 2100);
+    if (banner) {
+      banner.classList.add('fade-out');
+      setTimeout(() => banner.classList.remove('show', 'fade-out', 'win', 'lose'), 350);
+    }
+    showResultScreen(iWon, reasonText);
+  }, 2800);
 }
 
 function endReasonLabel(reason, iWon) {
