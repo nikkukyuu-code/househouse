@@ -766,3 +766,10 @@ a.btn.link-btn {
 }
 
 
+
+.build-stamp {
+  font-size: 0.65rem;
+  color: #665548;
+  margin-top: 2px;
+  letter-spacing: 0.04em;
+}

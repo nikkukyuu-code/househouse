@@ -5,10 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <meta http-equiv="Cache-Control" content="no-cache" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
   <meta name="theme-color" content="#120e18" />
   <title>ハウスと罠</title>
-  <link rel="stylesheet" href="css/style.css?v=20260919q" />
+  <link rel="stylesheet" href="css/style.css?v=20260919r" />
 </head>
 <body>
   <div id="app">
@@ -27,6 +28,7 @@
         </div>
       </div>
       <p class="peer-note" id="peer-note">通信準備中…</p>
+      <p class="build-stamp" id="build-stamp">build 20260919r</p>
     </section>
 
     <!-- ロビー -->
@@ -145,7 +147,7 @@
   </div>
 
   <script type="module">
-    import { init } from './js/game.js?v=20260919q';
+    import { init } from './js/game.js?v=20260919r';
     init().catch((e) => {
       console.error(e);
       const n = document.getElementById('peer-note');
