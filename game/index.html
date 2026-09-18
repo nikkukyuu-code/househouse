@@ -9,7 +9,7 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta name="theme-color" content="#120e18" />
   <title>ハウスと罠</title>
-  <link rel="stylesheet" href="css/style.css?v=20260920d" />
+  <link rel="stylesheet" href="css/style.css?v=20260920e" />
 </head>
 <body>
   <div id="app">
@@ -121,7 +121,7 @@
           <div class="flash-fx" id="flash-bot"></div>
         </div>
         <div class="match-controls" id="match-controls">
-          <p class="match-hint">階段で階を移動・宝箱を探せ</p>
+          <p class="match-hint">罠は1回だけ・あとは安全／宝箱を探せ</p>
           <div class="dpad" id="dpad" aria-label="移動パッド">
             <button type="button" class="dpad-btn up" data-dir="u" aria-label="上">▲</button>
             <button type="button" class="dpad-btn down" data-dir="d" aria-label="下">▼</button>
@@ -158,7 +158,7 @@
   </div>
 
   <script type="module">
-    import { init } from './js/game.js?v=20260920d';
+    import { init } from './js/game.js?v=20260920e';
     init().catch((e) => {
       console.error(e);
       const n = document.getElementById('peer-note');
