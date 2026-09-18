@@ -8,10 +8,10 @@ import {
   createBlueprint, createEmptyHouseData, isWalkable, isPlaceable,
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
-} from './house.js?v=20260920m';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920m';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920m';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920m';
+} from './house.js?v=20260920n';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920n';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920n';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920n';
 
 const blueprint = createBlueprint();
 
@@ -797,11 +797,9 @@ function placeAt(floor, x, y) {
     // Allow「仕掛け完了」again after re-filling chest + all traps
     if (!isSetupFullyPlaced(house)) {
       S._celebratedSetup = false;
+      clearTimeout(S._setupDoneTimer);
       const banner = $('setup-done-banner');
-      if (banner) {
-        banner.classList.add('hidden');
-        banner.classList.remove('show');
-      }
+      if (banner) banner.classList.remove('show', 'fade-out', 'hidden');
     }
     updateSetupHud();
     drawSetup();
@@ -1673,8 +1671,11 @@ function isSetupFullyPlaced(house) {
 }
 
 function maybeCelebrateSetupComplete(house) {
-  if (!isSetupFullyPlaced(house)) return;
-  if (S._celebratedSetup) return; // once per setup house
+  if (!isSetupFullyPlaced(house)) {
+    S._celebratedSetup = false;
+    return;
+  }
+  if (S._celebratedSetup) return; // once until incomplete again
   S._celebratedSetup = true;
   setStatus($('setup-status'), `仕掛け完了！ 宝箱＋罠${MAX_TRAPS}個`, 'ok');
   showSetupDone(
@@ -1702,7 +1703,7 @@ function showSetupDone(detail, thenFn) {
   if (titleEl) titleEl.textContent = '仕掛け完了！';
   if (detailEl) detailEl.textContent = detail || '';
   if (banner) {
-    banner.classList.remove('fade-out');
+    banner.classList.remove('fade-out', 'hidden');
     banner.classList.add('show');
   }
   try { sfx('ready'); } catch (_) {}
