@@ -8,10 +8,10 @@ import {
   createBlueprint, createEmptyHouseData, isWalkable, isPlaceable,
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
-} from './house.js?v=20260920n';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920n';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920n';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920n';
+} from './house.js?v=20260920o';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920o';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920o';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920o';
 
 const blueprint = createBlueprint();
 
@@ -46,6 +46,8 @@ const S = {
   revealSecrets: false,
   /** Spotlight enlarge: char + chest/trap at hit moment */
   heroFocus: null,
+  /** Chest-room alarm: soft red pulse on top/bot when explorer in that chest's room */
+  chestAlarm: { top: false, bot: false },
 };
 
 let canvTop, canvBot, ctxTop, ctxBot;
@@ -133,6 +135,90 @@ function findStairs(floor, kind) {
     }
   }
   return null;
+}
+
+/** Room interior tiles — doors are boundaries between rooms */
+function isRoomTile(t) {
+  return t === T.FLOOR || t === T.STAIRS_UP || t === T.STAIRS_DOWN;
+}
+
+/**
+ * Two cells are the same room if connected via FLOOR/stairs without crossing walls or doors.
+ */
+function sameRoom(floor, x1, y1, x2, y2) {
+  if (floor == null) return false;
+  if (!isRoomTile(tileAt(blueprint, floor, x1, y1))) return false;
+  if (!isRoomTile(tileAt(blueprint, floor, x2, y2))) return false;
+  if (x1 === x2 && y1 === y2) return true;
+  const key = (x, y) => `${x},${y}`;
+  const visited = new Set([key(x1, y1)]);
+  const q = [{ x: x1, y: y1 }];
+  const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  while (q.length) {
+    const c = q.shift();
+    if (c.x === x2 && c.y === y2) return true;
+    for (const [dx, dy] of dirs) {
+      const nx = c.x + dx;
+      const ny = c.y + dy;
+      const k = key(nx, ny);
+      if (visited.has(k)) continue;
+      if (!isRoomTile(tileAt(blueprint, floor, nx, ny))) continue;
+      visited.add(k);
+      q.push({ x: nx, y: ny });
+    }
+  }
+  return false;
+}
+
+/** All walkable room cells connected to (sx,sy) on the same floor (doors block). */
+function roomCells(floor, sx, sy) {
+  const cells = [];
+  if (!isRoomTile(tileAt(blueprint, floor, sx, sy))) return cells;
+  const visited = new Set([`${sx},${sy}`]);
+  const q = [{ x: sx, y: sy }];
+  const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  while (q.length) {
+    const c = q.shift();
+    cells.push(c);
+    for (const [dx, dy] of dirs) {
+      const nx = c.x + dx;
+      const ny = c.y + dy;
+      const k = `${nx},${ny}`;
+      if (visited.has(k)) continue;
+      if (!isRoomTile(tileAt(blueprint, floor, nx, ny))) continue;
+      visited.add(k);
+      q.push({ x: nx, y: ny });
+    }
+  }
+  return cells;
+}
+
+/** Update top/bot chest-room alarms; play SFX once on enter. */
+function updateChestAlarms() {
+  const prev = S.chestAlarm || { top: false, bot: false };
+  let top = false;
+  let bot = false;
+  if (!S.ended) {
+    if (S.foe && S.myHouse && S.myHouse.chest) {
+      const c = S.myHouse.chest;
+      if (S.foe.floor === c.floor && sameRoom(c.floor, c.x, c.y, S.foe.x, S.foe.y)) {
+        top = true;
+      }
+    }
+    if (S.me && S.theirHouse && S.theirHouse.chest) {
+      const c = S.theirHouse.chest;
+      if (S.me.floor === c.floor && sameRoom(c.floor, c.x, c.y, S.me.x, S.me.y)) {
+        bot = true;
+      }
+    }
+  }
+  if (top && !prev.top) {
+    try { sfx('alarm'); } catch (_) {}
+  }
+  if (bot && !prev.bot) {
+    try { sfx('alarm'); } catch (_) {}
+  }
+  S.chestAlarm = { top, bot };
 }
 
 /**
@@ -976,6 +1062,24 @@ function redrawMatchView(ctx, canvas, explorer, houseShown, showSecrets, trigger
     }
   }
 
+  // Soft red pulse over chest room while explorer is inside
+  const alarmOn = isOpponentView
+    ? !!(S.chestAlarm && S.chestAlarm.top)
+    : !!(S.chestAlarm && S.chestAlarm.bot);
+  const alarmChest = isOpponentView
+    ? (S.myHouse && S.myHouse.chest)
+    : (S.theirHouse && S.theirHouse.chest);
+  if (alarmOn && alarmChest && alarmChest.floor === drawFloor) {
+    const cells = roomCells(alarmChest.floor, alarmChest.x, alarmChest.y);
+    const cycle = 1300;
+    const phase = (S.time % cycle) / cycle;
+    const pulseA = 0.1 + 0.22 * (0.5 + 0.5 * Math.sin(phase * Math.PI * 2));
+    ctx.fillStyle = `rgba(210, 28, 40, ${pulseA})`;
+    for (const cell of cells) {
+      ctx.fillRect(ox + cell.x * cs, oy + cell.y * cs, cs, cs);
+    }
+  }
+
   const color = isOpponentView ? COLORS.player2 : COLORS.player1;
   const pulse = S.time * 0.008;
 
@@ -1537,6 +1641,8 @@ function tick(ts) {
   for (const f of S.fx) f.age += dt;
   S.fx = S.fx.filter((f) => f.age < f.life);
 
+  updateChestAlarms();
+
   if (ctxTop && S.foe) {
     redrawMatchView(ctxTop, canvTop, S.foe, S.myHouse, true, S.foeTriggered, true);
   }
@@ -1772,6 +1878,7 @@ function startMatch() {
   S.fx = [];
   S.holdDir = null;
   S.moveCooldown = 0;
+  S.chestAlarm = { top: false, bot: false };
   aiTimer = 0;
 
   // Normalize trap kinds (migration for any old data)

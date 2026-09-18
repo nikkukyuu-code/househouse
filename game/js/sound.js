@@ -150,6 +150,11 @@ export const SFX = {
   slowMo() {
     beep({ type: 'sine', freq: 200, freqEnd: 100, dur: 0.5, gain: 0.1 });
   },
+  alarm() {
+    beep({ type: 'square', freq: 920, dur: 0.09, gain: 0.11 });
+    beep({ type: 'square', freq: 690, dur: 0.09, gain: 0.1, delay: 0.1 });
+    beep({ type: 'square', freq: 920, dur: 0.12, gain: 0.12, delay: 0.2 });
+  },
 };
 
 export function play(name) {
