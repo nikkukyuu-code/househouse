@@ -49,10 +49,21 @@ let canvTop, canvBot, ctxTop, ctxBot;
 let animId = 0;
 let lastTs = 0;
 
+/** Always use CSS pixel size from layout — never canvas.width (DPR backing store). */
+function cssSize(canvas) {
+  const rect = canvas.getBoundingClientRect();
+  const w = rect.width || canvas.clientWidth || 1;
+  const h = rect.height || canvas.clientHeight || 1;
+  return { w: Math.max(1, w), h: Math.max(1, h) };
+}
+
 function cellSizeFor(canvas) {
-  const w = canvas.clientWidth || canvas.width;
-  const h = canvas.clientHeight || canvas.height;
-  return Math.floor(Math.min(w / COLS, h / ROWS));
+  const { w, h } = cssSize(canvas);
+  return Math.max(1, Math.floor(Math.min(w / COLS, h / ROWS)));
+}
+
+function isTrapTool(tool) {
+  return tool === 'trap' || tool === 'trap-normal' || tool === 'trap-pit';
 }
 
 function layoutCanvas(c) {
@@ -267,7 +278,10 @@ function aiStep(ex) {
 /* ---------- Setup placement ---------- */
 function placeAt(floor, x, y) {
   const house = S.setupWhich === 'mine' ? S.myHouse : S.theirHouse;
-  if (!isPlaceable(blueprint, floor, x, y)) return;
+  if (!isPlaceable(blueprint, floor, x, y)) {
+    setStatus($('setup-status'), '床のマスにだけ置けます（壁・ドア・階段は不可）', 'warn');
+    return;
+  }
 
   if (S.setupTool === 'erase') {
     if (house.chest && house.chest.floor === floor && house.chest.x === x && house.chest.y === y) {
@@ -276,22 +290,35 @@ function placeAt(floor, x, y) {
     house.traps = house.traps.filter((t) => !(t.floor === floor && t.x === x && t.y === y));
     updateSetupHud();
     drawSetup();
+    setStatus($('setup-status'), '消去しました', 'ok');
     return;
   }
 
   const occChest = house.chest && house.chest.floor === floor && house.chest.x === x && house.chest.y === y;
   const occTrap = house.traps.some((t) => t.floor === floor && t.x === x && t.y === y);
-  if (occChest || occTrap) return;
+  if (occChest || occTrap) {
+    setStatus($('setup-status'), 'そのマスにはすでに置いてあります', 'warn');
+    return;
+  }
 
   if (S.setupTool === 'chest') {
     house.chest = { floor, x, y };
-  } else if (S.setupTool === 'trap-normal' || S.setupTool === 'trap-pit') {
+    setStatus($('setup-status'), '宝箱を配置しました', 'ok');
+  } else if (isTrapTool(S.setupTool)) {
     if (house.traps.length >= MAX_TRAPS) {
       setStatus($('setup-status'), `罠は最大${MAX_TRAPS}個まで`, 'warn');
       return;
     }
     const kind = S.setupTool === 'trap-pit' ? TRAP_PIT : TRAP_NORMAL;
     house.traps.push({ floor, x, y, kind });
+    setStatus(
+      $('setup-status'),
+      kind === TRAP_PIT ? '落とし穴を配置しました' : '通常罠を配置しました',
+      'ok'
+    );
+  } else {
+    setStatus($('setup-status'), '上のボタンで宝箱か罠を選んでから床をタップ', 'warn');
+    return;
   }
   updateSetupHud();
   drawSetup();
@@ -320,26 +347,32 @@ function drawSetup() {
   const c = $('setup-canvas');
   if (!c) return;
   const ctx = layoutCanvas(c);
+  const { w, h } = cssSize(c);
   const cs = cellSizeFor(c);
-  const ox = Math.floor(((c.clientWidth || c.width) - COLS * cs) / 2);
-  const oy = Math.floor(((c.clientHeight || c.height) - ROWS * cs) / 2);
+  const ox = Math.floor((w - COLS * cs) / 2);
+  const oy = Math.floor((h - ROWS * cs) / 2);
   const house = S.setupWhich === 'mine' ? S.myHouse : S.theirHouse;
   ctx.fillStyle = COLORS.bg;
-  ctx.fillRect(0, 0, c.clientWidth, c.clientHeight);
+  ctx.fillRect(0, 0, w, h);
   drawHouse(ctx, blueprint, house, S.setupFloor, {
     showChest: true,
     showTraps: true,
     triggeredTraps: new Set(),
     ox, oy, cellSize: cs,
   });
-  c._map = { ox, oy, cs };
+  c._map = { ox, oy, cs, w, h };
 }
 
 function setupCanvasTap(e) {
   const c = $('setup-canvas');
-  if (!c || !c._map) return;
+  if (!c) return;
+  if (!c._map || !c._map.cs) drawSetup();
+  if (!c._map || !c._map.cs) return;
   const rect = c.getBoundingClientRect();
-  const t = e.changedTouches ? e.changedTouches[0] : e;
+  const t = (e.changedTouches && e.changedTouches[0])
+    || (e.touches && e.touches[0])
+    || e;
+  if (!t || t.clientX == null) return;
   const mx = t.clientX - rect.left;
   const my = t.clientY - rect.top;
   const { ox, oy, cs } = c._map;
@@ -347,6 +380,8 @@ function setupCanvasTap(e) {
   const y = Math.floor((my - oy) / cs);
   if (x >= 0 && y >= 0 && x < COLS && y < ROWS) {
     placeAt(S.setupFloor, x, y);
+  } else {
+    setStatus($('setup-status'), 'マップのマスをタップしてください', 'warn');
   }
 }
 
@@ -842,20 +877,31 @@ function bindControls() {
     });
   });
   document.querySelectorAll('.tool-btn').forEach((btn) => {
-    bindTap(btn, () => {
-      S.setupTool = btn.dataset.tool;
+    const select = (e) => {
+      if (e) e.preventDefault();
+      S.setupTool = btn.dataset.tool || 'chest';
       updateSetupHud();
-    });
+      const label = btn.textContent.trim();
+      setStatus($('setup-status'), `${label} を選択 — 床をタップして配置`, 'ok');
+    };
+    bindTap(btn, select);
+    btn.addEventListener('pointerdown', select, { passive: false });
   });
   bindTap($('btn-ready'), () => onReadySetup());
   bindTap($('btn-setup-back'), () => goTitle());
 
   const sc = $('setup-canvas');
-  sc.addEventListener('click', setupCanvasTap);
-  sc.addEventListener('touchend', (e) => {
+  let lastPlaceTs = 0;
+  const onPlace = (e) => {
     e.preventDefault();
+    const now = Date.now();
+    if (now - lastPlaceTs < 80) return; // debounce click+touch double fire
+    lastPlaceTs = now;
     setupCanvasTap(e);
-  }, { passive: false });
+  };
+  sc.addEventListener('pointerdown', onPlace, { passive: false });
+  sc.addEventListener('click', onPlace);
+  sc.addEventListener('touchend', onPlace, { passive: false });
 
   // Digits-only on join input
   const joinInput = $('join-code-input');
