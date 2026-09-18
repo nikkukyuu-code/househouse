@@ -727,65 +727,171 @@ function shuffle(arr) {
 }
 
 /**
- * COM house generation: prefer upper floors / corner rooms for chest,
- * traps near doors, stairs approaches — mix of bomb + pit.
+ * COM house generation: chest far from spawn (upper floors),
+ * traps at choke points — doors, stairs, spawn-room exits, chest approaches.
+ * Door-adjacent / spawn-exit cells prefer bombs; pits prefer upper floors.
  */
 export function generateComHouse(blueprint) {
   const cells = listPlaceable(blueprint);
   const spawn = getSpawn();
-  const dist = (c) => Math.abs(c.x - spawn.x) + Math.abs(c.y - spawn.y) + c.floor * 4;
+  // Stronger upper-floor bias for chest distance
+  const dist = (c) => Math.abs(c.x - spawn.x) + Math.abs(c.y - spawn.y) + c.floor * 8;
 
   const chestCandidates = shuffle(cells)
     .filter((c) => !(c.floor === spawn.floor && c.x === spawn.x && c.y === spawn.y))
-    .sort((a, b) => dist(b) - dist(a));
-  const topN = Math.max(5, (chestCandidates.length * 0.4) | 0);
-  const chest = chestCandidates[(Math.random() * topN) | 0];
+    .map((c) => {
+      // Extra bias: prefer floor 2, then 1, rarely 0
+      let bonus = c.floor * 6;
+      if (c.floor === FLOORS - 1) bonus += 4;
+      return { c, s: dist(c) + bonus + Math.random() * 3 };
+    })
+    .sort((a, b) => b.s - a.s);
+  const topN = Math.max(4, Math.min(12, (chestCandidates.length * 0.25) | 0));
+  const chest = chestCandidates[(Math.random() * topN) | 0].c;
 
   const used = new Set([`${chest.floor},${chest.x},${chest.y}`]);
+  const spawnKey = `${spawn.floor},${spawn.x},${spawn.y}`;
+  used.add(spawnKey); // never place on spawn (also filtered below)
+
+  function isAdjTo(c, tileKind) {
+    for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+      if (tileAt(blueprint, c.floor, c.x + dx, c.y + dy) === tileKind) return true;
+    }
+    return false;
+  }
+
+  function walkableNeighborCount(c) {
+    let n = 0;
+    for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+      if (isWalkable(tileAt(blueprint, c.floor, c.x + dx, c.y + dy))) n += 1;
+    }
+    return n;
+  }
+
+  /** Same room as spawn on 1F: walls at x=4,8 and y=4 split rooms; spawn is (6,7) → center-bottom room */
+  function inSpawnRoom(c) {
+    if (c.floor !== spawn.floor) return false;
+    // Spawn room: x in (4,8), y in (4, ROWS-1) roughly — between vertical walls 4&8, below horizontal wall 4
+    return c.x > 4 && c.x < 8 && c.y > 4 && c.y < ROWS - 1;
+  }
+
+  function nearSpawnExit(c) {
+    // Floor cells just outside / at exits of spawn room (door-adjacent on 1F near spawn)
+    if (c.floor !== 0) return false;
+    if (inSpawnRoom(c) && isAdjTo(c, T.DOOR)) return true;
+    // Immediately outside spawn-room doors
+    if (!inSpawnRoom(c) && isAdjTo(c, T.DOOR)) {
+      const man = Math.abs(c.x - spawn.x) + Math.abs(c.y - spawn.y);
+      if (man <= 6) return true;
+    }
+    // Cells around spawn within 1–3 (approach out of starting pocket)
+    const man = Math.abs(c.x - spawn.x) + Math.abs(c.y - spawn.y);
+    if (c.floor === 0 && man >= 1 && man <= 3) return true;
+    return false;
+  }
+
+  /** Rough short-path bias: cells on lower floors toward chest floor / stairs up */
+  function onLikelyApproach(c) {
+    if (c.floor > chest.floor) return false;
+    if (c.floor < chest.floor) {
+      if (isAdjTo(c, T.STAIRS_UP) || isAdjTo(c, T.STAIRS_DOWN) || isAdjTo(c, T.DOOR)) return true;
+      const toUp = Math.abs(c.x - 11) + Math.abs(c.y - 1);
+      const toDown = Math.abs(c.x - 1) + Math.abs(c.y - 7);
+      if (toUp <= 5 || toDown <= 5) return true;
+      // Intermediate floors between spawn and chest are high-value choke zones
+      if (c.floor > 0 && c.floor < chest.floor) return true;
+    }
+    return false;
+  }
 
   function trapScore(c) {
     let s = 0;
-    for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
-      const t = tileAt(blueprint, c.floor, c.x + dx, c.y + dy);
-      if (t === T.DOOR) s += 4;
-      if (t === T.STAIRS_UP || t === T.STAIRS_DOWN) s += 5;
-    }
-    if (c.floor === chest.floor) s += 2;
+    const doorAdj = isAdjTo(c, T.DOOR);
+    const stairsAdj = isAdjTo(c, T.STAIRS_UP) || isAdjTo(c, T.STAIRS_DOWN);
+    if (doorAdj) s += 7;
+    if (stairsAdj) s += 6;
+    if (nearSpawnExit(c)) s += 5;
+    if (onLikelyApproach(c)) s += 4;
+    if (c.floor === chest.floor) s += 3;
     const cd = Math.abs(c.x - chest.x) + Math.abs(c.y - chest.y);
-    if (c.floor === chest.floor && cd >= 1 && cd <= 3) s += 3;
-    if (c.floor === 0 && dist(c) <= 4) s += 1;
-    // Pits are more interesting on upper floors
-    if (c.floor > 0) s += 1;
-    s += Math.random() * 2;
+    if (c.floor === chest.floor && cd >= 1 && cd <= 3) s += 5;
+    // Corridor-like (few walkable neighbors)
+    const wn = walkableNeighborCount(c);
+    if (wn <= 2) s += 4;
+    else if (wn === 3) s += 1;
+    // Encourage some upper-floor placements without drowning spawn defense
+    if (c.floor === chest.floor) s += 2;
+    else if (c.floor > 0) s += 1.5;
+    s += Math.random() * 1.5;
     return s;
   }
 
+  function pickKind(c) {
+    const doorAdj = isAdjTo(c, T.DOOR);
+    const spawnExit = nearSpawnExit(c);
+    // Door / spawn-exit: strongly prefer bomb
+    if (doorAdj || spawnExit) {
+      if (Math.random() < 0.88) return TRAP_BOMB;
+      return TRAP_PIT;
+    }
+    // Upper floors: pits more often
+    if (c.floor >= 2 && Math.random() < 0.55) return TRAP_PIT;
+    if (c.floor === 1 && Math.random() < 0.4) return TRAP_PIT;
+    if (c.floor === 0 && Math.random() < 0.15) return TRAP_PIT;
+    if (Math.random() < 0.3) return TRAP_PIT;
+    return TRAP_BOMB;
+  }
+
   const trapPool = cells
-    .filter((c) => !used.has(`${c.floor},${c.x},${c.y}`))
+    .filter((c) => {
+      const key = `${c.floor},${c.x},${c.y}`;
+      return !used.has(key) && key !== spawnKey;
+    })
     .map((c) => ({ c, s: trapScore(c) }))
     .sort((a, b) => b.s - a.s);
 
   const traps = [];
   const want = MAX_TRAPS;
+  const perFloor = {};
+  // Always place exactly MAX_TRAPS — no random skip; soft-cap per floor for spread
   for (let i = 0; i < trapPool.length && traps.length < want; i++) {
-    if (Math.random() < 0.22 && traps.length > 1) continue;
     const { c } = trapPool[i];
     const key = `${c.floor},${c.x},${c.y}`;
     if (used.has(key)) continue;
+    if (c.floor === spawn.floor && c.x === spawn.x && c.y === spawn.y) continue;
+    if (c.floor === chest.floor && c.x === chest.x && c.y === chest.y) continue;
+    const fc = perFloor[c.floor] || 0;
+    // Soft cap: leave room for other floors until late fills
+    if (fc >= 4 && traps.length < want - 2) continue;
     used.add(key);
-    // Mix: prefer pit on 2F/3F (~45%), bomb otherwise; ensure both kinds appear often
-    let kind = TRAP_BOMB;
-    if (c.floor > 0 && Math.random() < 0.55) kind = TRAP_PIT;
-    else if (c.floor === 0 && Math.random() < 0.25) kind = TRAP_PIT;
-    else if (Math.random() < 0.4) kind = TRAP_PIT;
-    traps.push({ floor: c.floor, x: c.x, y: c.y, kind });
+    perFloor[c.floor] = fc + 1;
+    traps.push({ floor: c.floor, x: c.x, y: c.y, kind: pickKind(c) });
+  }
+  // Fill remainder if soft-cap skipped too many
+  if (traps.length < want) {
+    for (let i = 0; i < trapPool.length && traps.length < want; i++) {
+      const { c } = trapPool[i];
+      const key = `${c.floor},${c.x},${c.y}`;
+      if (used.has(key)) continue;
+      if (c.floor === spawn.floor && c.x === spawn.x && c.y === spawn.y) continue;
+      if (c.floor === chest.floor && c.x === chest.x && c.y === chest.y) continue;
+      used.add(key);
+      traps.push({ floor: c.floor, x: c.x, y: c.y, kind: pickKind(c) });
+    }
   }
 
-  // Guarantee at least one of each kind when we have 2+ traps
+  // Guarantee mix of bomb + pit
   if (traps.length >= 2) {
     const hasPit = traps.some((t) => t.kind === TRAP_PIT);
     const hasBomb = traps.some((t) => t.kind === TRAP_BOMB);
-    if (!hasPit) traps[0].kind = TRAP_PIT;
+    if (!hasPit) {
+      // Convert a non-door trap to pit if possible
+      const idx = traps.findIndex((t) => {
+        const c = { floor: t.floor, x: t.x, y: t.y };
+        return !isAdjTo(c, T.DOOR);
+      });
+      traps[idx >= 0 ? idx : 0].kind = TRAP_PIT;
+    }
     if (!hasBomb) traps[traps.length - 1].kind = TRAP_BOMB;
   }
 

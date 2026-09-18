@@ -8,10 +8,10 @@ import {
   createBlueprint, createEmptyHouseData, isWalkable, isPlaceable,
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
-} from './house.js?v=20260920f';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920f';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920f';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920f';
+} from './house.js?v=20260920g';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920g';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920g';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920g';
 
 const blueprint = createBlueprint();
 
@@ -215,69 +215,465 @@ function checkHazards(ex, triggeredSet, onTrap, onChest) {
   }
 }
 
-/* ---------- COM / AI explorer ---------- */
+/* ---------- COM / AI explorer (BFS floor-clearing) ---------- */
+const AI_DIRS = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+
+function aiNeighbors(floor, x, y) {
+  const out = [];
+  for (const [dx, dy] of AI_DIRS) {
+    const nx = x + dx;
+    const ny = y + dy;
+    if (isWalkable(tileAt(blueprint, floor, nx, ny))) out.push({ x: nx, y: ny, dx, dy });
+  }
+  return out;
+}
+
+/** Walkable cells on a floor that are not yet in visited. */
+function aiFloorUnvisited(floor, visited) {
+  const cells = [];
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      if (!isWalkable(tileAt(blueprint, floor, x, y))) continue;
+      if (!visited.has(`${floor},${x},${y}`)) cells.push({ x, y });
+    }
+  }
+  return cells;
+}
+
+/**
+ * BFS on one floor from (sx,sy) to nearest goal matching predicate.
+ * Returns first step {dx,dy} or null. Optionally avoid reversing last move.
+ */
+function aiBfsNextStep(floor, sx, sy, isGoal, preferNotDx, preferNotDy) {
+  const startKey = `${sx},${sy}`;
+  if (isGoal(sx, sy)) return null;
+  const q = [{ x: sx, y: sy }];
+  const prev = new Map();
+  prev.set(startKey, null);
+  let found = null;
+  while (q.length) {
+    const cur = q.shift();
+    for (const n of aiNeighbors(floor, cur.x, cur.y)) {
+      const k = `${n.x},${n.y}`;
+      if (prev.has(k)) continue;
+      prev.set(k, { x: cur.x, y: cur.y, stepDx: n.dx, stepDy: n.dy });
+      if (isGoal(n.x, n.y)) {
+        found = { x: n.x, y: n.y };
+        q.length = 0;
+        break;
+      }
+      q.push({ x: n.x, y: n.y });
+    }
+  }
+  if (!found) return null;
+  // Walk back to reconstruct first step from start
+  let cx = found.x;
+  let cy = found.y;
+  let first = null;
+  while (true) {
+    const p = prev.get(`${cx},${cy}`);
+    if (!p) break;
+    first = { dx: p.stepDx, dy: p.stepDy };
+    if (p.x === sx && p.y === sy) break;
+    cx = p.x;
+    cy = p.y;
+  }
+  if (!first) return null;
+  // Prefer not reversing: if first step is reverse and another equally-short path exists, try alt
+  if (
+    preferNotDx != null && preferNotDy != null
+    && first.dx === -preferNotDx && first.dy === -preferNotDy
+  ) {
+    const alt = aiBfsNextStepAvoidReverse(floor, sx, sy, isGoal, preferNotDx, preferNotDy);
+    if (alt) return alt;
+  }
+  return first;
+}
+
+/** Second BFS that forbids the immediate reverse as the first edge from start. */
+function aiBfsNextStepAvoidReverse(floor, sx, sy, isGoal, lastDx, lastDy) {
+  const startKey = `${sx},${sy}`;
+  const q = [{ x: sx, y: sy }];
+  const prev = new Map();
+  prev.set(startKey, null);
+  let found = null;
+  while (q.length) {
+    const cur = q.shift();
+    for (const n of aiNeighbors(floor, cur.x, cur.y)) {
+      if (cur.x === sx && cur.y === sy && n.dx === -lastDx && n.dy === -lastDy) continue;
+      const k = `${n.x},${n.y}`;
+      if (prev.has(k)) continue;
+      prev.set(k, { x: cur.x, y: cur.y, stepDx: n.dx, stepDy: n.dy });
+      if (isGoal(n.x, n.y)) {
+        found = { x: n.x, y: n.y };
+        q.length = 0;
+        break;
+      }
+      q.push({ x: n.x, y: n.y });
+    }
+  }
+  if (!found) return null;
+  let cx = found.x;
+  let cy = found.y;
+  let first = null;
+  while (true) {
+    const p = prev.get(`${cx},${cy}`);
+    if (!p) break;
+    first = { dx: p.stepDx, dy: p.stepDy };
+    if (p.x === sx && p.y === sy) break;
+    cx = p.x;
+    cy = p.y;
+  }
+  return first;
+}
+
+function aiFindTile(floor, kind) {
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      if (blueprint[floor][y][x] === kind) return { x, y };
+    }
+  }
+  return null;
+}
+
+function aiApplyStep(ex, step) {
+  if (!step) return false;
+  if (tryMove(ex, step.dx, step.dy)) {
+    ex.memory.lastDx = step.dx;
+    ex.memory.lastDy = step.dy;
+    ex.memory.stuck = 0;
+    if (!ex.memory.recent) ex.memory.recent = [];
+    ex.memory.recent.push(`${ex.floor},${ex.x},${ex.y}`);
+    if (ex.memory.recent.length > 8) ex.memory.recent.shift();
+    return true;
+  }
+  return false;
+}
+
+function aiIsStuck(ex) {
+  const r = ex.memory.recent || [];
+  if (r.length < 8) return (ex.memory.stuck || 0) >= 6;
+  const uniq = new Set(r);
+  return uniq.size <= 2 || (ex.memory.stuck || 0) >= 5;
+}
+
+
+/** If already standing on the right stairs for targetFloor, transition now. */
+
+function aiTriggeredSet(ex) {
+  const set = new Set();
+  if (ex && ex.triggered) {
+    for (const k of ex.triggered) set.add(k);
+  }
+  // COM explores player's house → foeTriggered
+  if (ex === S.foe && S.foeTriggered) {
+    for (const k of S.foeTriggered) set.add(k);
+  }
+  if (ex === S.me && S.myTriggered) {
+    for (const k of S.myTriggered) set.add(k);
+  }
+  return set;
+}
+
+function aiIsCellTriggered(ex, floor, x, y) {
+  const k = `${floor},${x},${y}`;
+  if (ex && ex.triggered && ex.triggered.has(k)) return true;
+  if (ex === S.foe && S.foeTriggered && S.foeTriggered.has(k)) return true;
+  if (ex === S.me && S.myTriggered && S.myTriggered.has(k)) return true;
+  return false;
+}
+
+function aiIsDoorAdjacent(floor, x, y) {
+  for (const [dx, dy] of AI_DIRS) {
+    if (tileAt(blueprint, floor, x + dx, y + dy) === T.DOOR) return true;
+  }
+  return false;
+}
+
+function aiInSpawnRoom(floor, x, y) {
+  if (floor !== 0) return false;
+  return x > 4 && x < 8 && y > 4 && y < ROWS - 1;
+}
+
+function aiNearSpawnExit(floor, x, y) {
+  if (floor !== 0) return false;
+  const sp = getSpawn();
+  const man = Math.abs(x - sp.x) + Math.abs(y - sp.y);
+  if (aiInSpawnRoom(floor, x, y) && aiIsDoorAdjacent(floor, x, y)) return true;
+  if (man >= 1 && man <= 3) return true;
+  if (aiIsDoorAdjacent(floor, x, y) && man <= 6) return true;
+  return false;
+}
+
+/**
+ * Soft danger cost for an unexplored cell. Triggered = 0 (safe).
+ * Unknown door-adj / early spawn-exit: slight penalty (still walkable).
+ */
+function aiCautionCost(ex, floor, x, y) {
+  if (aiIsCellTriggered(ex, floor, x, y)) return 0; // spent trap — safe / prefer ok
+  const visited = ex.visited;
+  const key = `${floor},${x},${y}`;
+  // Already visited without dying there → treat as known-safe enough
+  if (visited && visited.has(key)) return 0;
+  let cost = 0;
+  if (aiIsDoorAdjacent(floor, x, y)) cost += 3;
+  // Early match: cautious leaving spawn room
+  const phase = (ex.memory && ex.memory.phase) || 0;
+  if (phase < 40 && aiNearSpawnExit(floor, x, y)) cost += 3;
+  return cost;
+}
+
+/**
+ * Among equal-ish BFS options, prefer stepping onto lower-caution cells.
+ * If the only way is a "dangerous" cell, still take it (dead-end / only path).
+ */
+function aiPickStepWithCaution(ex, candidates) {
+  // candidates: [{dx,dy, cost?}]
+  if (!candidates || !candidates.length) return null;
+  let best = null;
+  let bestS = -1e9;
+  for (const step of candidates) {
+    const nx = ex.x + step.dx;
+    const ny = ex.y + step.dy;
+    if (!isWalkable(tileAt(blueprint, ex.floor, nx, ny))) continue;
+    let s = 10 - aiCautionCost(ex, ex.floor, nx, ny);
+    if (aiIsCellTriggered(ex, ex.floor, nx, ny)) s += 2; // known safe path fine
+    if (ex.memory && ex.memory.lastDx === -step.dx && ex.memory.lastDy === -step.dy) s -= 2;
+    s += Math.random() * 0.5;
+    if (s > bestS) { bestS = s; best = step; }
+  }
+  return best;
+}
+
+function aiTakeStairsIfNeeded(ex, targetFloor) {
+  if (targetFloor == null || targetFloor === ex.floor) return false;
+  const here = tileAt(blueprint, ex.floor, ex.x, ex.y);
+  if (targetFloor > ex.floor && here === T.STAIRS_UP && ex.floor < FLOORS - 1) {
+    ex.floor += 1;
+    const down = findStairs(ex.floor, T.STAIRS_DOWN);
+    if (down) { ex.x = down.x; ex.y = down.y; }
+    ex.memory.stuck = 0;
+    ex.visited.add(`${ex.floor},${ex.x},${ex.y}`);
+    if (!ex.memory.recent) ex.memory.recent = [];
+    ex.memory.recent.push(`${ex.floor},${ex.x},${ex.y}`);
+    if (ex.memory.recent.length > 8) ex.memory.recent.shift();
+    return true;
+  }
+  if (targetFloor < ex.floor && here === T.STAIRS_DOWN && ex.floor > 0) {
+    ex.floor -= 1;
+    const up = findStairs(ex.floor, T.STAIRS_UP);
+    if (up) { ex.x = up.x; ex.y = up.y; }
+    ex.memory.stuck = 0;
+    ex.visited.add(`${ex.floor},${ex.x},${ex.y}`);
+    if (!ex.memory.recent) ex.memory.recent = [];
+    ex.memory.recent.push(`${ex.floor},${ex.x},${ex.y}`);
+    if (ex.memory.recent.length > 8) ex.memory.recent.shift();
+    return true;
+  }
+  return false;
+}
+
 function aiStep(ex) {
   if (!ex.visited) ex.visited = new Set();
-  if (!ex.memory) ex.memory = { preferFloor: 0, stuck: 0, phase: 0 };
+  if (!ex.memory) {
+    ex.memory = { stuck: 0, phase: 0, lastDx: 0, lastDy: 0, recent: [], escapeGoal: null };
+  }
   ex.memory.phase = (ex.memory.phase || 0) + 1;
   const key = `${ex.floor},${ex.x},${ex.y}`;
   ex.visited.add(key);
 
-  const dirs = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+  const lastDx = ex.memory.lastDx;
+  const lastDy = ex.memory.lastDy;
 
-  function canStep(dx, dy) {
-    const nx = ex.x + dx, ny = ex.y + dy;
-    return isWalkable(tileAt(blueprint, ex.floor, nx, ny));
-  }
-
-  function scoreDir(dx, dy) {
-    const nx = ex.x + dx, ny = ex.y + dy;
-    if (!canStep(dx, dy)) return -999;
-    const nk = `${ex.floor},${nx},${ny}`;
-    let s = 0;
-    const t = tileAt(blueprint, ex.floor, nx, ny);
-    if (!ex.visited.has(nk)) s += 8;
-    else s -= 3;
-    const targetFloor = Math.min(FLOORS - 1, (ex.memory.phase / 55) | 0);
-    if (t === T.STAIRS_UP && ex.floor < targetFloor) s += 6;
-    if (t === T.STAIRS_UP && ex.floor >= targetFloor && Math.random() < 0.25) s += 3;
-    if (t === T.STAIRS_DOWN && ex.floor > targetFloor) s += 5;
-    if (t === T.DOOR) s += 2;
-    s += Math.random() * 4;
-    if (ex.memory.lastDx === -dx && ex.memory.lastDy === -dy) s -= 2;
-    return s;
-  }
-
-  if (Math.random() < 0.12) {
-    const shuffled = dirs.slice().sort(() => Math.random() - 0.5);
+  // Small randomness so play isn't perfectly deterministic
+  if (Math.random() < 0.06) {
+    const shuffled = AI_DIRS.slice().sort(() => Math.random() - 0.5);
     for (const [dx, dy] of shuffled) {
-      if (tryMove(ex, dx, dy)) {
-        ex.memory.lastDx = dx;
-        ex.memory.lastDy = dy;
-        ex.memory.stuck = 0;
-        return true;
+      if (lastDx === -dx && lastDy === -dy && Math.random() < 0.7) continue;
+      const nx = ex.x + dx, ny = ex.y + dy;
+      // Soft skip unknown door/spawn danger unless it's the only option later
+      if (aiCautionCost(ex, ex.floor, nx, ny) >= 3 && Math.random() < 0.75) continue;
+      if (aiApplyStep(ex, { dx, dy })) return true;
+    }
+  }
+
+  // Anti-stuck: force path toward a random unvisited cell (any floor) via stairs
+  if (aiIsStuck(ex)) {
+    ex.memory.stuck = (ex.memory.stuck || 0) + 1;
+    const allUnvis = [];
+    for (let f = 0; f < FLOORS; f++) {
+      for (const c of aiFloorUnvisited(f, ex.visited)) {
+        allUnvis.push({ floor: f, x: c.x, y: c.y });
       }
     }
-  }
-
-  let best = null, bestS = -999;
-  for (const [dx, dy] of dirs) {
-    const s = scoreDir(dx, dy);
-    if (s > bestS) { bestS = s; best = [dx, dy]; }
-  }
-  if (best && bestS > -999) {
-    if (tryMove(ex, best[0], best[1])) {
-      ex.memory.lastDx = best[0];
-      ex.memory.lastDy = best[1];
-      ex.memory.stuck = 0;
-      return true;
+    if (allUnvis.length) {
+      const goal = allUnvis[(Math.random() * allUnvis.length) | 0];
+      ex.memory.escapeGoal = goal;
+      if (aiTakeStairsIfNeeded(ex, goal.floor)) return true;
+      const step = aiPlanToward(ex, goal, lastDx, lastDy);
+      if (aiApplyStep(ex, step)) return true;
     }
   }
+
+  // 1) Clear current floor: BFS to nearest unvisited (caution: soft-avoid unknown door/spawn)
+  const unvisHere = aiFloorUnvisited(ex.floor, ex.visited);
+  if (unvisHere.length) {
+    // Prefer safer unvisited goals first; fall back to any if needed
+    const sortedGoals = unvisHere.slice().sort((a, b) => {
+      return aiCautionCost(ex, ex.floor, a.x, a.y) - aiCautionCost(ex, ex.floor, b.x, b.y)
+        || (Math.random() - 0.5);
+    });
+    let step = null;
+    // Try low-caution goals, then any
+    for (const preferSafe of [true, false]) {
+      const goals = preferSafe
+        ? sortedGoals.filter((c) => aiCautionCost(ex, ex.floor, c.x, c.y) <= 2)
+        : sortedGoals;
+      if (!goals.length) continue;
+      const goalSet = new Set(goals.map((c) => `${c.x},${c.y}`));
+      step = aiBfsNextStep(
+        ex.floor, ex.x, ex.y,
+        (x, y) => goalSet.has(`${x},${y}`),
+        lastDx, lastDy
+      );
+      if (step) {
+        // If first step is high-caution but an alternate neighbor leads to a safe goal path, prefer it
+        const opts = [];
+        for (const [dx, dy] of AI_DIRS) {
+          const nx = ex.x + dx, ny = ex.y + dy;
+          if (!isWalkable(tileAt(blueprint, ex.floor, nx, ny))) continue;
+          // Accept this first step if BFS from neighbor still reaches a goal quickly
+          opts.push({ dx, dy });
+        }
+        // Keep BFS step but if it's very cautious and we have other walkable opts with lower cost that aren't reverse-only dead ends:
+        const stepCost = aiCautionCost(ex, ex.floor, ex.x + step.dx, ex.y + step.dy);
+        if (stepCost >= 3) {
+          const safer = aiPickStepWithCaution(ex, opts.filter((o) => {
+            // only consider if that neighbor is closer-ish to some goal via another BFS
+            const sub = aiBfsNextStep(ex.floor, ex.x + o.dx, ex.y + o.dy, (x, y) => goalSet.has(`${x},${y}`), null, null);
+            // standing on goal after one step counts
+            if (goalSet.has(`${ex.x + o.dx},${ex.y + o.dy}`)) return true;
+            return !!sub || goalSet.has(`${ex.x + o.dx},${ex.y + o.dy}`);
+          }));
+          // If safer alternative exists with lower caution, use it; else take original (only path)
+          if (safer) {
+            const sc = aiCautionCost(ex, ex.floor, ex.x + safer.dx, ex.y + safer.dy);
+            if (sc < stepCost) step = safer;
+          }
+        }
+        break;
+      }
+    }
+    if (aiApplyStep(ex, step)) return true;
+  }
+
+  // 2) Floor fully explored (or BFS failed): prefer stairs UP to clear higher floors
+  if (ex.floor < FLOORS - 1) {
+    if (aiTakeStairsIfNeeded(ex, ex.floor + 1)) return true;
+    const up = aiFindTile(ex.floor, T.STAIRS_UP);
+    if (up) {
+      const step = aiBfsNextStep(
+        ex.floor, ex.x, ex.y,
+        (x, y) => x === up.x && y === up.y,
+        lastDx, lastDy
+      );
+      if (aiApplyStep(ex, step)) return true;
+    }
+  }
+
+  // 3) Top floor done (or can't go up): check lower floors for unvisited, path to stairs DOWN
+  let lowerHasUnvis = false;
+  for (let f = 0; f < ex.floor; f++) {
+    if (aiFloorUnvisited(f, ex.visited).length) { lowerHasUnvis = true; break; }
+  }
+  // Also recheck any other floor with unvisited (e.g. skipped via pit)
+  let anyOtherUnvis = lowerHasUnvis;
+  if (!anyOtherUnvis) {
+    for (let f = 0; f < FLOORS; f++) {
+      if (f === ex.floor) continue;
+      if (aiFloorUnvisited(f, ex.visited).length) { anyOtherUnvis = true; break; }
+    }
+  }
+  if (anyOtherUnvis && ex.floor > 0) {
+    if (aiTakeStairsIfNeeded(ex, ex.floor - 1)) return true;
+    const down = aiFindTile(ex.floor, T.STAIRS_DOWN);
+    if (down) {
+      const step = aiBfsNextStep(
+        ex.floor, ex.x, ex.y,
+        (x, y) => x === down.x && y === down.y,
+        lastDx, lastDy
+      );
+      if (aiApplyStep(ex, step)) return true;
+    }
+  }
+
+  // 4) Everything explored: wander toward less-recent / stairs to recheck
+  const stepWander = aiWanderStep(ex, lastDx, lastDy);
+  if (aiApplyStep(ex, stepWander)) return true;
+
   ex.memory.stuck = (ex.memory.stuck || 0) + 1;
-  for (const [dx, dy] of dirs.sort(() => Math.random() - 0.5)) {
-    if (tryMove(ex, dx, dy)) return true;
+  for (const [dx, dy] of AI_DIRS.slice().sort(() => Math.random() - 0.5)) {
+    if (aiApplyStep(ex, { dx, dy })) return true;
   }
   return false;
+}
+
+/** Plan a step toward a multi-floor goal (uses stairs). */
+function aiPlanToward(ex, goal, lastDx, lastDy) {
+  if (!goal) return null;
+  if (goal.floor === ex.floor) {
+    return aiBfsNextStep(
+      ex.floor, ex.x, ex.y,
+      (x, y) => x === goal.x && y === goal.y,
+      lastDx, lastDy
+    );
+  }
+  if (goal.floor > ex.floor) {
+    const up = aiFindTile(ex.floor, T.STAIRS_UP);
+    if (!up) return null;
+    if (ex.x === up.x && ex.y === up.y) {
+      // Will be handled by caller via tryMove — return a dummy that steps onto stairs
+      // by moving to a neighbor then... actually return null and let stairs special-case.
+      return null;
+    }
+    return aiBfsNextStep(
+      ex.floor, ex.x, ex.y,
+      (x, y) => x === up.x && y === up.y,
+      lastDx, lastDy
+    );
+  }
+  const down = aiFindTile(ex.floor, T.STAIRS_DOWN);
+  if (!down) return null;
+  if (ex.x === down.x && ex.y === down.y) return null;
+  return aiBfsNextStep(
+    ex.floor, ex.x, ex.y,
+    (x, y) => x === down.x && y === down.y,
+    lastDx, lastDy
+  );
+}
+
+function aiWanderStep(ex, lastDx, lastDy) {
+  // Prefer less-recent cells; soft-avoid unknown door/spawn danger; triggered = fine
+  let best = null;
+  let bestS = -1e9;
+  const neighbors = aiNeighbors(ex.floor, ex.x, ex.y);
+  for (const n of neighbors) {
+    let s = Math.random() * 2;
+    const t = tileAt(blueprint, ex.floor, n.x, n.y);
+    if (t === T.STAIRS_UP || t === T.STAIRS_DOWN) s += 0.5;
+    const nk = `${ex.floor},${n.x},${n.y}`;
+    if (!ex.visited.has(nk)) s += 10;
+    if (aiIsCellTriggered(ex, ex.floor, n.x, n.y)) s += 3; // known safe
+    else s -= aiCautionCost(ex, ex.floor, n.x, n.y);
+    // If only one neighbor (dead end / corridor), don't let caution block
+    if (neighbors.length <= 1) s += 5;
+    if (lastDx === -n.dx && lastDy === -n.dy) s -= 3;
+    const recent = ex.memory.recent || [];
+    const hits = recent.filter((k) => k === nk).length;
+    s -= hits * 2;
+    if (s > bestS) { bestS = s; best = { dx: n.dx, dy: n.dy }; }
+  }
+  return best;
 }
 
 /* ---------- Setup placement ---------- */
