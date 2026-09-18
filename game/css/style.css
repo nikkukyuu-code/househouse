@@ -424,16 +424,40 @@ body {
 }
 .flash-fx.show { opacity: 1; }
 
+/* Controls sit BELOW the map — no overlay on the playfield */
+.match-controls {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding:
+    6px 10px
+    max(8px, env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(180deg, rgba(18, 14, 24, 0.95), rgba(10, 8, 16, 0.98));
+  border-top: 1px solid rgba(201, 162, 39, 0.35);
+  z-index: 10;
+  min-height: clamp(96px, 16vh, 120px);
+}
+.match-half.bot {
+  /* top map + controls: give map more room by shrinking max slightly via flex */
+}
+.match-half.bot .match-canvas-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+}
 .dpad {
-  position: absolute;
-  right: max(6px, env(safe-area-inset-right, 0px));
-  bottom: max(6px, env(safe-area-inset-bottom, 0px));
-  width: min(132px, 36vw, 28vh);
-  height: min(132px, 36vw, 28vh);
+  position: relative;
+  right: auto;
+  bottom: auto;
+  width: min(112px, 30vw, 18vh);
+  height: min(112px, 30vw, 18vh);
+  flex: 0 0 auto;
   z-index: 10;
   touch-action: none;
-  filter: drop-shadow(0 4px 10px rgba(0,0,0,0.55));
+  filter: drop-shadow(0 3px 8px rgba(0,0,0,0.5));
   pointer-events: auto;
+  margin-left: auto;
 }
 .dpad-btn {
   position: absolute;
@@ -465,15 +489,18 @@ body {
 .dpad-btn.right { right: 0; top: 50%; transform: translateY(-50%); }
 
 .match-hint {
-  position: absolute;
-  left: 6px;
-  bottom: 8px;
-  font-size: clamp(0.55rem, 1.5vh, 0.68rem);
-  color: rgba(255,255,255,0.4);
-  z-index: 9;
-  max-width: 38%;
-  line-height: 1.25;
+  position: static;
+  left: auto;
+  bottom: auto;
+  font-size: clamp(0.7rem, 2vh, 0.85rem);
+  color: rgba(255,255,255,0.55);
+  z-index: 1;
+  max-width: 55%;
+  line-height: 1.35;
   pointer-events: none;
+  flex: 1 1 auto;
+  text-align: left;
+  margin: 0;
 }
 
 #result-overlay {
@@ -524,10 +551,11 @@ body {
   .title-sub br { display: none; }
   .peer-note { display: none; }
   .legend { display: none; }
-  .match-hint { display: none; }
+  .match-hint { font-size: 0.65rem; }
+  .match-controls { min-height: 84px; padding-top: 4px; padding-bottom: 4px; }
   .dpad {
-    width: min(110px, 32vw, 26vh);
-    height: min(110px, 32vw, 26vh);
+    width: min(96px, 28vw, 16vh);
+    height: min(96px, 28vw, 16vh);
   }
   .tool-btn { font-size: clamp(0.6rem, 1.6vh, 0.75rem); padding-left: 2px; padding-right: 2px; }
 }

@@ -8,7 +8,7 @@
   <meta http-equiv="Cache-Control" content="no-cache" />
   <meta name="theme-color" content="#120e18" />
   <title>ハウスと罠</title>
-  <link rel="stylesheet" href="css/style.css?v=20260919d" />
+  <link rel="stylesheet" href="css/style.css?v=20260919e" />
 </head>
 <body>
   <div id="app">
@@ -108,13 +108,15 @@
         <div class="match-canvas-wrap">
           <canvas id="canvas-bot"></canvas>
           <div class="flash-fx" id="flash-bot"></div>
+        </div>
+        <div class="match-controls" id="match-controls">
+          <p class="match-hint">階段で階を移動・宝箱を探せ</p>
           <div class="dpad" id="dpad" aria-label="移動パッド">
             <button type="button" class="dpad-btn up" data-dir="u" aria-label="上">▲</button>
             <button type="button" class="dpad-btn down" data-dir="d" aria-label="下">▼</button>
             <button type="button" class="dpad-btn left" data-dir="l" aria-label="左">◀</button>
             <button type="button" class="dpad-btn right" data-dir="r" aria-label="右">▶</button>
           </div>
-          <p class="match-hint">階段で階を移動<br />宝箱を探せ</p>
         </div>
       </div>
 
@@ -137,7 +139,7 @@
   </div>
 
   <script type="module">
-    import { init } from './js/game.js?v=20260919d';
+    import { init } from './js/game.js?v=20260919e';
     init().catch((e) => {
       console.error(e);
       const n = document.getElementById('peer-note');
