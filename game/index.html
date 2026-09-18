@@ -13,6 +13,7 @@
   <div id="app">
     <!-- タイトル -->
     <section id="screen-title" class="screen active">
+      <div class="title-glow" aria-hidden="true"></div>
       <h1 class="title-logo">ハウスハウス</h1>
       <p class="title-sub">家に罠を仕掛けて<br />相手の宝箱を探せ！</p>
       <div class="btn-col">
@@ -28,21 +29,22 @@
     <section id="screen-lobby" class="screen">
       <p class="lobby-label">オンライン対戦</p>
       <div id="lobby-code-wrap">
-        <p class="lobby-label">ルームコード</p>
-        <div class="room-code" id="room-code-display">----</div>
+        <p class="lobby-label">ルームコード（6桁）</p>
+        <div class="room-code" id="room-code-display">------</div>
       </div>
       <div id="lobby-join-wrap" class="hidden">
-        <p class="lobby-label">コードを入力</p>
+        <p class="lobby-label">6桁コードを入力</p>
         <input
           class="join-input allow-scroll"
           id="join-code-input"
           type="text"
-          maxlength="4"
-          inputmode="text"
+          maxlength="6"
+          inputmode="numeric"
+          pattern="[0-9]{6}"
           autocomplete="off"
-          autocapitalize="characters"
-          placeholder="ABCD"
-          aria-label="ルームコード"
+          autocapitalize="off"
+          placeholder="123456"
+          aria-label="ルームコード（6桁）"
         />
         <div class="btn-col" style="margin-top:14px;max-width:280px">
           <button type="button" class="btn btn-primary" id="btn-join-go">参加する</button>
@@ -70,13 +72,14 @@
       </div>
       <div class="tool-row">
         <button type="button" class="tool-btn active" data-tool="chest">📦 宝箱</button>
-        <button type="button" class="tool-btn" data-tool="trap">💥 罠</button>
+        <button type="button" class="tool-btn" data-tool="trap-normal">⚠ 通常罠</button>
+        <button type="button" class="tool-btn" data-tool="trap-pit">🕳 落とし穴</button>
         <button type="button" class="tool-btn" data-tool="erase">🗑 消す</button>
       </div>
       <div id="setup-canvas-wrap">
         <canvas id="setup-canvas" class="active-canvas"></canvas>
       </div>
-      <p class="legend">緑▲=上階へ　青▼=下階へ　茶色=ドア　床をタップして配置</p>
+      <p class="legend">緑▲上階　青▼下階　⚠通常罠　🕳落とし穴　床をタップ</p>
       <p class="status-msg" id="setup-status"></p>
       <div class="setup-actions">
         <button type="button" class="btn btn-ghost" id="btn-setup-back">戻る</button>

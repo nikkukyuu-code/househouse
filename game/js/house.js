@@ -19,16 +19,17 @@ export const T = {
 export const MAX_TRAPS = 5;
 export const MAX_HP = 3;
 
+export const TRAP_NORMAL = 'normal';
+export const TRAP_PIT = 'pit';
+
 /** Fixed 3-floor house blueprint (same for both players; only chest/traps differ) */
 export function createBlueprint() {
-  // Each floor: ROWS x COLS of tile kinds
   const floors = [];
   for (let f = 0; f < FLOORS; f++) {
     const grid = [];
     for (let y = 0; y < ROWS; y++) {
       const row = [];
       for (let x = 0; x < COLS; x++) {
-        // Outer wall
         if (x === 0 || y === 0 || x === COLS - 1 || y === ROWS - 1) {
           row.push(T.WALL);
         } else {
@@ -40,28 +41,23 @@ export function createBlueprint() {
     floors.push(grid);
   }
 
-  // Interior walls forming rooms — same pattern each floor with slight variation
   for (let f = 0; f < FLOORS; f++) {
     const g = floors[f];
-    // Vertical dividers
     for (let y = 1; y < ROWS - 1; y++) {
       g[y][4] = T.WALL;
       g[y][8] = T.WALL;
     }
-    // Horizontal divider
     for (let x = 1; x < COLS - 1; x++) {
       g[4][x] = T.WALL;
     }
-    // Doors in walls
-    g[2][4] = T.DOOR; // left-mid vertical
+    g[2][4] = T.DOOR;
     g[6][4] = T.DOOR;
     g[2][8] = T.DOOR;
     g[6][8] = T.DOOR;
-    g[4][2] = T.DOOR; // horizontal
+    g[4][2] = T.DOOR;
     g[4][6] = T.DOOR;
     g[4][10] = T.DOOR;
 
-    // Stairs: up near top-right room, down near bottom-left (except extremes)
     if (f < FLOORS - 1) {
       g[1][11] = T.STAIRS_UP;
     }
@@ -81,15 +77,24 @@ export function isPlaceable(blueprint, floor, x, y) {
   if (floor < 0 || floor >= FLOORS) return false;
   if (x < 0 || y < 0 || x >= COLS || y >= ROWS) return false;
   const t = blueprint[floor][y][x];
-  // Only plain floor (not stairs/doors) for chest/traps
   return t === T.FLOOR;
 }
 
-/** Empty house data for placement */
 export function createEmptyHouseData() {
   return {
-    chest: null, // { floor, x, y }
-    traps: [], // [{ floor, x, y }]
+    chest: null,
+    traps: [],
+  };
+}
+
+/** Normalize trap; missing kind → normal (migration) */
+export function normalizeTrap(t) {
+  if (!t || typeof t !== 'object') return null;
+  return {
+    floor: t.floor | 0,
+    x: t.x | 0,
+    y: t.y | 0,
+    kind: t.kind === TRAP_PIT ? TRAP_PIT : TRAP_NORMAL,
   };
 }
 
@@ -100,9 +105,12 @@ export function serializeHouse(data) {
 export function parseHouse(json) {
   const d = typeof json === 'string' ? JSON.parse(json) : json;
   if (!d || typeof d !== 'object') throw new Error('invalid house');
+  const traps = Array.isArray(d.traps)
+    ? d.traps.map(normalizeTrap).filter(Boolean)
+    : [];
   return {
     chest: d.chest || null,
-    traps: Array.isArray(d.traps) ? d.traps : [],
+    traps,
   };
 }
 
@@ -113,8 +121,11 @@ export function validateHouse(data, blueprint) {
   if (data.traps.length > MAX_TRAPS) return { ok: false, msg: `罠は最大${MAX_TRAPS}個です` };
   const seen = new Set();
   seen.add(`${floor},${x},${y}`);
-  for (const t of data.traps) {
-    if (!isPlaceable(blueprint, t.floor, t.x, t.y)) return { ok: false, msg: '罠の位置が不正です' };
+  for (const raw of data.traps) {
+    const t = normalizeTrap(raw);
+    if (!t || !isPlaceable(blueprint, t.floor, t.x, t.y)) {
+      return { ok: false, msg: '罠の位置が不正です' };
+    }
     const key = `${t.floor},${t.x},${t.y}`;
     if (seen.has(key)) return { ok: false, msg: '同じマスに複数置けません' };
     seen.add(key);
@@ -122,7 +133,6 @@ export function validateHouse(data, blueprint) {
   return { ok: true };
 }
 
-/** Spawn point: near bottom-center of 1F */
 export function getSpawn() {
   return { floor: 0, x: 6, y: 7 };
 }
@@ -132,25 +142,232 @@ export function tileAt(blueprint, floor, x, y) {
   return blueprint[floor][y][x];
 }
 
-/** Colors for rendering */
 export const COLORS = {
-  wall: '#3d2b1f',
+  wall: '#4a3428',
+  wallTop: '#5c4334',
   wallEdge: '#2a1c14',
-  floor: '#e8d5b7',
-  floorAlt: '#dcc9a8',
+  wallShadow: 'rgba(0,0,0,0.35)',
+  floor: '#e6d0a8',
+  floorAlt: '#d9c094',
+  floorGrain: 'rgba(120,80,40,0.12)',
   door: '#8b6914',
+  doorLight: '#c9a227',
+  doorDark: '#5c4010',
   stairsUp: '#5b8c5a',
+  stairsUpHi: '#7ab87a',
   stairsDown: '#4a7c9b',
+  stairsDownHi: '#6aa0c0',
   chest: '#c9a227',
   chestLid: '#e8c547',
+  chestEdge: '#8a6a12',
+  chestLock: '#5c4010',
   trap: '#8b0000',
   trapArmed: '#cc2222',
+  pitDark: '#0a080c',
+  pitRim: '#3a3028',
   player1: '#3b82f6',
   player2: '#ef4444',
   ghost: 'rgba(100,100,100,0.35)',
   bg: '#1a1520',
   roomLabel: 'rgba(0,0,0,0.15)',
 };
+
+function drawWoodFloor(ctx, px, py, cellSize, x, y) {
+  const alt = (x + y) % 2 === 0;
+  ctx.fillStyle = alt ? COLORS.floor : COLORS.floorAlt;
+  ctx.fillRect(px, py, cellSize, cellSize);
+  // Grain hint lines
+  ctx.strokeStyle = COLORS.floorGrain;
+  ctx.lineWidth = 1;
+  const g1 = py + cellSize * 0.28;
+  const g2 = py + cellSize * 0.62;
+  ctx.beginPath();
+  ctx.moveTo(px + 2, g1);
+  ctx.lineTo(px + cellSize - 2, g1 + ((x + y) % 3) - 1);
+  ctx.moveTo(px + 3, g2);
+  ctx.lineTo(px + cellSize - 3, g2 - ((x * 2 + y) % 3) + 1);
+  ctx.stroke();
+  // Soft inner glow
+  ctx.fillStyle = 'rgba(255,240,200,0.06)';
+  ctx.fillRect(px + 1, py + 1, cellSize - 2, cellSize * 0.35);
+}
+
+function drawWallTile(ctx, px, py, cellSize) {
+  ctx.fillStyle = COLORS.wall;
+  ctx.fillRect(px, py, cellSize, cellSize);
+  // Top highlight strip
+  ctx.fillStyle = COLORS.wallTop;
+  ctx.fillRect(px, py, cellSize, Math.max(3, cellSize * 0.18));
+  // Bottom shadow
+  ctx.fillStyle = COLORS.wallShadow;
+  ctx.fillRect(px, py + cellSize - 4, cellSize, 4);
+  // Brick-ish edge
+  ctx.fillStyle = COLORS.wallEdge;
+  ctx.fillRect(px, py, cellSize, 2);
+  ctx.fillRect(px, py, 2, cellSize);
+}
+
+function drawDoorTile(ctx, px, py, cellSize) {
+  drawWoodFloor(ctx, px, py, cellSize, 0, 0);
+  const m = Math.max(3, cellSize * 0.12);
+  // Door panel
+  ctx.fillStyle = COLORS.doorDark;
+  ctx.fillRect(px + m, py + m, cellSize - m * 2, cellSize - m * 2);
+  ctx.fillStyle = COLORS.door;
+  ctx.fillRect(px + m + 2, py + m + 2, cellSize - m * 2 - 4, cellSize - m * 2 - 4);
+  // Frame highlight
+  ctx.strokeStyle = COLORS.doorLight;
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(px + m + 1, py + m + 1, cellSize - m * 2 - 2, cellSize - m * 2 - 2);
+  // Knob
+  ctx.fillStyle = COLORS.doorLight;
+  ctx.beginPath();
+  ctx.arc(px + cellSize * 0.72, py + cellSize * 0.52, cellSize * 0.08, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawStairsTile(ctx, px, py, cellSize, up) {
+  const base = up ? COLORS.stairsUp : COLORS.stairsDown;
+  const hi = up ? COLORS.stairsUpHi : COLORS.stairsDownHi;
+  ctx.fillStyle = base;
+  ctx.fillRect(px, py, cellSize, cellSize);
+  const steps = 4;
+  for (let i = 0; i < steps; i++) {
+    const t = i / steps;
+    ctx.fillStyle = i % 2 === 0 ? hi : base;
+    const sy = py + cellSize * (up ? 0.15 + t * 0.7 : 0.15 + (1 - t) * 0.55);
+    const sw = cellSize * (0.55 + t * 0.35);
+    ctx.fillRect(px + (cellSize - sw) / 2, sy, sw, cellSize * 0.14);
+  }
+  ctx.fillStyle = '#fff';
+  ctx.font = `bold ${Math.floor(cellSize * 0.32)}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(up ? '▲' : '▼', px + cellSize / 2, py + cellSize * 0.42);
+}
+
+/** Draw a trap sprite (normal spike / pit hole) */
+export function drawTrapSprite(ctx, tr, triggered, px, py, cellSize) {
+  const kind = tr.kind === TRAP_PIT ? TRAP_PIT : TRAP_NORMAL;
+  const cx = px + cellSize / 2;
+  const cy = py + cellSize / 2;
+
+  if (kind === TRAP_PIT) {
+    if (triggered) {
+      // Spent / visible hole
+      ctx.fillStyle = COLORS.pitRim;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy + 1, cellSize * 0.38, cellSize * 0.28, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = COLORS.pitDark;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, cellSize * 0.32, cellSize * 0.22, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // Crack lines
+      ctx.strokeStyle = 'rgba(20,15,10,0.7)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(cx - cellSize * 0.35, cy);
+      ctx.lineTo(cx - cellSize * 0.15, cy - cellSize * 0.08);
+      ctx.lineTo(cx + cellSize * 0.05, cy + cellSize * 0.05);
+      ctx.moveTo(cx + cellSize * 0.1, cy - cellSize * 0.12);
+      ctx.lineTo(cx + cellSize * 0.32, cy + cellSize * 0.02);
+      ctx.stroke();
+    } else {
+      // Armed pit — cracked floor hint (designer view)
+      ctx.fillStyle = 'rgba(30,20,15,0.55)';
+      ctx.beginPath();
+      ctx.ellipse(cx, cy + 1, cellSize * 0.36, cellSize * 0.26, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = COLORS.pitDark;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, cellSize * 0.28, cellSize * 0.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#6a5040';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(cx - cellSize * 0.3, cy - cellSize * 0.05);
+      ctx.lineTo(cx - cellSize * 0.05, cy + cellSize * 0.1);
+      ctx.lineTo(cx + cellSize * 0.28, cy - cellSize * 0.02);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(255,200,100,0.35)';
+      ctx.font = `bold ${Math.floor(cellSize * 0.28)}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('穴', cx, cy);
+    }
+    return;
+  }
+
+  // Normal spike / warning mark
+  if (triggered) {
+    ctx.fillStyle = '#555';
+    ctx.beginPath();
+    ctx.arc(cx, cy, cellSize * 0.26, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#333';
+    ctx.font = `bold ${Math.floor(cellSize * 0.35)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('×', cx, cy + 1);
+  } else {
+    // Spikes
+    ctx.fillStyle = COLORS.trapArmed;
+    ctx.beginPath();
+    ctx.arc(cx, cy, cellSize * 0.3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#ff8888';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = '#ffdddd';
+    const spikeH = cellSize * 0.22;
+    for (let i = -1; i <= 1; i++) {
+      const sx = cx + i * cellSize * 0.16;
+      ctx.beginPath();
+      ctx.moveTo(sx - cellSize * 0.06, cy + cellSize * 0.08);
+      ctx.lineTo(sx, cy - spikeH);
+      ctx.lineTo(sx + cellSize * 0.06, cy + cellSize * 0.08);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.fillStyle = '#fff';
+    ctx.font = `bold ${Math.floor(cellSize * 0.28)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('!', cx, cy + cellSize * 0.18);
+  }
+}
+
+export function drawChestSprite(ctx, px, py, cellSize) {
+  const m = Math.max(3, cellSize * 0.12);
+  // Shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.fillRect(px + m + 2, py + cellSize - m, cellSize - m * 2, 3);
+  // Body
+  const bodyY = py + cellSize * 0.38;
+  const bodyH = cellSize * 0.48;
+  ctx.fillStyle = COLORS.chestEdge;
+  ctx.fillRect(px + m, bodyY, cellSize - m * 2, bodyH);
+  ctx.fillStyle = COLORS.chest;
+  ctx.fillRect(px + m + 2, bodyY + 2, cellSize - m * 2 - 4, bodyH - 4);
+  // Gold highlight stripe
+  ctx.fillStyle = 'rgba(255,240,160,0.45)';
+  ctx.fillRect(px + m + 3, bodyY + 3, cellSize - m * 2 - 6, 3);
+  // Lid
+  ctx.fillStyle = COLORS.chestEdge;
+  ctx.fillRect(px + m - 1, py + cellSize * 0.22, cellSize - m * 2 + 2, cellSize * 0.22);
+  ctx.fillStyle = COLORS.chestLid;
+  ctx.fillRect(px + m + 1, py + cellSize * 0.24, cellSize - m * 2 - 2, cellSize * 0.16);
+  ctx.fillStyle = 'rgba(255,255,220,0.5)';
+  ctx.fillRect(px + m + 2, py + cellSize * 0.25, cellSize - m * 2 - 4, 3);
+  // Lock
+  ctx.fillStyle = COLORS.chestLock;
+  const lx = px + cellSize / 2 - 3;
+  const ly = py + cellSize * 0.42;
+  ctx.fillRect(lx, ly, 6, 7);
+  ctx.fillStyle = '#e8c547';
+  ctx.fillRect(lx + 1, ly + 1, 4, 3);
+}
 
 export function drawHouse(ctx, blueprint, houseData, floor, opts = {}) {
   const {
@@ -160,7 +377,11 @@ export function drawHouse(ctx, blueprint, houseData, floor, opts = {}) {
     ox = 0,
     oy = 0,
     cellSize = TILE,
+    vignette = true,
   } = opts;
+
+  const mapW = COLS * cellSize;
+  const mapH = ROWS * cellSize;
 
   for (let y = 0; y < ROWS; y++) {
     for (let x = 0; x < COLS; x++) {
@@ -169,103 +390,131 @@ export function drawHouse(ctx, blueprint, houseData, floor, opts = {}) {
       const py = oy + y * cellSize;
 
       if (t === T.WALL) {
-        ctx.fillStyle = COLORS.wall;
-        ctx.fillRect(px, py, cellSize, cellSize);
-        ctx.fillStyle = COLORS.wallEdge;
-        ctx.fillRect(px, py, cellSize, 3);
+        drawWallTile(ctx, px, py, cellSize);
       } else if (t === T.DOOR) {
-        ctx.fillStyle = COLORS.floor;
-        ctx.fillRect(px, py, cellSize, cellSize);
-        ctx.fillStyle = COLORS.door;
-        ctx.fillRect(px + 4, py + 4, cellSize - 8, cellSize - 8);
+        drawDoorTile(ctx, px, py, cellSize);
       } else if (t === T.STAIRS_UP) {
-        ctx.fillStyle = COLORS.stairsUp;
-        ctx.fillRect(px, py, cellSize, cellSize);
-        ctx.fillStyle = '#fff';
-        ctx.font = `bold ${Math.floor(cellSize * 0.35)}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('▲', px + cellSize / 2, py + cellSize / 2);
+        drawStairsTile(ctx, px, py, cellSize, true);
       } else if (t === T.STAIRS_DOWN) {
-        ctx.fillStyle = COLORS.stairsDown;
-        ctx.fillRect(px, py, cellSize, cellSize);
-        ctx.fillStyle = '#fff';
-        ctx.font = `bold ${Math.floor(cellSize * 0.35)}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('▼', px + cellSize / 2, py + cellSize / 2);
+        drawStairsTile(ctx, px, py, cellSize, false);
       } else {
-        const alt = (x + y) % 2 === 0;
-        ctx.fillStyle = alt ? COLORS.floor : COLORS.floorAlt;
-        ctx.fillRect(px, py, cellSize, cellSize);
+        drawWoodFloor(ctx, px, py, cellSize, x, y);
       }
     }
   }
 
-  // Traps
+  // Soft floor ambient glow in center
+  if (vignette) {
+    const grd = ctx.createRadialGradient(
+      ox + mapW / 2, oy + mapH / 2, mapW * 0.15,
+      ox + mapW / 2, oy + mapH / 2, mapW * 0.72
+    );
+    grd.addColorStop(0, 'rgba(255,230,180,0.07)');
+    grd.addColorStop(0.55, 'rgba(0,0,0,0)');
+    grd.addColorStop(1, 'rgba(0,0,0,0.28)');
+    ctx.fillStyle = grd;
+    ctx.fillRect(ox, oy, mapW, mapH);
+  }
+
   if (showTraps && houseData) {
-    for (const tr of houseData.traps) {
-      if (tr.floor !== floor) continue;
+    for (const raw of houseData.traps) {
+      const tr = normalizeTrap(raw);
+      if (!tr || tr.floor !== floor) continue;
       const key = `${tr.floor},${tr.x},${tr.y}`;
       const px = ox + tr.x * cellSize;
       const py = oy + tr.y * cellSize;
-      const triggered = triggeredTraps.has(key);
-      ctx.fillStyle = triggered ? '#444' : COLORS.trapArmed;
-      ctx.beginPath();
-      ctx.arc(px + cellSize / 2, py + cellSize / 2, cellSize * 0.28, 0, Math.PI * 2);
-      ctx.fill();
-      if (!triggered) {
-        ctx.strokeStyle = '#ff6666';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        ctx.fillStyle = '#fff';
-        ctx.font = `bold ${Math.floor(cellSize * 0.4)}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('!', px + cellSize / 2, py + cellSize / 2 + 1);
-      }
+      drawTrapSprite(ctx, tr, triggeredTraps.has(key), px, py, cellSize);
     }
   }
 
-  // Chest
   if (showChest && houseData && houseData.chest && houseData.chest.floor === floor) {
     const c = houseData.chest;
-    const px = ox + c.x * cellSize;
-    const py = oy + c.y * cellSize;
-    ctx.fillStyle = COLORS.chest;
-    ctx.fillRect(px + 6, py + 10, cellSize - 12, cellSize - 14);
-    ctx.fillStyle = COLORS.chestLid;
-    ctx.fillRect(px + 4, py + 6, cellSize - 8, 8);
-    ctx.fillStyle = '#5c4010';
-    ctx.fillRect(px + cellSize / 2 - 3, py + 14, 6, 6);
+    drawChestSprite(ctx, ox + c.x * cellSize, oy + c.y * cellSize, cellSize);
   }
 }
 
 export function drawPlayer(ctx, x, y, color, ox, oy, cellSize = TILE, pulse = 0) {
   const px = ox + x * cellSize + cellSize / 2;
   const py = oy + y * cellSize + cellSize / 2;
-  const r = cellSize * 0.32 + Math.sin(pulse) * 1.5;
-  ctx.fillStyle = color;
+  const bob = Math.sin(pulse) * 1.2;
+  const s = cellSize;
+
+  // Soft shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.28)';
   ctx.beginPath();
-  ctx.arc(px, py, r, 0, Math.PI * 2);
+  ctx.ellipse(px, py + s * 0.28, s * 0.22, s * 0.1, 0, 0, Math.PI * 2);
   ctx.fill();
+
+  // Legs
+  ctx.fillStyle = shadeColor(color, -35);
+  ctx.fillRect(px - s * 0.14, py + s * 0.08 + bob, s * 0.1, s * 0.18);
+  ctx.fillRect(px + s * 0.04, py + s * 0.08 + bob, s * 0.1, s * 0.18);
+
+  // Body
+  ctx.fillStyle = color;
+  roundRect(ctx, px - s * 0.2, py - s * 0.12 + bob, s * 0.4, s * 0.28, 3);
+  ctx.fill();
+  // Body highlight
+  ctx.fillStyle = 'rgba(255,255,255,0.22)';
+  roundRect(ctx, px - s * 0.16, py - s * 0.1 + bob, s * 0.32, s * 0.1, 2);
+  ctx.fill();
+
+  // Head
+  ctx.fillStyle = '#f5d0b0';
+  ctx.beginPath();
+  ctx.arc(px, py - s * 0.22 + bob, s * 0.18, 0, Math.PI * 2);
+  ctx.fill();
+  // Hair / cap in player color
+  ctx.fillStyle = shadeColor(color, -20);
+  ctx.beginPath();
+  ctx.arc(px, py - s * 0.28 + bob, s * 0.17, Math.PI, 0);
+  ctx.fill();
+
+  // Eyes
+  ctx.fillStyle = '#1a1020';
+  ctx.beginPath();
+  ctx.arc(px - s * 0.06, py - s * 0.22 + bob, s * 0.035, 0, Math.PI * 2);
+  ctx.arc(px + s * 0.06, py - s * 0.22 + bob, s * 0.035, 0, Math.PI * 2);
+  ctx.fill();
+  // Eye shine
   ctx.fillStyle = '#fff';
   ctx.beginPath();
-  ctx.arc(px - r * 0.3, py - r * 0.2, r * 0.22, 0, Math.PI * 2);
-  ctx.arc(px + r * 0.3, py - r * 0.2, r * 0.22, 0, Math.PI * 2);
+  ctx.arc(px - s * 0.05, py - s * 0.23 + bob, s * 0.015, 0, Math.PI * 2);
+  ctx.arc(px + s * 0.07, py - s * 0.23 + bob, s * 0.015, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = '#111';
+
+  // Smile
+  ctx.strokeStyle = '#8a5040';
+  ctx.lineWidth = 1.2;
   ctx.beginPath();
-  ctx.arc(px - r * 0.3, py - r * 0.2, r * 0.1, 0, Math.PI * 2);
-  ctx.arc(px + r * 0.3, py - r * 0.2, r * 0.1, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.arc(px, py - s * 0.16 + bob, s * 0.07, 0.15 * Math.PI, 0.85 * Math.PI);
+  ctx.stroke();
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function shadeColor(hex, amt) {
+  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!m) return hex;
+  const clamp = (n) => Math.max(0, Math.min(255, n));
+  const r = clamp(parseInt(m[1], 16) + amt);
+  const g = clamp(parseInt(m[2], 16) + amt);
+  const b = clamp(parseInt(m[3], 16) + amt);
+  return `rgb(${r},${g},${b})`;
 }
 
 export function floorLabel(f) {
   return `${f + 1}F`;
 }
 
-/** Collect all placeable floor cells */
 export function listPlaceable(blueprint) {
   const cells = [];
   for (let f = 0; f < FLOORS; f++) {
@@ -289,41 +538,35 @@ function shuffle(arr) {
 
 /**
  * COM house generation: prefer upper floors / corner rooms for chest,
- * traps near doors, stairs approaches, and mid-room choke points.
- * Imperfect — not every good spot is used.
+ * traps near doors, stairs approaches — mix of normal + pit.
  */
 export function generateComHouse(blueprint) {
   const cells = listPlaceable(blueprint);
   const spawn = getSpawn();
   const dist = (c) => Math.abs(c.x - spawn.x) + Math.abs(c.y - spawn.y) + c.floor * 4;
 
-  // Prefer chest far from spawn, often 2F/3F
   const chestCandidates = shuffle(cells)
     .filter((c) => !(c.floor === spawn.floor && c.x === spawn.x && c.y === spawn.y))
     .sort((a, b) => dist(b) - dist(a));
-  // Pick from top 40% with some randomness
   const topN = Math.max(5, (chestCandidates.length * 0.4) | 0);
   const chest = chestCandidates[(Math.random() * topN) | 0];
 
   const used = new Set([`${chest.floor},${chest.x},${chest.y}`]);
 
-  // Trap heuristic scores
   function trapScore(c) {
     let s = 0;
-    // Near doors / stairs
     for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
       const t = tileAt(blueprint, c.floor, c.x + dx, c.y + dy);
       if (t === T.DOOR) s += 4;
       if (t === T.STAIRS_UP || t === T.STAIRS_DOWN) s += 5;
     }
-    // Prefer same floor as chest sometimes (guard)
     if (c.floor === chest.floor) s += 2;
-    // Near chest but not on it
     const cd = Math.abs(c.x - chest.x) + Math.abs(c.y - chest.y);
     if (c.floor === chest.floor && cd >= 1 && cd <= 3) s += 3;
-    // Spawn area lightly
     if (c.floor === 0 && dist(c) <= 4) s += 1;
-    s += Math.random() * 2; // noise
+    // Pits are more interesting on upper floors
+    if (c.floor > 0) s += 1;
+    s += Math.random() * 2;
     return s;
   }
 
@@ -334,14 +577,26 @@ export function generateComHouse(blueprint) {
 
   const traps = [];
   const want = MAX_TRAPS;
-  // Take good spots but skip some (imperfect) — every other or random reject
   for (let i = 0; i < trapPool.length && traps.length < want; i++) {
-    if (Math.random() < 0.22 && traps.length > 1) continue; // skip some good ones
+    if (Math.random() < 0.22 && traps.length > 1) continue;
     const { c } = trapPool[i];
     const key = `${c.floor},${c.x},${c.y}`;
     if (used.has(key)) continue;
     used.add(key);
-    traps.push({ floor: c.floor, x: c.x, y: c.y });
+    // Mix: prefer pit on 2F/3F (~45%), normal otherwise; ensure both kinds appear often
+    let kind = TRAP_NORMAL;
+    if (c.floor > 0 && Math.random() < 0.55) kind = TRAP_PIT;
+    else if (c.floor === 0 && Math.random() < 0.25) kind = TRAP_PIT;
+    else if (Math.random() < 0.4) kind = TRAP_PIT;
+    traps.push({ floor: c.floor, x: c.x, y: c.y, kind });
+  }
+
+  // Guarantee at least one of each kind when we have 2+ traps
+  if (traps.length >= 2) {
+    const hasPit = traps.some((t) => t.kind === TRAP_PIT);
+    const hasNormal = traps.some((t) => t.kind === TRAP_NORMAL);
+    if (!hasPit) traps[0].kind = TRAP_PIT;
+    if (!hasNormal) traps[traps.length - 1].kind = TRAP_NORMAL;
   }
 
   return { chest: { floor: chest.floor, x: chest.x, y: chest.y }, traps };

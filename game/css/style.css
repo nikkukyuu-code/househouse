@@ -25,7 +25,7 @@ body {
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
-  background: #120e18;
+  background: #0e0a14;
   color: #f5f0e8;
   font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP",
     "Yu Gothic", sans-serif;
@@ -45,7 +45,9 @@ body {
   overflow: hidden;
   overscroll-behavior: none;
   touch-action: none;
-  background: linear-gradient(180deg, #1a1424 0%, #120e18 100%);
+  background:
+    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(201, 162, 39, 0.12), transparent 55%),
+    linear-gradient(180deg, #1e1628 0%, #120e18 45%, #0c0812 100%);
   display: flex;
   flex-direction: column;
 }
@@ -75,22 +77,50 @@ body {
   text-align: center;
   padding-left: 14px;
   padding-right: 14px;
+  position: relative;
+}
+.title-glow {
+  position: absolute;
+  top: 18%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(280px, 70vw);
+  height: min(120px, 18vh);
+  background: radial-gradient(ellipse, rgba(255, 200, 80, 0.22), transparent 70%);
+  pointer-events: none;
+  filter: blur(8px);
 }
 .title-logo {
+  position: relative;
   font-size: clamp(1.6rem, 7vh, 2.6rem);
   font-weight: 900;
   letter-spacing: 0.08em;
   color: #ffe08a;
-  text-shadow: 0 3px 0 #8b5a1a, 0 0 20px rgba(255, 200, 80, 0.35);
+  text-shadow:
+    0 3px 0 #8b5a1a,
+    0 6px 0 rgba(60, 30, 10, 0.35),
+    0 0 28px rgba(255, 200, 80, 0.45),
+    0 0 60px rgba(255, 160, 40, 0.2);
   flex-shrink: 0;
   line-height: 1.15;
+  background: linear-gradient(180deg, #fff6c8 0%, #ffe08a 40%, #e8b84a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  /* Fallback color when clip unsupported still shows via text-shadow stack */
+}
+@supports (-webkit-background-clip: text) or (background-clip: text) {
+  .title-logo {
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+  }
 }
 .title-sub {
   font-size: clamp(0.75rem, 2.2vh, 0.9rem);
-  color: #b8a890;
+  color: #c4b498;
   margin-bottom: clamp(4px, 1.5vh, 16px);
   line-height: 1.4;
   flex-shrink: 0;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.4);
 }
 .btn-col {
   display: flex;
@@ -103,7 +133,7 @@ body {
 .btn {
   appearance: none;
   border: none;
-  border-radius: 12px;
+  border-radius: 14px;
   padding: clamp(8px, 1.6vh, 14px) 16px;
   font-size: clamp(0.9rem, 2.4vh, 1.05rem);
   font-weight: 700;
@@ -111,31 +141,41 @@ body {
   cursor: pointer;
   touch-action: manipulation;
   min-height: clamp(40px, 6.5vh, 52px);
-  transition: transform 0.08s, filter 0.15s;
+  transition: transform 0.08s, filter 0.15s, box-shadow 0.15s;
   -webkit-tap-highlight-color: transparent;
+  position: relative;
 }
-.btn:active, .btn.pressed { transform: scale(0.97); filter: brightness(0.92); }
+.btn:active, .btn.pressed { transform: scale(0.97) translateY(1px); filter: brightness(0.92); }
 .btn:disabled { opacity: 0.45; pointer-events: none; }
 .btn-com {
-  background: linear-gradient(180deg, #5ecf8a, #2e9a58);
+  background: linear-gradient(180deg, #7ee0a4 0%, #5ecf8a 35%, #2e9a58 100%);
   color: #0a1a10;
-  box-shadow: 0 3px 0 #1a6a38;
+  box-shadow:
+    0 4px 0 #1a6a38,
+    0 6px 16px rgba(46, 154, 88, 0.35),
+    inset 0 1px 0 rgba(255,255,255,0.35);
 }
 .btn-primary {
-  background: linear-gradient(180deg, #f0b429, #c9841a);
+  background: linear-gradient(180deg, #ffd060 0%, #f0b429 40%, #c9841a 100%);
   color: #1a1008;
-  box-shadow: 0 3px 0 #8a5a10;
+  box-shadow:
+    0 4px 0 #8a5a10,
+    0 6px 16px rgba(201, 132, 26, 0.35),
+    inset 0 1px 0 rgba(255,255,255,0.4);
 }
 .btn-secondary {
-  background: linear-gradient(180deg, #4a7ec8, #2f5a9a);
+  background: linear-gradient(180deg, #6a9ae0 0%, #4a7ec8 40%, #2f5a9a 100%);
   color: #fff;
-  box-shadow: 0 3px 0 #1e3a6a;
+  box-shadow:
+    0 4px 0 #1e3a6a,
+    0 6px 16px rgba(47, 90, 154, 0.35),
+    inset 0 1px 0 rgba(255,255,255,0.25);
 }
 .btn-ghost {
-  background: rgba(255,255,255,0.08);
+  background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.05));
   color: #ddd;
-  border: 2px solid rgba(255,255,255,0.15);
-  box-shadow: none;
+  border: 2px solid rgba(255,255,255,0.18);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
 }
 .btn-danger {
   background: linear-gradient(180deg, #e05555, #a03030);
@@ -160,33 +200,42 @@ body {
 }
 .lobby-label { color: #cbb896; font-size: clamp(0.8rem, 2.2vh, 0.95rem); }
 .room-code {
-  font-size: clamp(1.8rem, 6vh, 2.5rem);
+  font-size: clamp(1.6rem, 5.5vh, 2.3rem);
   font-weight: 900;
-  letter-spacing: 0.3em;
+  letter-spacing: 0.22em;
   color: #ffe08a;
-  padding: clamp(8px, 1.5vh, 12px) 8px clamp(8px, 1.5vh, 12px) 0.3em;
-  background: rgba(0,0,0,0.35);
-  border-radius: 12px;
+  padding: clamp(8px, 1.5vh, 12px) 8px clamp(8px, 1.5vh, 12px) 0.22em;
+  background:
+    linear-gradient(180deg, rgba(40, 30, 20, 0.7), rgba(0,0,0,0.45));
+  border-radius: 14px;
   border: 2px dashed #c9a227;
-  min-width: min(220px, 80vw);
+  box-shadow:
+    0 0 24px rgba(201, 162, 39, 0.2),
+    inset 0 1px 0 rgba(255, 224, 138, 0.15);
+  min-width: min(260px, 86vw);
+  font-variant-numeric: tabular-nums;
 }
 .join-input {
   font-size: clamp(1.3rem, 4.5vh, 1.7rem);
   font-weight: 800;
-  letter-spacing: 0.25em;
+  letter-spacing: 0.28em;
   text-align: center;
-  text-transform: uppercase;
+  text-transform: none;
   padding: clamp(10px, 1.8vh, 14px);
   width: 100%;
   max-width: 280px;
-  border-radius: 12px;
+  border-radius: 14px;
   border: 3px solid #c9a227;
-  background: #fffef8;
+  background: linear-gradient(180deg, #fffef8, #f5edd8);
   color: #1a1008;
   font-family: inherit;
+  font-variant-numeric: tabular-nums;
   touch-action: manipulation;
   -webkit-user-select: text;
   user-select: text;
+  box-shadow:
+    0 4px 12px rgba(0,0,0,0.25),
+    inset 0 1px 0 #fff;
 }
 .hidden { display: none !important; }
 .status-msg {
@@ -199,7 +248,7 @@ body {
 .status-msg.warn { color: #ff8a7a; }
 .status-msg.ok { color: #8ddea0; }
 
-/* ---- Setup: chrome shrinks, canvas flex-fills ---- */
+/* ---- Setup ---- */
 #screen-setup {
   gap: clamp(3px, 0.8vh, 6px);
   padding-top: max(4px, env(safe-area-inset-top, 0px));
@@ -213,6 +262,7 @@ body {
   color: #ffe08a;
   margin-bottom: 2px;
   line-height: 1.2;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.4);
 }
 .setup-counts {
   display: flex;
@@ -225,7 +275,7 @@ body {
 
 .floor-tabs, .tool-row {
   display: flex;
-  gap: clamp(4px, 1vw, 8px);
+  gap: clamp(3px, 0.8vw, 6px);
   justify-content: center;
   flex: 0 0 auto;
   flex-wrap: nowrap;
@@ -233,36 +283,44 @@ body {
 .floor-tab, .tool-btn {
   appearance: none;
   border: 2px solid rgba(255,255,255,0.2);
-  background: rgba(255,255,255,0.06);
+  background: linear-gradient(180deg, rgba(255,255,255,0.1), rgba(255,255,255,0.04));
   color: #eee;
   border-radius: 10px;
-  padding: clamp(6px, 1.2vh, 10px) clamp(8px, 2.5vw, 14px);
-  font-size: clamp(0.8rem, 2.2vh, 0.95rem);
+  padding: clamp(5px, 1vh, 9px) clamp(4px, 1.5vw, 10px);
+  font-size: clamp(0.68rem, 1.9vh, 0.85rem);
   font-weight: 700;
   font-family: inherit;
-  min-height: clamp(36px, 5.5vh, 46px);
+  min-height: clamp(34px, 5.2vh, 44px);
   min-width: 0;
   flex: 1 1 auto;
   max-width: 110px;
   cursor: pointer;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);
 }
-.tool-btn { max-width: 120px; }
+.tool-btn { max-width: 96px; }
 .floor-tab.active, .tool-btn.active {
-  background: #c9a227;
+  background: linear-gradient(180deg, #e8c547, #c9a227);
   color: #1a1008;
   border-color: #ffe08a;
+  box-shadow:
+    0 2px 8px rgba(201, 162, 39, 0.4),
+    inset 0 1px 0 rgba(255,255,255,0.45);
 }
 
 #setup-canvas-wrap {
   flex: 1 1 auto;
   min-height: 0;
   position: relative;
-  border-radius: 10px;
+  border-radius: 12px;
   overflow: hidden;
-  background: #0d0a12;
-  border: 2px solid rgba(201,162,39,0.35);
+  background:
+    radial-gradient(ellipse at center, #1a1424 0%, #0d0a12 100%);
+  border: 2px solid rgba(201,162,39,0.4);
+  box-shadow:
+    inset 0 0 40px rgba(0,0,0,0.45),
+    0 0 16px rgba(201, 162, 39, 0.12);
 }
 #setup-canvas {
   width: 100%;
@@ -279,7 +337,7 @@ body {
 .setup-actions .btn { flex: 1; min-height: clamp(38px, 6vh, 48px); }
 
 .legend {
-  font-size: clamp(0.6rem, 1.6vh, 0.72rem);
+  font-size: clamp(0.55rem, 1.5vh, 0.7rem);
   color: #887868;
   text-align: center;
   flex: 0 0 auto;
@@ -289,7 +347,7 @@ body {
   text-overflow: ellipsis;
 }
 
-/* ---- Match: equal split halves, controls overlay ---- */
+/* ---- Match ---- */
 #screen-match {
   padding: 0;
   position: relative;
@@ -306,6 +364,7 @@ body {
 }
 .match-half.top {
   border-bottom: 2px solid #c9a227;
+  box-shadow: 0 2px 12px rgba(201, 162, 39, 0.15);
 }
 .match-half.bot { border-bottom: none; }
 .match-hud {
@@ -313,14 +372,14 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 2px 8px;
-  background: rgba(0,0,0,0.55);
+  background: linear-gradient(180deg, rgba(0,0,0,0.7), rgba(0,0,0,0.5));
   flex: 0 0 auto;
   z-index: 2;
   height: clamp(22px, 3.5vh, 28px);
 }
 .match-hud .label { font-size: clamp(0.65rem, 1.8vh, 0.75rem); color: #cbb896; }
 .hearts { letter-spacing: 2px; font-size: clamp(0.95rem, 2.4vh, 1.1rem); }
-.heart.full { color: #ff4d6a; }
+.heart.full { color: #ff4d6a; text-shadow: 0 0 6px rgba(255, 77, 106, 0.5); }
 .heart.empty { color: #554444; }
 
 .match-canvas-wrap {
@@ -354,7 +413,6 @@ body {
 }
 .flash-fx.show { opacity: 1; }
 
-/* D-pad overlays bottom canvas — never pushes layout */
 .dpad {
   position: absolute;
   right: max(6px, env(safe-area-inset-right, 0px));
@@ -363,16 +421,16 @@ body {
   height: min(132px, 36vw, 28vh);
   z-index: 10;
   touch-action: none;
-  filter: drop-shadow(0 3px 6px rgba(0,0,0,0.5));
+  filter: drop-shadow(0 4px 10px rgba(0,0,0,0.55));
   pointer-events: auto;
 }
 .dpad-btn {
   position: absolute;
   width: 34%;
   height: 34%;
-  border-radius: 10px;
-  border: 2px solid rgba(255,255,255,0.35);
-  background: rgba(30, 40, 60, 0.78);
+  border-radius: 12px;
+  border: 2px solid rgba(255,255,255,0.4);
+  background: linear-gradient(180deg, rgba(50, 65, 95, 0.88), rgba(25, 35, 55, 0.9));
   color: #fff;
   font-size: clamp(0.9rem, 3vh, 1.3rem);
   font-weight: 900;
@@ -383,8 +441,13 @@ body {
   -webkit-tap-highlight-color: transparent;
   user-select: none;
   padding: 0;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.2);
 }
-.dpad-btn.pressed { background: rgba(201, 162, 39, 0.9); color: #1a1008; }
+.dpad-btn.pressed {
+  background: linear-gradient(180deg, #e8c547, #c9a227);
+  color: #1a1008;
+  border-color: #ffe08a;
+}
 .dpad-btn.up { top: 0; left: 50%; transform: translateX(-50%); }
 .dpad-btn.down { bottom: 0; left: 50%; transform: translateX(-50%); }
 .dpad-btn.left { left: 0; top: 50%; transform: translateY(-50%); }
@@ -402,11 +465,12 @@ body {
   pointer-events: none;
 }
 
-/* Result overlay — fixed within viewport */
 #result-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(10, 8, 16, 0.9);
+  background:
+    radial-gradient(ellipse at center, rgba(40, 30, 20, 0.5), transparent 60%),
+    rgba(10, 8, 16, 0.92);
   display: none;
   flex-direction: column;
   align-items: center;
@@ -421,8 +485,12 @@ body {
 #result-title {
   font-size: clamp(1.8rem, 7vh, 2.4rem);
   font-weight: 900;
+  text-shadow: 0 4px 16px rgba(0,0,0,0.5);
 }
-#result-title.win { color: #ffe08a; }
+#result-title.win {
+  color: #ffe08a;
+  text-shadow: 0 0 24px rgba(255, 200, 80, 0.5), 0 4px 16px rgba(0,0,0,0.5);
+}
 #result-title.lose { color: #ff8a7a; }
 #result-sub {
   color: #b8a890;
@@ -433,13 +501,14 @@ body {
 
 @media (min-width: 500px) {
   #app {
-    box-shadow: 0 0 40px rgba(0,0,0,0.6);
+    box-shadow:
+      0 0 60px rgba(0,0,0,0.7),
+      0 0 1px rgba(201, 162, 39, 0.3);
     border-left: 1px solid rgba(255,255,255,0.06);
     border-right: 1px solid rgba(255,255,255,0.06);
   }
 }
 
-/* Very short viewports: compress chrome further */
 @media (max-height: 560px) {
   .title-sub br { display: none; }
   .peer-note { display: none; }
@@ -449,4 +518,5 @@ body {
     width: min(110px, 32vw, 26vh);
     height: min(110px, 32vw, 26vh);
   }
+  .tool-btn { font-size: clamp(0.6rem, 1.6vh, 0.75rem); padding-left: 2px; padding-right: 2px; }
 }

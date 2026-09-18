@@ -31,11 +31,18 @@ export function isPeerAvailable() {
   return !!PeerCtor || !!(typeof window !== 'undefined' && window.Peer);
 }
 
+/** Exactly 6 digits (000000–999999, leading zeros OK) */
 function genRoomCode() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let c = '';
-  for (let i = 0; i < 4; i++) c += chars[(Math.random() * chars.length) | 0];
-  return c;
+  const n = (Math.random() * 1000000) | 0;
+  return String(n).padStart(6, '0');
+}
+
+export function normalizeRoomCode(code) {
+  return String(code || '').trim().replace(/\D/g, '');
+}
+
+export function isValidRoomCode(code) {
+  return /^\d{6}$/.test(normalizeRoomCode(code));
 }
 
 /**
@@ -89,8 +96,8 @@ export class NetSession {
     const ok = await loadPeerJS();
     if (!ok) throw new Error('PeerJSを読み込めませんでした');
     PeerCtor = window.Peer;
-    code = String(code).trim().toUpperCase();
-    if (!/^[A-Z0-9]{4}$/.test(code)) throw new Error('ルームコードは4文字です');
+    code = normalizeRoomCode(code);
+    if (!/^\d{6}$/.test(code)) throw new Error('ルームコードは6桁の数字です');
     this.roomCode = code;
     this.role = 'guest';
     this._status('接続中…');

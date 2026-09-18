@@ -4,46 +4,45 @@
 
 import {
   TILE, FLOORS, COLS, ROWS, T, MAX_TRAPS, MAX_HP,
+  TRAP_NORMAL, TRAP_PIT, normalizeTrap,
   createBlueprint, createEmptyHouseData, isWalkable, isPlaceable,
-  validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, floorLabel, COLORS,
-  generateComHouse,
+  validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
+  floorLabel, COLORS, generateComHouse, parseHouse,
 } from './house.js';
-import { NetSession, loadPeerJS, isPeerAvailable } from './net.js';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js';
 import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js';
 
 const blueprint = createBlueprint();
 
 /** App state */
 const S = {
-  mode: null, // 'online-host' | 'online-guest' | 'local'
+  mode: null, // 'online-host' | 'online-guest' | 'local' | 'com'
   net: null,
   phase: 'title',
-  // houses
   myHouse: createEmptyHouseData(),
   theirHouse: createEmptyHouseData(),
-  setupTool: 'chest', // 'chest' | 'trap' | 'erase'
+  setupTool: 'chest', // 'chest' | 'trap-normal' | 'trap-pit' | 'erase'
   setupFloor: 0,
-  setupWhich: 'mine', // 'mine' | 'theirs' (local sequential)
-  localStep: 0, // 0=design mine, 1=design theirs
-  // match
+  setupWhich: 'mine',
+  localStep: 0,
   me: null,
-  foe: null, // for local: AI explorer in my house
+  foe: null,
   myHp: MAX_HP,
   foeHp: MAX_HP,
   myTriggered: new Set(),
   foeTriggered: new Set(),
   ended: false,
-  winner: null, // 'me' | 'foe' | null
-  // input
-  holdDir: null, // 'u'|'d'|'l'|'r'
+  winner: null,
+  holdDir: null,
   moveCooldown: 0,
-  // fx
   fx: [],
   time: 0,
   readyMine: false,
   readyTheirs: false,
   peerReady: false,
   iAmReady: false,
+  /** After win/lose, reveal opponent chest on bottom view */
+  revealSecrets: false,
 };
 
 let canvTop, canvBot, ctxTop, ctxBot;
@@ -77,7 +76,6 @@ function resizeCanvases() {
   }
 }
 
-/* ---------- Player entity ---------- */
 function makeExplorer(houseData, label) {
   const sp = getSpawn();
   return {
@@ -100,10 +98,8 @@ function tryMove(ex, dx, dy) {
   if (!isWalkable(t)) return false;
   ex.x = nx;
   ex.y = ny;
-  // stairs
   if (t === T.STAIRS_UP && ex.floor < FLOORS - 1) {
     ex.floor += 1;
-    // land on stairs down of upper floor if exists, else same xy
     const down = findStairs(ex.floor, T.STAIRS_DOWN);
     if (down) { ex.x = down.x; ex.y = down.y; }
   } else if (t === T.STAIRS_DOWN && ex.floor > 0) {
@@ -123,11 +119,69 @@ function findStairs(floor, kind) {
   return null;
 }
 
+/**
+ * Pitfall drop: if not on 1F, go to floor below.
+ * Prefer same x,y if walkable; else near stairs-down of the floor fallen from
+ * (arrive at stairs-up on the lower floor); else any walkable.
+ */
+function applyPitfallDrop(ex) {
+  if (ex.floor <= 0) return false;
+  const fromFloor = ex.floor;
+  const sx = ex.x;
+  const sy = ex.y;
+  ex.floor -= 1;
+
+  if (isWalkable(tileAt(blueprint, ex.floor, sx, sy))) {
+    ex.x = sx;
+    ex.y = sy;
+    return true;
+  }
+
+  // Stairs-down on the floor we fell from → land at stairs-up on new floor
+  const downOnFrom = findStairs(fromFloor, T.STAIRS_DOWN);
+  if (downOnFrom) {
+    const neighbors = [
+      { x: downOnFrom.x, y: downOnFrom.y },
+      { x: downOnFrom.x + 1, y: downOnFrom.y },
+      { x: downOnFrom.x - 1, y: downOnFrom.y },
+      { x: downOnFrom.x, y: downOnFrom.y + 1 },
+      { x: downOnFrom.x, y: downOnFrom.y - 1 },
+    ];
+    for (const n of neighbors) {
+      if (isWalkable(tileAt(blueprint, ex.floor, n.x, n.y))) {
+        ex.x = n.x;
+        ex.y = n.y;
+        return true;
+      }
+    }
+  }
+
+  const up = findStairs(ex.floor, T.STAIRS_UP);
+  if (up && isWalkable(tileAt(blueprint, ex.floor, up.x, up.y))) {
+    ex.x = up.x;
+    ex.y = up.y;
+    return true;
+  }
+
+  // Any walkable cell
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      if (isWalkable(tileAt(blueprint, ex.floor, x, y))) {
+        ex.x = x;
+        ex.y = y;
+        return true;
+      }
+    }
+  }
+  return true;
+}
+
 function checkHazards(ex, triggeredSet, onTrap, onChest) {
   const h = ex.house;
   if (!h) return;
-  // traps
-  for (const tr of h.traps) {
+  for (const raw of h.traps) {
+    const tr = normalizeTrap(raw);
+    if (!tr) continue;
     if (tr.floor === ex.floor && tr.x === ex.x && tr.y === ex.y) {
       const key = `${tr.floor},${tr.x},${tr.y}`;
       if (!triggeredSet.has(key)) {
@@ -137,7 +191,6 @@ function checkHazards(ex, triggeredSet, onTrap, onChest) {
       }
     }
   }
-  // chest
   if (h.chest && h.chest.floor === ex.floor && h.chest.x === ex.x && h.chest.y === ex.y) {
     if (!ex.foundChest) {
       ex.foundChest = true;
@@ -146,7 +199,7 @@ function checkHazards(ex, triggeredSet, onTrap, onChest) {
   }
 }
 
-/* ---------- COM / AI explorer (imperfect — no chest omniscience) ---------- */
+/* ---------- COM / AI explorer ---------- */
 function aiStep(ex) {
   if (!ex.visited) ex.visited = new Set();
   if (!ex.memory) ex.memory = { preferFloor: 0, stuck: 0, phase: 0 };
@@ -167,24 +220,18 @@ function aiStep(ex) {
     const nk = `${ex.floor},${nx},${ny}`;
     let s = 0;
     const t = tileAt(blueprint, ex.floor, nx, ny);
-    // Prefer unvisited
     if (!ex.visited.has(nk)) s += 8;
     else s -= 3;
-    // Soft floor progression: explore current floor then go up
     const targetFloor = Math.min(FLOORS - 1, (ex.memory.phase / 55) | 0);
     if (t === T.STAIRS_UP && ex.floor < targetFloor) s += 6;
     if (t === T.STAIRS_UP && ex.floor >= targetFloor && Math.random() < 0.25) s += 3;
     if (t === T.STAIRS_DOWN && ex.floor > targetFloor) s += 5;
-    // Doorways lead to new rooms
     if (t === T.DOOR) s += 2;
-    // Light randomness (imperfect)
     s += Math.random() * 4;
-    // Avoid immediate reverse thrashing
     if (ex.memory.lastDx === -dx && ex.memory.lastDy === -dy) s -= 2;
     return s;
   }
 
-  // Occasionally random move (dumb moment — may hit traps)
   if (Math.random() < 0.12) {
     const shuffled = dirs.slice().sort(() => Math.random() - 0.5);
     for (const [dx, dy] of shuffled) {
@@ -211,7 +258,6 @@ function aiStep(ex) {
     }
   }
   ex.memory.stuck = (ex.memory.stuck || 0) + 1;
-  // Unstick: take any walkable including stairs
   for (const [dx, dy] of dirs.sort(() => Math.random() - 0.5)) {
     if (tryMove(ex, dx, dy)) return true;
   }
@@ -233,19 +279,19 @@ function placeAt(floor, x, y) {
     return;
   }
 
-  // occupied?
   const occChest = house.chest && house.chest.floor === floor && house.chest.x === x && house.chest.y === y;
   const occTrap = house.traps.some((t) => t.floor === floor && t.x === x && t.y === y);
   if (occChest || occTrap) return;
 
   if (S.setupTool === 'chest') {
     house.chest = { floor, x, y };
-  } else if (S.setupTool === 'trap') {
+  } else if (S.setupTool === 'trap-normal' || S.setupTool === 'trap-pit') {
     if (house.traps.length >= MAX_TRAPS) {
       setStatus($('setup-status'), `罠は最大${MAX_TRAPS}個まで`, 'warn');
       return;
     }
-    house.traps.push({ floor, x, y });
+    const kind = S.setupTool === 'trap-pit' ? TRAP_PIT : TRAP_NORMAL;
+    house.traps.push({ floor, x, y, kind });
   }
   updateSetupHud();
   drawSetup();
@@ -262,7 +308,6 @@ function updateSetupHud() {
     title = S.setupWhich === 'mine' ? '① あなたの家を設計' : '② 練習用・相手の家を設計';
   }
   $('setup-title').textContent = title;
-  // floor tabs
   document.querySelectorAll('.floor-tab').forEach((btn) => {
     btn.classList.toggle('active', Number(btn.dataset.floor) === S.setupFloor);
   });
@@ -287,7 +332,6 @@ function drawSetup() {
     triggeredTraps: new Set(),
     ox, oy, cellSize: cs,
   });
-  // highlight placeable lightly
   c._map = { ox, oy, cs };
 }
 
@@ -306,61 +350,12 @@ function setupCanvasTap(e) {
   }
 }
 
-/* ---------- Match rendering ---------- */
-function drawMatchView(ctx, canvas, explorer, houseShown, showSecrets, triggered, title, hp, isOpponentView) {
-  const w = canvas.clientWidth;
-  const h = canvas.clientHeight;
-  ctx.fillStyle = isOpponentView ? '#1a1020' : '#101820';
-  ctx.fillRect(0, 0, w, h);
-  const cs = cellSizeFor(canvas);
-  const ox = Math.floor((w - COLS * cs) / 2);
-  const oy = Math.floor((h - ROWS * cs) / 2) + 4;
-  drawHouse(ctx, blueprint, houseShown, explorer.floor, {
-    showChest: showSecrets,
-    showTraps: showSecrets || triggered.size > 0,
-    // In opponent view (top): you see YOUR traps/chest always
-    // In your view (bottom): you don't see opponent traps until triggered — but we show triggered
-    // Actually: designer sees own house secrets on top; explorer shouldn't see traps on bottom until hit
-    // For bottom: showTraps only for triggered ones — drawHouse shows all if showTraps. Patch:
-    triggeredTraps: triggered,
-    ox, oy, cellSize: cs,
-  });
-  // Re-draw traps selectively for explorer view
-  if (!showSecrets && houseShown) {
-    // clear and redraw without untriggered traps — already drew with showTraps maybe wrong
-    // Simpler: redraw floors then only triggered traps + no chest
-  }
-
-  // Player
-  const color = isOpponentView ? COLORS.player2 : COLORS.player1;
-  drawPlayer(ctx, explorer.x, explorer.y, color, ox, oy, cs, S.time * 0.008);
-
-  // HUD strip
-  ctx.fillStyle = 'rgba(0,0,0,0.55)';
-  ctx.fillRect(0, 0, w, 28);
-  ctx.fillStyle = '#fff';
-  ctx.font = 'bold 13px sans-serif';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(title, 8, 14);
-  ctx.textAlign = 'right';
-  ctx.fillText(floorLabel(explorer.floor), w - 8, 14);
-
-  // FX
-  for (const f of S.fx) {
-    if (f.view !== (isOpponentView ? 'top' : 'bot')) continue;
-    const alpha = Math.max(0, 1 - f.age / f.life);
-    ctx.globalAlpha = alpha;
-    ctx.fillStyle = f.color;
-    ctx.font = `bold ${16 + f.age * 0.05}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.fillText(f.text, w / 2, h * 0.35 - f.age * 0.04);
-    ctx.globalAlpha = 1;
-  }
-}
-
-function redrawMatchSecretsFix(ctx, canvas, explorer, houseShown, showSecrets, triggered, isOpponentView) {
-  // Redraw properly: showSecrets true on top (your house), false on bottom except triggered traps
+/* ---------- Match rendering (visibility rules) ----------
+ * Top (opponent in YOUR house): show YOUR chest + ALL armed traps (incl. pits).
+ * Bottom (you in THEIR house): never show untriggered chest/traps;
+ *   only triggered traps (spent hole/mark). Chest only after found/end.
+ */
+function redrawMatchView(ctx, canvas, explorer, houseShown, showSecrets, triggered, isOpponentView) {
   const w = canvas.clientWidth;
   const h = canvas.clientHeight;
   ctx.fillStyle = isOpponentView ? '#1a1020' : '#101820';
@@ -369,16 +364,21 @@ function redrawMatchSecretsFix(ctx, canvas, explorer, houseShown, showSecrets, t
   const ox = Math.floor((w - COLS * cs) / 2);
   const oy = Math.floor((h - ROWS * cs) / 2) + 6;
 
-  // Draw house base without items
-  drawHouse(ctx, blueprint, null, explorer.floor, { showChest: false, showTraps: false, ox, oy, cellSize: cs });
+  // Base tiles only — never leak secrets via drawHouse items
+  drawHouse(ctx, blueprint, null, explorer.floor, {
+    showChest: false,
+    showTraps: false,
+    ox, oy, cellSize: cs,
+  });
 
   if (houseShown) {
     if (showSecrets) {
-      // all traps + chest
+      // Designer watching: all traps + chest
       drawHouseItems(ctx, houseShown, explorer.floor, triggered, true, true, ox, oy, cs);
     } else {
-      // only triggered traps, no chest
-      drawHouseItems(ctx, houseShown, explorer.floor, triggered, false, false, ox, oy, cs);
+      // Explorer: only triggered traps; chest only if already found or match ended reveal
+      const showChest = !!(explorer.foundChest || S.revealSecrets);
+      drawHouseItems(ctx, houseShown, explorer.floor, triggered, false, showChest, ox, oy, cs);
     }
   }
 
@@ -410,35 +410,17 @@ function redrawMatchSecretsFix(ctx, canvas, explorer, houseShown, showSecrets, t
 }
 
 function drawHouseItems(ctx, houseData, floor, triggered, showAllTraps, showChest, ox, oy, cs) {
-  if (showAllTraps || triggered.size) {
-    for (const tr of houseData.traps) {
-      if (tr.floor !== floor) continue;
-      const key = `${tr.floor},${tr.x},${tr.y}`;
-      const isTrig = triggered.has(key);
-      if (!showAllTraps && !isTrig) continue;
-      const px = ox + tr.x * cs;
-      const py = oy + tr.y * cs;
-      ctx.fillStyle = isTrig ? '#555' : COLORS.trapArmed;
-      ctx.beginPath();
-      ctx.arc(px + cs / 2, py + cs / 2, cs * 0.28, 0, Math.PI * 2);
-      ctx.fill();
-      if (!isTrig) {
-        ctx.fillStyle = '#fff';
-        ctx.font = `bold ${Math.floor(cs * 0.4)}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('!', px + cs / 2, py + cs / 2 + 1);
-      }
-    }
+  for (const raw of houseData.traps) {
+    const tr = normalizeTrap(raw);
+    if (!tr || tr.floor !== floor) continue;
+    const key = `${tr.floor},${tr.x},${tr.y}`;
+    const isTrig = triggered.has(key);
+    if (!showAllTraps && !isTrig) continue;
+    drawTrapSprite(ctx, tr, isTrig, ox + tr.x * cs, oy + tr.y * cs, cs);
   }
   if (showChest && houseData.chest && houseData.chest.floor === floor) {
     const c = houseData.chest;
-    const px = ox + c.x * cs;
-    const py = oy + c.y * cs;
-    ctx.fillStyle = COLORS.chest;
-    ctx.fillRect(px + 6, py + 10, cs - 12, cs - 14);
-    ctx.fillStyle = COLORS.chestLid;
-    ctx.fillRect(px + 4, py + 6, cs - 8, 8);
+    drawChestSprite(ctx, ox + c.x * cs, oy + c.y * cs, cs);
   }
 }
 
@@ -455,6 +437,7 @@ function endGame(winner) {
   if (S.ended) return;
   S.ended = true;
   S.winner = winner;
+  S.revealSecrets = true;
   const overlay = $('result-overlay');
   const title = $('result-title');
   const sub = $('result-sub');
@@ -475,21 +458,49 @@ function endGame(winner) {
 
 /* ---------- Match loop ---------- */
 function onTrapHit(who, tr) {
-  // who: 'me' (I stepped on their trap) or 'foe' (they stepped on my trap)
+  const kind = tr.kind === TRAP_PIT ? TRAP_PIT : TRAP_NORMAL;
+  const isPit = kind === TRAP_PIT;
+
   if (who === 'me') {
     S.myHp = Math.max(0, S.myHp - 1);
-    addFx('bot', '罠だ！', '#ff4444');
-    flashOverlay($('flash-bot'), '💥 罠！', 600);
+    if (isPit) {
+      applyPitfallDrop(S.me);
+      addFx('bot', '落とし穴！', '#aa66ff');
+      flashOverlay($('flash-bot'), '🕳 落とし穴！', 700);
+    } else {
+      addFx('bot', '罠だ！', '#ff4444');
+      flashOverlay($('flash-bot'), '💥 罠！', 600);
+    }
     if (S.myHp <= 0) endGame('foe');
   } else {
     S.foeHp = Math.max(0, S.foeHp - 1);
-    addFx('top', '罠作動！', '#ffaa00');
-    flashOverlay($('flash-top'), '💥 罠作動！', 600);
+    if (isPit && S.foe) {
+      applyPitfallDrop(S.foe);
+      addFx('top', '落とし穴作動！', '#aa66ff');
+      flashOverlay($('flash-top'), '🕳 落とし穴！', 700);
+    } else {
+      addFx('top', '罠作動！', '#ffaa00');
+      flashOverlay($('flash-top'), '💥 罠作動！', 600);
+    }
     if (S.foeHp <= 0) endGame('me');
   }
   updateHpBars();
   if (S.mode && S.mode.startsWith('online') && S.net) {
-    S.net.send({ type: 'trap', who, floor: tr.floor, x: tr.x, y: tr.y, myHp: S.myHp, foeHp: S.foeHp });
+    const ex = who === 'me' ? S.me : S.foe;
+    S.net.send({
+      type: 'trap',
+      who,
+      floor: tr.floor,
+      x: tr.x,
+      y: tr.y,
+      kind,
+      myHp: S.myHp,
+      foeHp: S.foeHp,
+      // After pitfall, report new position of the victim
+      newFloor: ex ? ex.floor : undefined,
+      newX: ex ? ex.x : undefined,
+      newY: ex ? ex.y : undefined,
+    });
   }
 }
 
@@ -547,7 +558,6 @@ function tick(ts) {
   S.moveCooldown = Math.max(0, S.moveCooldown - dt);
   applyMoveFromInput();
 
-  // AI for local
   if ((S.mode === 'local' || S.mode === 'com') && S.foe && !S.ended) {
     aiTimer += dt;
     if (aiTimer > (S.mode === 'com' ? 420 : 380)) {
@@ -557,18 +567,16 @@ function tick(ts) {
     }
   }
 
-  // FX age
   for (const f of S.fx) f.age += dt;
   S.fx = S.fx.filter((f) => f.age < f.life);
 
-  // Draw
   if (ctxTop && S.foe) {
-    // Top: opponent exploring YOUR house — you see secrets
-    redrawMatchSecretsFix(ctxTop, canvTop, S.foe, S.myHouse, true, S.foeTriggered, true);
+    // Top: opponent exploring YOUR house — you see your secrets
+    redrawMatchView(ctxTop, canvTop, S.foe, S.myHouse, true, S.foeTriggered, true);
   }
   if (ctxBot && S.me) {
     // Bottom: you exploring THEIR house — hide secrets except triggered
-    redrawMatchSecretsFix(ctxBot, canvBot, S.me, S.theirHouse, false, S.myTriggered, false);
+    redrawMatchView(ctxBot, canvBot, S.me, S.theirHouse, false, S.myTriggered, false);
   }
 }
 
@@ -577,7 +585,7 @@ function handleNetMessage(msg) {
   if (!msg || !msg.type) return;
   switch (msg.type) {
     case 'house':
-      S.theirHouse = msg.house;
+      S.theirHouse = parseHouse(msg.house);
       setStatus($('net-status'), '相手の家データを受信しました', 'ok');
       maybeStartOnlineMatch();
       break;
@@ -594,26 +602,31 @@ function handleNetMessage(msg) {
       }
       break;
     case 'trap':
-      // Peer reports they hit a trap in our house or we need sync
       if (msg.who === 'me') {
-        // peer hit a trap in our house → foe took damage from our perspective... 
-        // Peer sends who='me' meaning THEY got hit. So foeHp decreases for us.
+        // Peer hit a trap in our house
         const key = `${msg.floor},${msg.x},${msg.y}`;
         S.foeTriggered.add(key);
         S.foeHp = typeof msg.myHp === 'number' ? msg.myHp : Math.max(0, S.foeHp - 1);
-        addFx('top', '罠作動！', '#ffaa00');
+        if (msg.kind === TRAP_PIT) {
+          addFx('top', '落とし穴作動！', '#aa66ff');
+          if (S.foe && typeof msg.newFloor === 'number') {
+            S.foe.floor = msg.newFloor;
+            S.foe.x = msg.newX;
+            S.foe.y = msg.newY;
+          }
+        } else {
+          addFx('top', '罠作動！', '#ffaa00');
+        }
         updateHpBars();
         if (S.foeHp <= 0) endGame('me');
       }
       break;
     case 'chest':
       if (msg.who === 'me') {
-        // peer found chest in our house
         endGame('foe');
       }
       break;
     case 'gameover':
-      // peer ended — if they won, we lost
       break;
     default:
       break;
@@ -644,12 +657,13 @@ function startSetup() {
   S.localStep = 0;
   S.iAmReady = false;
   S.peerReady = false;
+  S.revealSecrets = false;
   showScreen('screen-setup');
   updateSetupHud();
   requestAnimationFrame(() => {
     drawSetup();
   });
-  setStatus($('setup-status'), 'マスをタップして配置。宝箱1つ必須。', '');
+  setStatus($('setup-status'), 'マスをタップして配置。宝箱1つ必須。罠は通常／落とし穴。', '');
 }
 
 function onReadySetup() {
@@ -682,7 +696,6 @@ function onReadySetup() {
     return;
   }
 
-  // online
   S.iAmReady = true;
   if (S.net) {
     S.net.send({ type: 'house', house: S.myHouse });
@@ -697,6 +710,7 @@ function startMatch() {
   S.phase = 'match';
   S.ended = false;
   S.winner = null;
+  S.revealSecrets = false;
   S.myHp = MAX_HP;
   S.foeHp = MAX_HP;
   S.myTriggered = new Set();
@@ -706,7 +720,10 @@ function startMatch() {
   S.moveCooldown = 0;
   aiTimer = 0;
 
-  // me explores their house; foe explores my house
+  // Normalize trap kinds (migration for any old data)
+  S.myHouse = parseHouse(S.myHouse);
+  S.theirHouse = parseHouse(S.theirHouse);
+
   S.me = makeExplorer(S.theirHouse, 'me');
   S.foe = makeExplorer(S.myHouse, 'foe');
 
@@ -730,7 +747,7 @@ async function createRoom() {
   showScreen('screen-lobby');
   $('lobby-code-wrap').classList.remove('hidden');
   $('lobby-join-wrap').classList.add('hidden');
-  $('room-code-display').textContent = '----';
+  $('room-code-display').textContent = '------';
   try {
     S.net = new NetSession();
     S.net.onStatus = (m) => setStatus($('net-status'), m, '');
@@ -739,8 +756,7 @@ async function createRoom() {
     S.mode = 'online-host';
     const code = await S.net.host();
     $('room-code-display').textContent = code;
-    setStatus($('net-status'), 'このコードを相手に伝えてください', 'ok');
-    // When peer connects, go to setup
+    setStatus($('net-status'), 'この6桁コードを相手に伝えてください', 'ok');
     const check = setInterval(() => {
       if (S.net && S.net.conn && S.net.conn.open) {
         clearInterval(check);
@@ -753,9 +769,9 @@ async function createRoom() {
 }
 
 async function joinRoom() {
-  const code = ($('join-code-input').value || '').trim().toUpperCase();
-  if (code.length < 4) {
-    setStatus($('net-status'), '4文字のルームコードを入力', 'warn');
+  const code = normalizeRoomCode($('join-code-input').value);
+  if (!isValidRoomCode(code)) {
+    setStatus($('net-status'), '6桁の数字のルームコードを入力', 'warn');
     return;
   }
   setStatus($('net-status'), '接続中…', '');
@@ -776,13 +792,12 @@ function showJoinLobby() {
   showScreen('screen-lobby');
   $('lobby-code-wrap').classList.add('hidden');
   $('lobby-join-wrap').classList.remove('hidden');
-  setStatus($('net-status'), 'ホストのルームコードを入力', '');
+  setStatus($('net-status'), 'ホストの6桁ルームコードを入力', '');
   S.mode = 'online-guest';
 }
 
 /* ---------- Input binding ---------- */
 function bindControls() {
-  // D-pad
   document.querySelectorAll('.dpad-btn').forEach((btn) => {
     const dir = btn.dataset.dir;
     bindHold(
@@ -792,10 +807,6 @@ function bindControls() {
     );
   });
 
-  // Floor change during match (optional quick stairs — actually stairs are on map; add floor hint buttons?)
-  // Skip separate floor buttons — stairs on map.
-
-  // Keyboard fallback
   const keyMap = {
     ArrowUp: 'u', ArrowDown: 'd', ArrowLeft: 'l', ArrowRight: 'r',
     w: 'u', W: 'u', s: 'd', S: 'd', a: 'l', A: 'l', d: 'r', D: 'r',
@@ -810,7 +821,6 @@ function bindControls() {
     if (keyMap[e.key] && S.holdDir === keyMap[e.key]) S.holdDir = null;
   });
 
-  // Title buttons
   bindTap($('btn-create'), () => createRoom());
   bindTap($('btn-join'), () => showJoinLobby());
   bindTap($('btn-com'), () => {
@@ -824,7 +834,6 @@ function bindControls() {
   bindTap($('btn-join-go'), () => joinRoom());
   bindTap($('btn-lobby-back'), () => goTitle());
 
-  // Setup
   document.querySelectorAll('.floor-tab').forEach((btn) => {
     bindTap(btn, () => {
       S.setupFloor = Number(btn.dataset.floor);
@@ -848,6 +857,14 @@ function bindControls() {
     setupCanvasTap(e);
   }, { passive: false });
 
+  // Digits-only on join input
+  const joinInput = $('join-code-input');
+  if (joinInput) {
+    joinInput.addEventListener('input', () => {
+      joinInput.value = joinInput.value.replace(/\D/g, '').slice(0, 6);
+    });
+  }
+
   bindTap($('btn-again'), () => {
     if (S.mode === 'local' || S.mode === 'com') {
       startSetup();
@@ -865,7 +882,6 @@ function bindControls() {
 
 export async function init() {
   lockTouch($('app'));
-  // Prevent double-tap zoom
   let lastTouch = 0;
   document.addEventListener(
     'touchend',
@@ -880,12 +896,11 @@ export async function init() {
   bindControls();
   showScreen('screen-title');
 
-  // Preload PeerJS in background
   loadPeerJS().then((ok) => {
     const note = $('peer-note');
     if (note) {
       note.textContent = ok
-        ? 'オンライン対戦: PeerJS準備OK（HTTPS推奨）'
+        ? 'オンライン対戦: PeerJS準備OK（HTTPS推奨・6桁コード）'
         : 'PeerJS未読込 — ローカル練習は利用可能';
     }
   });
