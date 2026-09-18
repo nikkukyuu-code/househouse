@@ -422,7 +422,6 @@ a.btn.link-btn {
   height: clamp(22px, 3.5vh, 28px);
 }
 .match-hud .label { font-size: clamp(0.65rem, 1.8vh, 0.75rem); color: #cbb896; }
-.hearts { letter-spacing: 2px; font-size: clamp(0.95rem, 2.4vh, 1.1rem); }
 .hearts {
   letter-spacing: 1px;
   font-size: clamp(0.72rem, 1.9vh, 0.95rem);
