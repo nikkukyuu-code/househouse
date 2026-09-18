@@ -8,10 +8,10 @@ import {
   createBlueprint, createEmptyHouseData, isWalkable, isPlaceable,
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
-} from './house.js?v=20260919h';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260919h';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260919h';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260919h';
+} from './house.js?v=20260919i';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260919i';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260919i';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260919i';
 
 const blueprint = createBlueprint();
 
@@ -44,6 +44,8 @@ const S = {
   iAmReady: false,
   /** After win/lose, reveal opponent chest on bottom view */
   revealSecrets: false,
+  /** Spotlight enlarge: char + chest/trap at hit moment */
+  heroFocus: null,
 };
 
 let canvTop, canvBot, ctxTop, ctxBot;
@@ -403,40 +405,84 @@ function redrawMatchView(ctx, canvas, explorer, houseShown, showSecrets, trigger
 
   const focus = S.slowMoFocus;
   const thisFocus = (isOpponentView && focus === 'top') || (!isOpponentView && focus === 'bot');
-  let zoom = 1;
-  if (S.slowMo && thisFocus) {
-    zoom = 1.08 + 0.04 * Math.sin((S.slowMoPulse || 0) * 0.008);
-    ctx.save();
-    ctx.translate(w / 2, h / 2);
-    ctx.scale(zoom, zoom);
-    ctx.translate(-w / 2, -h / 2);
-  }
+  const hero = heroFocusActive(isOpponentView);
 
   const cs = cellSizeFor(canvas);
   const ox = Math.floor((w - COLS * cs) / 2);
   const oy = Math.floor((h - ROWS * cs) / 2) + 6;
 
+  // Camera: zoom toward hero cell (or soft center zoom in slow-mo)
+  let zoomed = false;
+  if (hero || (S.slowMo && thisFocus)) {
+    const fx = hero ? hero.x : explorer.x;
+    const fy = hero ? hero.y : explorer.y;
+    const cx = ox + (fx + 0.5) * cs;
+    const cy = oy + (fy + 0.5) * cs;
+    const pulse = Math.sin((S.slowMoPulse || performance.now() * 0.01) * 0.01);
+    const zoom = hero
+      ? 1.55 + 0.12 * pulse
+      : 1.1 + 0.05 * pulse;
+    ctx.save();
+    ctx.translate(w / 2, h / 2);
+    ctx.scale(zoom, zoom);
+    ctx.translate(-cx, -cy);
+    zoomed = true;
+  }
+
+  const drawFloor = hero ? hero.floor : explorer.floor;
+
   // Base tiles only — never leak secrets via drawHouse items
-  drawHouse(ctx, blueprint, null, explorer.floor, {
+  drawHouse(ctx, blueprint, null, drawFloor, {
     showChest: false,
     showTraps: false,
     ox, oy, cellSize: cs,
   });
 
+  const skipX = hero ? hero.x : -1;
+  const skipY = hero ? hero.y : -1;
+  const skipFloor = hero ? hero.floor : -1;
+
   if (houseShown) {
     if (showSecrets) {
-      // Designer watching: all traps + chest
-      drawHouseItems(ctx, houseShown, explorer.floor, triggered, true, true, ox, oy, cs);
+      drawHouseItems(ctx, houseShown, drawFloor, triggered, true, true, ox, oy, cs, skipX, skipY, skipFloor);
     } else {
-      // Explorer: only triggered traps; chest only if already found or match ended reveal
-      const showChest = !!(explorer.foundChest || S.revealSecrets);
-      drawHouseItems(ctx, houseShown, explorer.floor, triggered, false, showChest, ox, oy, cs);
+      const showChest = !!(explorer.foundChest || S.revealSecrets || (hero && hero.kind === 'chest'));
+      drawHouseItems(ctx, houseShown, drawFloor, triggered, false, showChest, ox, oy, cs, skipX, skipY, skipFloor);
     }
   }
 
   const color = isOpponentView ? COLORS.player2 : COLORS.player1;
-  drawPlayer(ctx, explorer.x, explorer.y, color, ox, oy, cs, S.time * 0.008);
+  const pulse = S.time * 0.008;
 
+  if (hero) {
+    // Giant character + chest/trap at the hit cell
+    const hx = ox + hero.x * cs + cs / 2;
+    const hy = oy + hero.y * cs + cs / 2;
+    const big = 2.25 + 0.12 * Math.sin((S.slowMoPulse || performance.now() * 0.01) * 0.012);
+    ctx.save();
+    ctx.translate(hx, hy);
+    ctx.scale(big, big);
+    // Soft glow behind
+    ctx.fillStyle = hero.kind === 'chest' ? 'rgba(255, 210, 80, 0.35)' : 'rgba(255, 60, 60, 0.3)';
+    ctx.beginPath();
+    ctx.arc(0, 0, cs * 0.7, 0, Math.PI * 2);
+    ctx.fill();
+    if (hero.kind === 'chest') {
+      drawChestSprite(ctx, -cs / 2, -cs / 2, cs);
+    } else {
+      const tr = { floor: hero.floor, x: hero.x, y: hero.y, kind: hero.trapKind || TRAP_NORMAL };
+      drawTrapSprite(ctx, tr, true, -cs / 2, -cs / 2, cs);
+    }
+    // Character slightly above the object
+    drawPlayer(ctx, 0, 0, color, -cs / 2, -cs / 2 - cs * 0.08, cs, pulse);
+    ctx.restore();
+  } else {
+    drawPlayer(ctx, explorer.x, explorer.y, color, ox, oy, cs, pulse);
+  }
+
+  if (zoomed) ctx.restore();
+
+  // HUD in screen space
   ctx.fillStyle = 'rgba(0,0,0,0.6)';
   ctx.fillRect(0, 0, w, 30);
   ctx.fillStyle = '#ffe8a3';
@@ -447,7 +493,7 @@ function redrawMatchView(ctx, canvas, explorer, houseShown, showSecrets, trigger
   ctx.fillText(title, 8, 15);
   ctx.textAlign = 'right';
   ctx.fillStyle = '#fff';
-  ctx.fillText(floorLabel(explorer.floor), w - 8, 15);
+  ctx.fillText(floorLabel(drawFloor), w - 8, 15);
 
   for (const f of S.fx) {
     if (f.view !== (isOpponentView ? 'top' : 'bot')) continue;
@@ -460,8 +506,7 @@ function redrawMatchView(ctx, canvas, explorer, houseShown, showSecrets, trigger
     ctx.globalAlpha = 1;
   }
 
-  if (S.slowMo && thisFocus) {
-    // Climax ring
+  if (hero || (S.slowMo && thisFocus)) {
     ctx.strokeStyle = 'rgba(255, 224, 138, 0.55)';
     ctx.lineWidth = 3;
     ctx.beginPath();
@@ -469,14 +514,14 @@ function redrawMatchView(ctx, canvas, explorer, houseShown, showSecrets, trigger
     ctx.stroke();
     ctx.fillStyle = 'rgba(255, 200, 80, 0.08)';
     ctx.fillRect(0, 0, w, h);
-    ctx.restore();
   }
 }
 
-function drawHouseItems(ctx, houseData, floor, triggered, showAllTraps, showChest, ox, oy, cs) {
+function drawHouseItems(ctx, houseData, floor, triggered, showAllTraps, showChest, ox, oy, cs, skipX = -1, skipY = -1, skipFloor = -1) {
   for (const raw of houseData.traps) {
     const tr = normalizeTrap(raw);
     if (!tr || tr.floor !== floor) continue;
+    if (tr.floor === skipFloor && tr.x === skipX && tr.y === skipY) continue;
     const key = `${tr.floor},${tr.x},${tr.y}`;
     const isTrig = triggered.has(key);
     if (!showAllTraps && !isTrig) continue;
@@ -484,12 +529,40 @@ function drawHouseItems(ctx, houseData, floor, triggered, showAllTraps, showChes
   }
   if (showChest && houseData.chest && houseData.chest.floor === floor) {
     const c = houseData.chest;
-    drawChestSprite(ctx, ox + c.x * cs, oy + c.y * cs, cs);
+    if (!(c.floor === skipFloor && c.x === skipX && c.y === skipY)) {
+      drawChestSprite(ctx, ox + c.x * cs, oy + c.y * cs, cs);
+    }
   }
 }
 
 function addFx(view, text, color, life = 1000) {
   S.fx.push({ view, text, color, age: 0, life });
+}
+
+/**
+ * Dramatic enlarge of character + chest/trap at the hit cell.
+ * @param {{view:'top'|'bot', kind:'chest'|'trap', x:number, y:number, floor:number, trapKind?:string, ms?:number, px?:number, py?:number}} opts
+ */
+function startHeroFocus(opts) {
+  const ms = opts.ms == null ? 1600 : opts.ms;
+  S.heroFocus = {
+    view: opts.view,
+    kind: opts.kind,
+    x: opts.x,
+    y: opts.y,
+    floor: opts.floor,
+    trapKind: opts.trapKind || TRAP_NORMAL,
+    px: opts.px != null ? opts.px : opts.x,
+    py: opts.py != null ? opts.py : opts.y,
+    until: performance.now() + ms,
+  };
+}
+
+function heroFocusActive(isOpponentView) {
+  const h = S.heroFocus;
+  if (!h || performance.now() >= h.until) return null;
+  const view = isOpponentView ? 'top' : 'bot';
+  return h.view === view ? h : null;
 }
 
 function updateHpBars() {
@@ -632,11 +705,40 @@ function showResultScreen(iWon, reasonText) {
 function onTrapHit(who, tr) {
   const kind = tr.kind === TRAP_PIT ? TRAP_PIT : TRAP_NORMAL;
   const isPit = kind === TRAP_PIT;
+  const view = who === 'me' ? 'bot' : 'top';
+  const ex = who === 'me' ? S.me : S.foe;
+  const willEnd = who === 'me' ? S.myHp <= 1 : S.foeHp <= 1;
+
+  startHeroFocus({
+    view,
+    kind: 'trap',
+    x: tr.x,
+    y: tr.y,
+    floor: tr.floor,
+    trapKind: kind,
+    px: ex ? ex.x : tr.x,
+    py: ex ? ex.y : tr.y,
+    ms: willEnd ? 3000 : 1400,
+  });
 
   if (who === 'me') {
     S.myHp = Math.max(0, S.myHp - 1);
     if (isPit) {
-      applyPitfallDrop(S.me);
+      // Delay drop so the enlarge shot shows char + pit together
+      clearTimeout(S._pitTimer);
+      const victim = S.me;
+      S._pitTimer = setTimeout(() => {
+        if (victim) applyPitfallDrop(victim);
+        if (S.mode && S.mode.startsWith('online') && S.net && victim) {
+          S.net.send({
+            type: 'pos',
+            floor: victim.floor,
+            x: victim.x,
+            y: victim.y,
+            hp: S.myHp,
+          });
+        }
+      }, willEnd ? 2200 : 900);
       addFx('bot', '落とし穴！', '#aa66ff');
       flashOverlay($('flash-bot'), '🕳 落とし穴！', 700);
       if (S.myHp > 0) sfx('pit');
@@ -649,7 +751,11 @@ function onTrapHit(who, tr) {
   } else {
     S.foeHp = Math.max(0, S.foeHp - 1);
     if (isPit && S.foe) {
-      applyPitfallDrop(S.foe);
+      clearTimeout(S._pitTimer);
+      const victim = S.foe;
+      S._pitTimer = setTimeout(() => {
+        if (victim) applyPitfallDrop(victim);
+      }, willEnd ? 2200 : 900);
       addFx('top', '落とし穴作動！', '#aa66ff');
       flashOverlay($('flash-top'), '🕳 落とし穴！', 700);
       if (S.foeHp > 0) sfx('pit');
@@ -662,7 +768,7 @@ function onTrapHit(who, tr) {
   }
   updateHpBars();
   if (S.mode && S.mode.startsWith('online') && S.net) {
-    const ex = who === 'me' ? S.me : S.foe;
+    const reportEx = who === 'me' ? S.me : S.foe;
     S.net.send({
       type: 'trap',
       who,
@@ -672,15 +778,29 @@ function onTrapHit(who, tr) {
       kind,
       myHp: S.myHp,
       foeHp: S.foeHp,
-      // After pitfall, report new position of the victim
-      newFloor: ex ? ex.floor : undefined,
-      newX: ex ? ex.x : undefined,
-      newY: ex ? ex.y : undefined,
+      // Pit drop is delayed locally; position updates after drop
+      newFloor: (!isPit && reportEx) ? reportEx.floor : tr.floor,
+      newX: (!isPit && reportEx) ? reportEx.x : tr.x,
+      newY: (!isPit && reportEx) ? reportEx.y : tr.y,
     });
   }
 }
 
 function onChestFound(who) {
+  const ex = who === 'me' ? S.me : S.foe;
+  const chest = ex && ex.house && ex.house.chest;
+  if (chest) {
+    startHeroFocus({
+      view: who === 'me' ? 'bot' : 'top',
+      kind: 'chest',
+      x: chest.x,
+      y: chest.y,
+      floor: chest.floor,
+      px: ex.x,
+      py: ex.y,
+      ms: 3000,
+    });
+  }
   if (who === 'me') {
     addFx('bot', '宝箱ゲット！', '#ffd700');
     flashOverlay($('flash-bot'), '💎 宝箱発見！', 1600);
@@ -787,13 +907,19 @@ function handleNetMessage(msg) {
         const key = `${msg.floor},${msg.x},${msg.y}`;
         S.foeTriggered.add(key);
         S.foeHp = typeof msg.myHp === 'number' ? msg.myHp : Math.max(0, S.foeHp - 1);
+        const willEnd = S.foeHp <= 0;
+        startHeroFocus({
+          view: 'top',
+          kind: 'trap',
+          x: msg.x,
+          y: msg.y,
+          floor: msg.floor,
+          trapKind: msg.kind === TRAP_PIT ? TRAP_PIT : TRAP_NORMAL,
+          ms: willEnd ? 3000 : 1400,
+        });
         if (msg.kind === TRAP_PIT) {
           addFx('top', '落とし穴作動！', '#aa66ff');
-          if (S.foe && typeof msg.newFloor === 'number') {
-            S.foe.floor = msg.newFloor;
-            S.foe.x = msg.newX;
-            S.foe.y = msg.newY;
-          }
+          // Floor drop arrives via later pos sync after peer's delayed drop
         } else {
           addFx('top', '罠作動！', '#ffaa00');
         }
@@ -803,6 +929,17 @@ function handleNetMessage(msg) {
       break;
     case 'chest':
       if (msg.who === 'me') {
+        const chest = S.myHouse && S.myHouse.chest;
+        if (chest) {
+          startHeroFocus({
+            view: 'top',
+            kind: 'chest',
+            x: chest.x,
+            y: chest.y,
+            floor: chest.floor,
+            ms: 3000,
+          });
+        }
         endGame('foe', 'chest_foe');
       }
       break;
@@ -916,6 +1053,8 @@ function startMatch() {
   clearTimeout(S._slowTimer);
   S.slowMo = false;
   S.timeScale = 1;
+  S.heroFocus = null;
+  clearTimeout(S._pitTimer);
   const matchEl = $('screen-match');
   if (matchEl) matchEl.classList.remove('slow-mo', 'slow-mo-bot', 'slow-mo-top');
   $('btn-ready').disabled = false;
