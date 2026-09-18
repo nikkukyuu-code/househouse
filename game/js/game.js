@@ -8,10 +8,10 @@ import {
   createBlueprint, createEmptyHouseData, isWalkable, isPlaceable,
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
-} from './house.js?v=20260920h';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920h';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920h';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920h';
+} from './house.js?v=20260920i';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920i';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920i';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920i';
 
 const blueprint = createBlueprint();
 
@@ -406,43 +406,17 @@ function aiNearSpawnExit(floor, x, y) {
 }
 
 /**
- * Soft danger cost for an unexplored cell. Triggered = 0 (safe).
- * Unknown door-adj / early spawn-exit: slight penalty (still walkable).
+ * Tiny tie-breaker only (0–1). Door/spawn cells must never block leaving a room.
+ * Triggered = 0 (safe). Do not use as a hard filter on goals.
  */
 function aiCautionCost(ex, floor, x, y) {
-  if (aiIsCellTriggered(ex, floor, x, y)) return 0; // spent trap — safe / prefer ok
+  if (aiIsCellTriggered(ex, floor, x, y)) return 0; // spent trap — safe
   const visited = ex.visited;
   const key = `${floor},${x},${y}`;
-  // Already visited without dying there → treat as known-safe enough
   if (visited && visited.has(key)) return 0;
-  let cost = 0;
-  if (aiIsDoorAdjacent(floor, x, y)) cost += 3;
-  // Early match: cautious leaving spawn room
-  const phase = (ex.memory && ex.memory.phase) || 0;
-  if (phase < 40 && aiNearSpawnExit(floor, x, y)) cost += 3;
-  return cost;
-}
-
-/**
- * Among equal-ish BFS options, prefer stepping onto lower-caution cells.
- * If the only way is a "dangerous" cell, still take it (dead-end / only path).
- */
-function aiPickStepWithCaution(ex, candidates) {
-  // candidates: [{dx,dy, cost?}]
-  if (!candidates || !candidates.length) return null;
-  let best = null;
-  let bestS = -1e9;
-  for (const step of candidates) {
-    const nx = ex.x + step.dx;
-    const ny = ex.y + step.dy;
-    if (!isWalkable(tileAt(blueprint, ex.floor, nx, ny))) continue;
-    let s = 10 - aiCautionCost(ex, ex.floor, nx, ny);
-    if (aiIsCellTriggered(ex, ex.floor, nx, ny)) s += 2; // known safe path fine
-    if (ex.memory && ex.memory.lastDx === -step.dx && ex.memory.lastDy === -step.dy) s -= 2;
-    s += Math.random() * 0.5;
-    if (s > bestS) { bestS = s; best = step; }
-  }
-  return best;
+  // Soft preference only — progress over caution
+  if (aiIsDoorAdjacent(floor, x, y) || aiNearSpawnExit(floor, x, y)) return 1;
+  return 0;
 }
 
 function aiTakeStairsIfNeeded(ex, targetFloor) {
@@ -490,9 +464,6 @@ function aiStep(ex) {
     const shuffled = AI_DIRS.slice().sort(() => Math.random() - 0.5);
     for (const [dx, dy] of shuffled) {
       if (lastDx === -dx && lastDy === -dy && Math.random() < 0.7) continue;
-      const nx = ex.x + dx, ny = ex.y + dy;
-      // Soft skip unknown door/spawn danger unless it's the only option later
-      if (aiCautionCost(ex, ex.floor, nx, ny) >= 3 && Math.random() < 0.75) continue;
       if (aiApplyStep(ex, { dx, dy })) return true;
     }
   }
@@ -515,54 +486,40 @@ function aiStep(ex) {
     }
   }
 
-  // 1) Clear current floor: BFS to nearest unvisited (caution: soft-avoid unknown door/spawn)
+  // 1) Clear current floor: BFS to nearest unvisited (progress over caution)
+  // Prefer leaving spawn / expanding other rooms — do NOT filter door-adjacent goals.
   const unvisHere = aiFloorUnvisited(ex.floor, ex.visited);
   if (unvisHere.length) {
-    // Prefer safer unvisited goals first; fall back to any if needed
-    const sortedGoals = unvisHere.slice().sort((a, b) => {
-      return aiCautionCost(ex, ex.floor, a.x, a.y) - aiCautionCost(ex, ex.floor, b.x, b.y)
-        || (Math.random() - 0.5);
-    });
-    let step = null;
-    // Try low-caution goals, then any
-    for (const preferSafe of [true, false]) {
-      const goals = preferSafe
-        ? sortedGoals.filter((c) => aiCautionCost(ex, ex.floor, c.x, c.y) <= 2)
-        : sortedGoals;
-      if (!goals.length) continue;
-      const goalSet = new Set(goals.map((c) => `${c.x},${c.y}`));
+    const phase = ex.memory.phase || 0;
+    const inSpawn = aiInSpawnRoom(ex.floor, ex.x, ex.y);
+    const outsideSpawn = unvisHere.filter((c) => !aiInSpawnRoom(ex.floor, c.x, c.y));
+    const spawnUnvis = unvisHere.filter((c) => aiInSpawnRoom(ex.floor, c.x, c.y));
+    // Few spawn cells left unvisited → treat as ready to leave
+    const spawnMostlyDone = spawnUnvis.length <= 3;
+
+    let goalPool = unvisHere;
+    // Leave spawn early (~12+ steps) or when spawn walkables are mostly visited
+    if (inSpawn && (phase >= 12 || spawnMostlyDone) && outsideSpawn.length) {
+      goalPool = outsideSpawn;
+    } else if (!inSpawn && outsideSpawn.length) {
+      // Room expansion: prefer unvisited outside spawn over clearing spawn leftovers
+      goalPool = outsideSpawn;
+    }
+
+    const goalSet = new Set(goalPool.map((c) => `${c.x},${c.y}`));
+    let step = aiBfsNextStep(
+      ex.floor, ex.x, ex.y,
+      (x, y) => goalSet.has(`${x},${y}`),
+      lastDx, lastDy
+    );
+    // Fallback to any unvisited on this floor if preferred pool is unreachable
+    if (!step && goalPool !== unvisHere) {
+      const allSet = new Set(unvisHere.map((c) => `${c.x},${c.y}`));
       step = aiBfsNextStep(
         ex.floor, ex.x, ex.y,
-        (x, y) => goalSet.has(`${x},${y}`),
+        (x, y) => allSet.has(`${x},${y}`),
         lastDx, lastDy
       );
-      if (step) {
-        // If first step is high-caution but an alternate neighbor leads to a safe goal path, prefer it
-        const opts = [];
-        for (const [dx, dy] of AI_DIRS) {
-          const nx = ex.x + dx, ny = ex.y + dy;
-          if (!isWalkable(tileAt(blueprint, ex.floor, nx, ny))) continue;
-          // Accept this first step if BFS from neighbor still reaches a goal quickly
-          opts.push({ dx, dy });
-        }
-        // Keep BFS step but if it's very cautious and we have other walkable opts with lower cost that aren't reverse-only dead ends:
-        const stepCost = aiCautionCost(ex, ex.floor, ex.x + step.dx, ex.y + step.dy);
-        if (stepCost >= 3) {
-          const safer = aiPickStepWithCaution(ex, opts.filter((o) => {
-            // only consider if that neighbor is closer-ish to some goal via another BFS
-            const sub = aiBfsNextStep(ex.floor, ex.x + o.dx, ex.y + o.dy, (x, y) => goalSet.has(`${x},${y}`), null, null);
-            // standing on goal after one step counts
-            if (goalSet.has(`${ex.x + o.dx},${ex.y + o.dy}`)) return true;
-            return !!sub || goalSet.has(`${ex.x + o.dx},${ex.y + o.dy}`);
-          }));
-          // If safer alternative exists with lower caution, use it; else take original (only path)
-          if (safer) {
-            const sc = aiCautionCost(ex, ex.floor, ex.x + safer.dx, ex.y + safer.dy);
-            if (sc < stepCost) step = safer;
-          }
-        }
-        break;
-      }
     }
     if (aiApplyStep(ex, step)) return true;
   }
@@ -1397,7 +1354,7 @@ function tick(ts) {
 
     if ((S.mode === 'local' || S.mode === 'com') && S.foe) {
       aiTimer += dt;
-      if (aiTimer > (S.mode === 'com' ? 420 : 380)) {
+      if (aiTimer > (S.mode === 'com' ? 270 : 380)) {
         aiTimer = 0;
         aiStep(S.foe);
         checkHazards(S.foe, S.foeTriggered, (tr) => onTrapHit('foe', tr), () => onChestFound('foe'));
