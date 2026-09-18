@@ -8,7 +8,7 @@
   <meta http-equiv="Cache-Control" content="no-cache" />
   <meta name="theme-color" content="#120e18" />
   <title>ハウスと罠</title>
-  <link rel="stylesheet" href="css/style.css?v=20260919m" />
+  <link rel="stylesheet" href="css/style.css?v=20260919n" />
 </head>
 <body>
   <div id="app">
@@ -23,7 +23,7 @@
         <button type="button" class="btn btn-secondary" id="btn-join">ルームに参加</button>
         <button type="button" class="btn btn-ghost" id="btn-local">両方設計して練習</button>
         <button type="button" class="btn btn-ghost" id="btn-mute" aria-pressed="false">🔊 音オン</button>
-        <a class="btn btn-ghost link-btn" href="../?v=20260919m">トップページへ</a>
+        <a class="btn btn-ghost link-btn" href="https://nikkukyuu-code.github.io/">トップページへ</a>
       </div>
       <p class="peer-note" id="peer-note">通信準備中…</p>
     </section>
@@ -137,14 +137,14 @@
         <div class="btn-col" style="max-width:260px">
           <button type="button" class="btn btn-primary" id="btn-again">もう一度</button>
           <button type="button" class="btn btn-ghost" id="btn-title">タイトルへ</button>
-          <a class="btn btn-ghost link-btn" href="../?v=20260919m">トップページへ</a>
+          <a class="btn btn-ghost link-btn" href="https://nikkukyuu-code.github.io/">トップページへ</a>
         </div>
       </div>
     </section>
   </div>
 
   <script type="module">
-    import { init } from './js/game.js?v=20260919m';
+    import { init } from './js/game.js?v=20260919n';
     init().catch((e) => {
       console.error(e);
       const n = document.getElementById('peer-note');
