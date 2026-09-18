@@ -2,136 +2,130 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#120e18" />
-  <title>ハウスハウス</title>
-  <link rel="stylesheet" href="css/style.css" />
+  <title>ハウスハウス — フォルダ構成</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100dvh;
+      background: linear-gradient(180deg, #1a1424 0%, #120e18 100%);
+      color: #f5f0e8;
+      font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", sans-serif;
+      line-height: 1.6;
+      padding: 24px 16px 40px;
+    }
+    main {
+      max-width: 520px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 1.75rem;
+      color: #ffe08a;
+      letter-spacing: 0.06em;
+      margin-bottom: 8px;
+    }
+    .sub {
+      color: #b8a890;
+      margin-bottom: 24px;
+      font-size: 0.95rem;
+    }
+    h2 {
+      font-size: 1.05rem;
+      color: #c9a227;
+      margin: 28px 0 10px;
+    }
+    p, li { color: #ddd; font-size: 0.95rem; }
+    ul { padding-left: 1.2em; margin-bottom: 12px; }
+    li { margin-bottom: 4px; }
+    .tree {
+      background: rgba(0,0,0,0.35);
+      border: 1px solid rgba(201,162,39,0.35);
+      border-radius: 12px;
+      padding: 14px 16px;
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 0.82rem;
+      line-height: 1.55;
+      color: #e8dcc8;
+      overflow-x: auto;
+      white-space: pre;
+      margin: 12px 0 20px;
+    }
+    .tree .dir { color: #8ddea0; }
+    .tree .file { color: #b8d4ff; }
+    .tree .note { color: #887868; }
+    .card {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 16px;
+    }
+    .card strong { color: #ffe08a; }
+    a.play {
+      display: block;
+      text-align: center;
+      text-decoration: none;
+      background: linear-gradient(180deg, #5ecf8a, #2e9a58);
+      color: #0a1a10;
+      font-weight: 800;
+      font-size: 1.05rem;
+      padding: 14px 16px;
+      border-radius: 12px;
+      box-shadow: 0 3px 0 #1a6a38;
+      margin: 20px 0 8px;
+    }
+    a.play:active { transform: translateY(1px); }
+    .muted { color: #887868; font-size: 0.8rem; text-align: center; }
+    code {
+      background: rgba(0,0,0,0.35);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 0.88em;
+    }
+  </style>
 </head>
 <body>
-  <div id="app">
-    <!-- タイトル -->
-    <section id="screen-title" class="screen active">
-      <h1 class="title-logo">ハウスハウス</h1>
-      <p class="title-sub">家に罠を仕掛けて<br />相手の宝箱を探せ！</p>
-      <div class="btn-col">
-        <button type="button" class="btn btn-com" id="btn-com">COM対戦</button>
-        <button type="button" class="btn btn-secondary" id="btn-create">ルームを作成</button>
-        <button type="button" class="btn btn-secondary" id="btn-join">ルームに参加</button>
-        <button type="button" class="btn btn-ghost" id="btn-local">両方設計して練習</button>
-      </div>
-      <p class="peer-note" id="peer-note">通信準備中…</p>
-    </section>
+  <main>
+    <h1>ハウスハウス</h1>
+    <p class="sub">リポジトリ内のフォルダ構成と、ゲームファイルの置き場所です。</p>
 
-    <!-- ロビー -->
-    <section id="screen-lobby" class="screen">
-      <p class="lobby-label">オンライン対戦</p>
-      <div id="lobby-code-wrap">
-        <p class="lobby-label">ルームコード</p>
-        <div class="room-code" id="room-code-display">----</div>
-      </div>
-      <div id="lobby-join-wrap" class="hidden">
-        <p class="lobby-label">コードを入力</p>
-        <input
-          class="join-input allow-scroll"
-          id="join-code-input"
-          type="text"
-          maxlength="4"
-          inputmode="text"
-          autocomplete="off"
-          autocapitalize="characters"
-          placeholder="ABCD"
-          aria-label="ルームコード"
-        />
-        <div class="btn-col" style="margin-top:14px;max-width:280px">
-          <button type="button" class="btn btn-primary" id="btn-join-go">参加する</button>
-        </div>
-      </div>
-      <p class="status-msg" id="net-status"></p>
-      <div class="btn-col" style="max-width:280px;margin-top:8px">
-        <button type="button" class="btn btn-ghost" id="btn-lobby-back">タイトルへ</button>
-      </div>
-    </section>
+    <a class="play" href="game/">ゲームを遊ぶ（game/）</a>
+    <p class="muted">本体は下の <code>game/</code> フォルダにあります</p>
 
-    <!-- セットアップ -->
-    <section id="screen-setup" class="screen">
-      <div class="setup-header">
-        <h2 id="setup-title">あなたの家を設計</h2>
-        <div class="setup-counts">
-          <span>宝箱 <strong id="setup-chest-count">—</strong></span>
-          <span>罠 <strong id="setup-trap-count">0/5</strong></span>
-        </div>
-      </div>
-      <div class="floor-tabs">
-        <button type="button" class="floor-tab active" data-floor="0">1F</button>
-        <button type="button" class="floor-tab" data-floor="1">2F</button>
-        <button type="button" class="floor-tab" data-floor="2">3F</button>
-      </div>
-      <div class="tool-row">
-        <button type="button" class="tool-btn active" data-tool="chest">📦 宝箱</button>
-        <button type="button" class="tool-btn" data-tool="trap">💥 罠</button>
-        <button type="button" class="tool-btn" data-tool="erase">🗑 消す</button>
-      </div>
-      <div id="setup-canvas-wrap">
-        <canvas id="setup-canvas" class="active-canvas"></canvas>
-      </div>
-      <p class="legend">緑▲=上階へ　青▼=下階へ　茶色=ドア　床をタップして配置</p>
-      <p class="status-msg" id="setup-status"></p>
-      <div class="setup-actions">
-        <button type="button" class="btn btn-ghost" id="btn-setup-back">戻る</button>
-        <button type="button" class="btn btn-primary" id="btn-ready">準備完了</button>
-      </div>
-    </section>
+    <h2>フォルダ構成</h2>
+    <div class="tree"><span class="note">nikkukyuu-code/househouse/</span>
+├── <span class="file">index.html</span>          <span class="note">← この説明ページ</span>
+├── <span class="file">README.md</span>
+└── <span class="dir">game/</span>                 <span class="note">← ゲーム本体</span>
+    ├── <span class="file">index.html</span>      <span class="note">起動ファイル</span>
+    ├── <span class="dir">css/</span>
+    │   └── <span class="file">style.css</span>
+    └── <span class="dir">js/</span>
+        ├── <span class="file">game.js</span>
+        ├── <span class="file">house.js</span>
+        ├── <span class="file">net.js</span>
+        └── <span class="file">ui.js</span></div>
 
-    <!-- マッチ -->
-    <section id="screen-match" class="screen">
-      <div class="match-half top">
-        <div class="match-hud">
-          <span class="label">相手の体力</span>
-          <span class="hearts" id="hp-top"></span>
-        </div>
-        <div class="match-canvas-wrap">
-          <canvas id="canvas-top"></canvas>
-          <div class="flash-fx" id="flash-top"></div>
-        </div>
-      </div>
-      <div class="match-half bot">
-        <div class="match-hud">
-          <span class="label">あなたの体力</span>
-          <span class="hearts" id="hp-bot"></span>
-        </div>
-        <div class="match-canvas-wrap">
-          <canvas id="canvas-bot"></canvas>
-          <div class="flash-fx" id="flash-bot"></div>
-          <div class="dpad" id="dpad" aria-label="移動パッド">
-            <button type="button" class="dpad-btn up" data-dir="u" aria-label="上">▲</button>
-            <button type="button" class="dpad-btn down" data-dir="d" aria-label="下">▼</button>
-            <button type="button" class="dpad-btn left" data-dir="l" aria-label="左">◀</button>
-            <button type="button" class="dpad-btn right" data-dir="r" aria-label="右">▶</button>
-          </div>
-          <p class="match-hint">階段で階を移動<br />宝箱を探せ</p>
-        </div>
-      </div>
+    <h2>ゲームファイルの場所</h2>
+    <div class="card">
+      <p>ブラウザで動かす本体はすべて <strong>game/</strong> の中にあります。</p>
+      <ul>
+        <li><code>game/index.html</code> … ゲームの入口</li>
+        <li><code>game/css/</code> … 見た目</li>
+        <li><code>game/js/</code> … 対戦・家・通信・UI</li>
+      </ul>
+      <p style="margin-top:10px">ルートの <code>index.html</code> は説明専用で、ゲームのロジックは含みません。</p>
+    </div>
 
-      <div id="result-overlay">
-        <div id="result-title">勝利！</div>
-        <p id="result-sub"></p>
-        <div class="btn-col" style="max-width:260px">
-          <button type="button" class="btn btn-primary" id="btn-again">もう一度</button>
-          <button type="button" class="btn btn-ghost" id="btn-title">タイトルへ</button>
-        </div>
-      </div>
-    </section>
-  </div>
-
-  <script type="module">
-    import { init } from './js/game.js';
-    init().catch((e) => {
-      console.error(e);
-      const n = document.getElementById('peer-note');
-      if (n) n.textContent = '起動エラー: ' + (e && e.message ? e.message : e);
-    });
-  </script>
+    <h2>URL</h2>
+    <div class="card">
+      <ul>
+        <li>説明ページ … <code>/</code>（いまのページ）</li>
+        <li>プレイ … <code>/game/</code></li>
+      </ul>
+      <p style="margin-top:10px">更新するときは <code>game/</code> 内のファイルを差し替えて <code>main</code> に push します。</p>
+    </div>
+  </main>
 </body>
 </html>
