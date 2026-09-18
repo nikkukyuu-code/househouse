@@ -8,9 +8,9 @@ import {
   createBlueprint, createEmptyHouseData, isWalkable, isPlaceable,
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
-} from './house.js?v=20260919b';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260919b';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260919b';
+} from './house.js?v=20260919d';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260919d';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260919d';
 
 const blueprint = createBlueprint();
 
@@ -468,27 +468,102 @@ function updateHpBars() {
   $('hp-bot').innerHTML = heartsHtml(S.myHp, MAX_HP);
 }
 
-function endGame(winner) {
+/**
+ * @param {'me'|'foe'} winner
+ * @param {'chest_me'|'chest_foe'|'hp_me'|'hp_foe'|string} reason
+ */
+function endGame(winner, reason) {
   if (S.ended) return;
   S.ended = true;
   S.winner = winner;
+  S.endReason = reason || '';
   S.revealSecrets = true;
+  S.holdDir = null;
+
+  const iWon = winner === 'me';
+  const reasonText = endReasonLabel(reason, iWon);
+  const bannerIcon = reasonIcon(reason);
+  const bannerLead = iWon ? '勝ち！' : '負け…';
+
+  // Phase 1: dramatic banner (keep playing view visible underneath)
+  const banner = $('end-banner');
+  const overlay = $('result-overlay');
+  if (overlay) overlay.classList.remove('show', 'win', 'lose');
+  if (banner) {
+    banner.classList.remove('fade-out', 'win', 'lose');
+    banner.classList.add('show', iWon ? 'win' : 'lose');
+    $('end-banner-icon').textContent = bannerIcon;
+    $('end-banner-text').textContent = bannerLead;
+    $('end-banner-detail').textContent = reasonText;
+  }
+
+  // Flash the relevant half longer
+  const flashBot = reason === 'chest_me' || reason === 'hp_me';
+  flashOverlay(
+    $(flashBot ? 'flash-bot' : 'flash-top'),
+    bannerIcon + ' ' + reasonText,
+    1600
+  );
+
+  if (S.mode && S.mode.startsWith('online') && S.net) {
+    S.net.send({
+      type: 'gameover',
+      winner: winner === 'me' ? 'host_or_self' : 'other',
+      reason,
+      from: S.mode,
+    });
+  }
+
+  // Phase 2: full result screen after drama
+  clearTimeout(S._endTimer);
+  S._endTimer = setTimeout(() => {
+    if (banner) {
+      banner.classList.add('fade-out');
+      setTimeout(() => banner.classList.remove('show', 'fade-out', 'win', 'lose'), 380);
+    }
+    showResultScreen(iWon, reasonText);
+  }, 2200);
+}
+
+function endReasonLabel(reason, iWon) {
+  switch (reason) {
+    case 'chest_me':
+      return '相手の家の宝箱を見つけた！';
+    case 'chest_foe':
+      return '相手に自分の宝箱を取られた…';
+    case 'hp_foe':
+      return '罠で相手の体力をゼロにした！';
+    case 'hp_me':
+      return '罠で体力がゼロになった…';
+    default:
+      return iWon ? '対戦に勝利しました' : '対戦に敗北しました';
+  }
+}
+
+function reasonIcon(reason) {
+  if (reason === 'chest_me' || reason === 'chest_foe') return '💎';
+  if (reason === 'hp_me' || reason === 'hp_foe') return '💔';
+  return '🏁';
+}
+
+function showResultScreen(iWon, reasonText) {
   const overlay = $('result-overlay');
   const title = $('result-title');
+  const reasonEl = $('result-reason');
   const sub = $('result-sub');
-  overlay.classList.add('show');
-  if (winner === 'me') {
+  if (!overlay) return;
+  overlay.classList.add('show', iWon ? 'win' : 'lose');
+  overlay.classList.remove(iWon ? 'lose' : 'win');
+  if (iWon) {
     title.textContent = '勝利！';
     title.className = 'win';
-    sub.textContent = '宝箱を見つけたか、相手の体力をゼロにしました';
+    sub.textContent = 'もう一度挑戦するか、タイトルへ戻れます';
   } else {
     title.textContent = '敗北…';
     title.className = 'lose';
-    sub.textContent = '相手に宝箱を取られたか、体力が尽きました';
+    sub.textContent = '罠の置き方や探索ルートを変えて再挑戦！';
   }
-  if (S.mode && S.mode.startsWith('online') && S.net) {
-    S.net.send({ type: 'gameover', winner: winner === 'me' ? 'host_or_self' : 'other', from: S.mode });
-  }
+  if (reasonEl) reasonEl.textContent = '理由：' + reasonText;
 }
 
 /* ---------- Match loop ---------- */
@@ -506,7 +581,7 @@ function onTrapHit(who, tr) {
       addFx('bot', '罠だ！', '#ff4444');
       flashOverlay($('flash-bot'), '💥 罠！', 600);
     }
-    if (S.myHp <= 0) endGame('foe');
+    if (S.myHp <= 0) endGame('foe', 'hp_me');
   } else {
     S.foeHp = Math.max(0, S.foeHp - 1);
     if (isPit && S.foe) {
@@ -517,7 +592,7 @@ function onTrapHit(who, tr) {
       addFx('top', '罠作動！', '#ffaa00');
       flashOverlay($('flash-top'), '💥 罠作動！', 600);
     }
-    if (S.foeHp <= 0) endGame('me');
+    if (S.foeHp <= 0) endGame('me', 'hp_foe');
   }
   updateHpBars();
   if (S.mode && S.mode.startsWith('online') && S.net) {
@@ -542,12 +617,12 @@ function onTrapHit(who, tr) {
 function onChestFound(who) {
   if (who === 'me') {
     addFx('bot', '宝箱ゲット！', '#ffd700');
-    flashOverlay($('flash-bot'), '💎 宝箱！', 800);
-    endGame('me');
+    flashOverlay($('flash-bot'), '💎 宝箱発見！', 1600);
+    endGame('me', 'chest_me');
   } else {
     addFx('top', '相手が宝箱を発見！', '#ffd700');
-    flashOverlay($('flash-top'), '💎 発見！', 800);
-    endGame('foe');
+    flashOverlay($('flash-top'), '💎 相手が発見！', 1600);
+    endGame('foe', 'chest_foe');
   }
   if (S.mode && S.mode.startsWith('online') && S.net) {
     S.net.send({ type: 'chest', who });
@@ -653,7 +728,7 @@ function handleNetMessage(msg) {
           addFx('top', '罠作動！', '#ffaa00');
         }
         updateHpBars();
-        if (S.foeHp <= 0) endGame('me');
+        if (S.foeHp <= 0) endGame('me', 'hp_foe');
       }
       break;
     case 'chest':
@@ -763,7 +838,10 @@ function startMatch() {
   S.foe = makeExplorer(S.myHouse, 'foe');
 
   showScreen('screen-match');
-  $('result-overlay').classList.remove('show');
+  $('result-overlay').classList.remove('show', 'win', 'lose');
+  const eb = $('end-banner');
+  if (eb) eb.classList.remove('show', 'fade-out', 'win', 'lose');
+  clearTimeout(S._endTimer);
   $('btn-ready').disabled = false;
 
   canvTop = $('canvas-top');
