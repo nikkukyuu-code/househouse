@@ -146,6 +146,14 @@ body {
   position: relative;
 }
 .btn:active, .btn.pressed { transform: scale(0.97) translateY(1px); filter: brightness(0.92); }
+a.btn.link-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  box-sizing: border-box;
+}
+
 .btn:disabled { opacity: 0.45; pointer-events: none; }
 .btn-com {
   background: linear-gradient(180deg, #7ee0a4 0%, #5ecf8a 35%, #2e9a58 100%);
