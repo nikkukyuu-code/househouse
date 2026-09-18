@@ -8,10 +8,10 @@ import {
   createBlueprint, createEmptyHouseData, isWalkable, isPlaceable,
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
-} from './house.js?v=20260919z';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260919z';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260919z';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260919z';
+} from './house.js?v=20260920a';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920a';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920a';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920a';
 
 const blueprint = createBlueprint();
 
@@ -1054,10 +1054,19 @@ function startSetup() {
   S.iAmReady = false;
   S.peerReady = false;
   S.revealSecrets = false;
+  clearTimeout(S._setupDoneTimer);
+  const doneBanner = $('setup-done-banner');
+  if (doneBanner) doneBanner.classList.remove('show', 'fade-out');
+  const readyBtn = $('btn-ready');
+  if (readyBtn) {
+    readyBtn.disabled = true;
+    readyBtn.textContent = `準備完了（罠 0/${MAX_TRAPS}）`;
+  }
   showScreen('screen-setup');
   updateSetupHud();
   requestAnimationFrame(() => {
     drawSetup();
+    updateSetupHud(); // again after paint — avoid stale enabled state from last match
   });
   setStatus($('setup-status'), `マスをタップして配置。宝箱1つ＋罠${MAX_TRAPS}個必須。`, '');
 }
@@ -1174,7 +1183,6 @@ function startMatch() {
   clearTimeout(S._setupDoneTimer);
   const matchEl = $('screen-match');
   if (matchEl) matchEl.classList.remove('slow-mo', 'slow-mo-bot', 'slow-mo-top');
-  $('btn-ready').disabled = false;
 
   canvTop = $('canvas-top');
   canvBot = $('canvas-bot');
