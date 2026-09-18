@@ -19,7 +19,9 @@ export const T = {
 export const MAX_TRAPS = 5;
 export const MAX_HP = 3;
 
-export const TRAP_NORMAL = 'normal';
+export const TRAP_BOMB = 'bomb';
+/** @deprecated alias — old saves used 'normal' */
+export const TRAP_NORMAL = TRAP_BOMB;
 export const TRAP_PIT = 'pit';
 
 /** Fixed 3-floor house blueprint (same for both players; only chest/traps differ) */
@@ -87,14 +89,16 @@ export function createEmptyHouseData() {
   };
 }
 
-/** Normalize trap; missing kind → normal (migration) */
+/** Normalize trap; missing/'normal' kind → bomb (migration) */
 export function normalizeTrap(t) {
   if (!t || typeof t !== 'object') return null;
+  const raw = t.kind;
+  const kind = raw === TRAP_PIT || raw === 'pit' ? TRAP_PIT : TRAP_BOMB;
   return {
     floor: t.floor | 0,
     x: t.x | 0,
     y: t.y | 0,
-    kind: t.kind === TRAP_PIT ? TRAP_PIT : TRAP_NORMAL,
+    kind,
   };
 }
 
@@ -374,7 +378,7 @@ function drawStairsTile(ctx, px, py, cellSize, up, floor = 0) {
 
 /** Draw a trap sprite (bomb / pit hole) */
 export function drawTrapSprite(ctx, tr, triggered, px, py, cellSize) {
-  const kind = tr.kind === TRAP_PIT ? TRAP_PIT : TRAP_NORMAL;
+  const kind = tr.kind === TRAP_PIT ? TRAP_PIT : TRAP_BOMB;
   const cx = px + cellSize / 2;
   const cy = py + cellSize / 2;
 
@@ -475,7 +479,7 @@ export function drawTrapSprite(ctx, tr, triggered, px, py, cellSize) {
     ctx.font = `bold ${Math.floor(cellSize * 0.22)}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('弾', cx, cy + cellSize * 0.06);
+    ctx.fillText('爆弾', cx, cy + cellSize * 0.06);
   }
 }
 
@@ -763,7 +767,7 @@ export function generateComHouse(blueprint) {
     if (used.has(key)) continue;
     used.add(key);
     // Mix: prefer pit on 2F/3F (~45%), bomb otherwise; ensure both kinds appear often
-    let kind = TRAP_NORMAL;
+    let kind = TRAP_BOMB;
     if (c.floor > 0 && Math.random() < 0.55) kind = TRAP_PIT;
     else if (c.floor === 0 && Math.random() < 0.25) kind = TRAP_PIT;
     else if (Math.random() < 0.4) kind = TRAP_PIT;
@@ -773,9 +777,9 @@ export function generateComHouse(blueprint) {
   // Guarantee at least one of each kind when we have 2+ traps
   if (traps.length >= 2) {
     const hasPit = traps.some((t) => t.kind === TRAP_PIT);
-    const hasNormal = traps.some((t) => t.kind === TRAP_NORMAL);
+    const hasBomb = traps.some((t) => t.kind === TRAP_BOMB);
     if (!hasPit) traps[0].kind = TRAP_PIT;
-    if (!hasNormal) traps[traps.length - 1].kind = TRAP_NORMAL;
+    if (!hasBomb) traps[traps.length - 1].kind = TRAP_BOMB;
   }
 
   return { chest: { floor: chest.floor, x: chest.x, y: chest.y }, traps };

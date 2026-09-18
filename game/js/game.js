@@ -4,14 +4,14 @@
 
 import {
   TILE, FLOORS, COLS, ROWS, T, MAX_TRAPS, MAX_HP,
-  TRAP_NORMAL, TRAP_PIT, normalizeTrap,
+  TRAP_BOMB, TRAP_PIT, normalizeTrap,
   createBlueprint, createEmptyHouseData, isWalkable, isPlaceable,
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
-} from './house.js?v=20260919s';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260919s';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260919s';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260919s';
+} from './house.js?v=20260919t';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260919t';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260919t';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260919t';
 
 const blueprint = createBlueprint();
 
@@ -22,7 +22,7 @@ const S = {
   phase: 'title',
   myHouse: createEmptyHouseData(),
   theirHouse: createEmptyHouseData(),
-  setupTool: 'chest', // 'chest' | 'trap-normal' | 'trap-pit' | 'erase'
+  setupTool: 'chest', // 'chest' | 'trap-bomb' | 'trap-pit' | 'erase'
   setupFloor: 0,
   setupWhich: 'mine',
   localStep: 0,
@@ -66,7 +66,7 @@ function cellSizeFor(canvas) {
 }
 
 function isTrapTool(tool) {
-  return tool === 'trap' || tool === 'trap-normal' || tool === 'trap-pit';
+  return tool === 'trap' || tool === 'trap-bomb' || tool === 'trap-normal' || tool === 'trap-pit';
 }
 
 function layoutCanvas(c) {
@@ -315,7 +315,7 @@ function placeAt(floor, x, y) {
       setStatus($('setup-status'), `罠は最大${MAX_TRAPS}個まで`, 'warn');
       return;
     }
-    const kind = S.setupTool === 'trap-pit' ? TRAP_PIT : TRAP_NORMAL;
+    const kind = S.setupTool === 'trap-pit' ? TRAP_PIT : TRAP_BOMB;
     house.traps.push({ floor, x, y, kind });
     setStatus(
       $('setup-status'),
@@ -473,7 +473,7 @@ function redrawMatchView(ctx, canvas, explorer, houseShown, showSecrets, trigger
     if (hero.kind === 'chest') {
       drawChestSprite(ctx, -cs / 2, -cs / 2, cs);
     } else {
-      const tr = { floor: hero.floor, x: hero.x, y: hero.y, kind: hero.trapKind || TRAP_NORMAL };
+      const tr = { floor: hero.floor, x: hero.x, y: hero.y, kind: hero.trapKind || TRAP_BOMB };
       drawTrapSprite(ctx, tr, true, -cs / 2, -cs / 2, cs);
     }
     // Character slightly above the object
@@ -554,7 +554,7 @@ function startHeroFocus(opts) {
     x: opts.x,
     y: opts.y,
     floor: opts.floor,
-    trapKind: opts.trapKind || TRAP_NORMAL,
+    trapKind: opts.trapKind || TRAP_BOMB,
     px: opts.px != null ? opts.px : opts.x,
     py: opts.py != null ? opts.py : opts.y,
     lethal: !!opts.lethal,
@@ -752,7 +752,7 @@ function showResultScreen(iWon, reasonText) {
 
 /* ---------- Match loop ---------- */
 function onTrapHit(who, tr) {
-  const kind = tr.kind === TRAP_PIT ? TRAP_PIT : TRAP_NORMAL;
+  const kind = tr.kind === TRAP_PIT ? TRAP_PIT : TRAP_BOMB;
   const isPit = kind === TRAP_PIT;
   const view = who === 'me' ? 'bot' : 'top';
   const ex = who === 'me' ? S.me : S.foe;
@@ -965,7 +965,7 @@ function handleNetMessage(msg) {
           floor: msg.floor,
           x: msg.x,
           y: msg.y,
-          kind: msg.kind === TRAP_PIT ? TRAP_PIT : TRAP_NORMAL,
+          kind: msg.kind === TRAP_PIT ? TRAP_PIT : TRAP_BOMB,
         };
         startHeroFocus({
           view: 'top',
@@ -973,7 +973,7 @@ function handleNetMessage(msg) {
           x: msg.x,
           y: msg.y,
           floor: msg.floor,
-          trapKind: msg.kind === TRAP_PIT ? TRAP_PIT : TRAP_NORMAL,
+          trapKind: msg.kind === TRAP_PIT ? TRAP_PIT : TRAP_BOMB,
           lethal: willEnd,
           ms: willEnd ? 6500 : 1400,
         });
