@@ -8,10 +8,10 @@ import {
   createBlueprint, createEmptyHouseData, isWalkable, isPlaceable,
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
-} from './house.js?v=20260920b';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920b';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920b';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920b';
+} from './house.js?v=20260920c';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920c';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920c';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920c';
 
 const blueprint = createBlueprint();
 
@@ -310,37 +310,35 @@ function placeAt(floor, x, y) {
     house.chest = { floor, x, y };
     setStatus($('setup-status'), '宝箱を配置しました', 'ok');
     sfx('place');
-  } else if (isTrapTool(S.setupTool)) {
+    updateSetupHud();
+    drawSetup();
+    maybeCelebrateSetupComplete(house);
+    return;
+  }
+  if (isTrapTool(S.setupTool)) {
     if (house.traps.length >= MAX_TRAPS) {
       setStatus($('setup-status'), `罠は最大${MAX_TRAPS}個まで`, 'warn');
       return;
     }
     const kind = S.setupTool === 'trap-pit' ? TRAP_PIT : TRAP_BOMB;
     house.traps.push({ floor, x, y, kind });
-    const filled = house.traps.length >= MAX_TRAPS;
+    const trapsFull = house.traps.length >= MAX_TRAPS;
     setStatus(
       $('setup-status'),
-      filled
-        ? `罠 ${MAX_TRAPS}/${MAX_TRAPS} — 仕掛け完了！`
+      trapsFull
+        ? (house.chest
+          ? `罠 ${MAX_TRAPS}/${MAX_TRAPS} — 罠は揃いました`
+          : `罠 ${MAX_TRAPS}/${MAX_TRAPS} — 次は宝箱を配置`)
         : (kind === TRAP_PIT ? '落とし穴を配置しました' : '爆弾を配置しました'),
       'ok'
     );
     sfx('place');
     updateSetupHud();
     drawSetup();
-    if (filled) {
-      showSetupDone(
-        `最後の罠を設置！\n${setupDoneSummary(house)}\n準備完了で対戦へ`,
-        null
-      );
-    }
-    return;
-  } else {
-    setStatus($('setup-status'), '上のボタンで宝箱か罠を選んでから床をタップ', 'warn');
+    maybeCelebrateSetupComplete(house);
     return;
   }
-  updateSetupHud();
-  drawSetup();
+  setStatus($('setup-status'), '上のボタンで宝箱か罠を選んでから床をタップ', 'warn');
 }
 
 function updateSetupHud() {
@@ -1103,6 +1101,7 @@ function startSetup() {
   S.iAmReady = false;
   S.peerReady = false;
   S.revealSecrets = false;
+  S._celebratedSetup = false;
   clearTimeout(S._setupDoneTimer);
   const doneBanner = $('setup-done-banner');
   if (doneBanner) doneBanner.classList.remove('show', 'fade-out');
@@ -1118,6 +1117,21 @@ function startSetup() {
     updateSetupHud(); // again after paint — avoid stale enabled state from last match
   });
   setStatus($('setup-status'), `マスをタップして配置。宝箱1つ＋罠${MAX_TRAPS}個必須。`, '');
+}
+
+function isSetupFullyPlaced(house) {
+  return !!(house && house.chest && house.traps && house.traps.length >= MAX_TRAPS);
+}
+
+function maybeCelebrateSetupComplete(house) {
+  if (!isSetupFullyPlaced(house)) return;
+  if (S._celebratedSetup) return; // once per setup house
+  S._celebratedSetup = true;
+  setStatus($('setup-status'), `仕掛け完了！ 宝箱＋罠${MAX_TRAPS}個`, 'ok');
+  showSetupDone(
+    `${setupDoneSummary(house)}\n準備完了で対戦へ`,
+    null
+  );
 }
 
 function setupDoneSummary(house) {
