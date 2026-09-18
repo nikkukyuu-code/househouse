@@ -8,9 +8,10 @@ import {
   createBlueprint, createEmptyHouseData, isWalkable, isPlaceable,
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
-} from './house.js?v=20260919f';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260919f';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260919f';
+} from './house.js?v=20260919g';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260919g';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260919g';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260919g';
 
 const blueprint = createBlueprint();
 
@@ -110,10 +111,12 @@ function tryMove(ex, dx, dy) {
   ex.x = nx;
   ex.y = ny;
   if (t === T.STAIRS_UP && ex.floor < FLOORS - 1) {
+    if (ex === S.me) sfx('stairs');
     ex.floor += 1;
     const down = findStairs(ex.floor, T.STAIRS_DOWN);
     if (down) { ex.x = down.x; ex.y = down.y; }
   } else if (t === T.STAIRS_DOWN && ex.floor > 0) {
+    if (ex === S.me) sfx('stairs');
     ex.floor -= 1;
     const up = findStairs(ex.floor, T.STAIRS_UP);
     if (up) { ex.x = up.x; ex.y = up.y; }
@@ -304,6 +307,7 @@ function placeAt(floor, x, y) {
   if (S.setupTool === 'chest') {
     house.chest = { floor, x, y };
     setStatus($('setup-status'), '宝箱を配置しました', 'ok');
+    sfx('place');
   } else if (isTrapTool(S.setupTool)) {
     if (house.traps.length >= MAX_TRAPS) {
       setStatus($('setup-status'), `罠は最大${MAX_TRAPS}個まで`, 'warn');
@@ -316,6 +320,7 @@ function placeAt(floor, x, y) {
       kind === TRAP_PIT ? '落とし穴を配置しました' : '通常罠を配置しました',
       'ok'
     );
+    sfx('place');
   } else {
     setStatus($('setup-status'), '上のボタンで宝箱か罠を選んでから床をタップ', 'warn');
     return;
@@ -515,6 +520,9 @@ function endGame(winner, reason) {
   S.timeScale = 0.18;
   S.slowMoFocus = focusView;
   S.slowMoPulse = 0;
+  sfx('slowMo');
+  if (reason === 'chest_me' || reason === 'chest_foe') sfx('chest');
+  else sfx('hurt');
   const match = $('screen-match');
   if (match) {
     match.classList.add('slow-mo');
@@ -559,6 +567,7 @@ function endGame(winner, reason) {
       $('end-banner-text').textContent = iWon ? '勝ち！' : '負け…';
       $('end-banner-detail').textContent = reasonText;
     }
+    sfx(iWon ? 'win' : 'lose');
 
     // Phase 2: result screen
     S._endTimer = setTimeout(() => {
@@ -623,9 +632,11 @@ function onTrapHit(who, tr) {
       applyPitfallDrop(S.me);
       addFx('bot', '落とし穴！', '#aa66ff');
       flashOverlay($('flash-bot'), '🕳 落とし穴！', 700);
+      if (S.myHp > 0) sfx('pit');
     } else {
       addFx('bot', '罠だ！', '#ff4444');
       flashOverlay($('flash-bot'), '💥 罠！', 600);
+      if (S.myHp > 0) sfx('trap');
     }
     if (S.myHp <= 0) endGame('foe', 'hp_me');
   } else {
@@ -634,9 +645,11 @@ function onTrapHit(who, tr) {
       applyPitfallDrop(S.foe);
       addFx('top', '落とし穴作動！', '#aa66ff');
       flashOverlay($('flash-top'), '🕳 落とし穴！', 700);
+      if (S.foeHp > 0) sfx('pit');
     } else {
       addFx('top', '罠作動！', '#ffaa00');
       flashOverlay($('flash-top'), '💥 罠作動！', 600);
+      if (S.foeHp > 0) sfx('trap');
     }
     if (S.foeHp <= 0) endGame('me', 'hp_foe');
   }
@@ -837,6 +850,7 @@ function onReadySetup() {
   if (S.mode === 'com') {
     S.theirHouse = generateComHouse(blueprint);
     setStatus($('setup-status'), 'COMが家を設計しました…', 'ok');
+    sfx('ready');
     startMatch();
     return;
   }
@@ -989,13 +1003,17 @@ function bindControls() {
     if (keyMap[e.key] && S.holdDir === keyMap[e.key]) S.holdDir = null;
   });
 
-  bindTap($('btn-create'), () => createRoom());
-  bindTap($('btn-join'), () => showJoinLobby());
+  bindTap($('btn-create'), () => { unlockAudio(); sfx('tap'); createRoom(); });
+  bindTap($('btn-join'), () => { unlockAudio(); sfx('tap'); showJoinLobby(); });
   bindTap($('btn-com'), () => {
+    unlockAudio();
+    sfx('tap');
     S.mode = 'com';
     startSetup();
   });
   bindTap($('btn-local'), () => {
+    unlockAudio();
+    sfx('tap');
     S.mode = 'local';
     startSetup();
   });
@@ -1016,6 +1034,7 @@ function bindControls() {
       updateSetupHud();
       const label = btn.textContent.trim();
       setStatus($('setup-status'), `${label} を選択 — 床をタップして配置`, 'ok');
+      sfx('tap');
     };
     bindTap(btn, select);
     btn.addEventListener('pointerdown', select, { passive: false });
@@ -1074,6 +1093,22 @@ export async function init() {
 
   bindControls();
   showScreen('screen-title');
+  loadMutePref();
+  syncMuteButton();
+
+  const unlockOnce = () => {
+    unlockAudio();
+  };
+  document.addEventListener('pointerdown', unlockOnce, { once: true });
+
+  const muteBtn = $('btn-mute');
+  if (muteBtn) {
+    bindTap(muteBtn, () => {
+      setMuted(!isMuted());
+      syncMuteButton();
+      if (!isMuted()) sfx('tap');
+    });
+  }
 
   loadPeerJS().then((ok) => {
     const note = $('peer-note');
@@ -1083,4 +1118,11 @@ export async function init() {
         : 'PeerJS未読込 — ローカル練習は利用可能';
     }
   });
+}
+
+function syncMuteButton() {
+  const muteBtn = $('btn-mute');
+  if (!muteBtn) return;
+  muteBtn.textContent = isMuted() ? '🔇 音オフ' : '🔊 音オン';
+  muteBtn.setAttribute('aria-pressed', isMuted() ? 'true' : 'false');
 }
