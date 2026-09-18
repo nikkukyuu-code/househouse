@@ -8,10 +8,10 @@ import {
   createBlueprint, createEmptyHouseData, isWalkable, isPlaceable,
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
-} from './house.js?v=20260920k';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920k';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920k';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920k';
+} from './house.js?v=20260920l';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920l';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920l';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920l';
 
 const blueprint = createBlueprint();
 
@@ -794,6 +794,15 @@ function placeAt(floor, x, y) {
       house.chest = null;
     }
     house.traps = house.traps.filter((t) => !(t.floor === floor && t.x === x && t.y === y));
+    // Allow「仕掛け完了」again after re-filling chest + all traps
+    if (!isSetupFullyPlaced(house)) {
+      S._celebratedSetup = false;
+      const banner = $('setup-done-banner');
+      if (banner) {
+        banner.classList.add('hidden');
+        banner.classList.remove('show');
+      }
+    }
     updateSetupHud();
     drawSetup();
     setStatus($('setup-status'), '消去しました', 'ok');
