@@ -8,10 +8,10 @@ import {
   createBlueprint, createEmptyHouseData, isWalkable, isPlaceable,
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
-} from './house.js?v=20260919i';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260919i';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260919i';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260919i';
+} from './house.js?v=20260919j';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260919j';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260919j';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260919j';
 
 const blueprint = createBlueprint();
 
@@ -419,8 +419,9 @@ function redrawMatchView(ctx, canvas, explorer, houseShown, showSecrets, trigger
     const cx = ox + (fx + 0.5) * cs;
     const cy = oy + (fy + 0.5) * cs;
     const pulse = Math.sin((S.slowMoPulse || performance.now() * 0.01) * 0.01);
+    const lethal = !!(hero && (hero.lethal || (S.ended && (S.endReason === 'hp_me' || S.endReason === 'hp_foe'))));
     const zoom = hero
-      ? 1.55 + 0.12 * pulse
+      ? (lethal ? 1.85 + 0.14 * pulse : 1.55 + 0.12 * pulse)
       : 1.1 + 0.05 * pulse;
     ctx.save();
     ctx.translate(w / 2, h / 2);
@@ -458,7 +459,9 @@ function redrawMatchView(ctx, canvas, explorer, houseShown, showSecrets, trigger
     // Giant character + chest/trap at the hit cell
     const hx = ox + hero.x * cs + cs / 2;
     const hy = oy + hero.y * cs + cs / 2;
-    const big = 2.25 + 0.12 * Math.sin((S.slowMoPulse || performance.now() * 0.01) * 0.012);
+    const lethal = !!(hero.lethal || (S.ended && (S.endReason === 'hp_me' || S.endReason === 'hp_foe')));
+    const base = lethal ? 2.85 : 2.25;
+    const big = base + 0.15 * Math.sin((S.slowMoPulse || performance.now() * 0.01) * 0.012);
     ctx.save();
     ctx.translate(hx, hy);
     ctx.scale(big, big);
@@ -554,6 +557,7 @@ function startHeroFocus(opts) {
     trapKind: opts.trapKind || TRAP_NORMAL,
     px: opts.px != null ? opts.px : opts.x,
     py: opts.py != null ? opts.py : opts.y,
+    lethal: !!opts.lethal,
     until: performance.now() + ms,
   };
 }
@@ -584,6 +588,20 @@ function climaxEventTitle(reason) {
   }
 }
 
+function showClimaxBanner(iWon, reasonText, eventTitle, bannerIcon) {
+  const banner = $('end-banner');
+  if (!banner) return;
+  banner.classList.remove('fade-out');
+  banner.classList.add('show', iWon ? 'win' : 'lose');
+  const chip = $('end-banner-chip');
+  if (chip) chip.textContent = iWon ? 'あなたの勝ち' : 'あなたの負け';
+  $('end-banner-icon').textContent = bannerIcon;
+  const ev = $('end-banner-event');
+  if (ev) ev.textContent = eventTitle;
+  $('end-banner-text').textContent = iWon ? '勝ち！' : '負け…';
+  $('end-banner-detail').textContent = reasonText;
+}
+
 function endGame(winner, reason) {
   if (S.ended) return;
   S.ended = true;
@@ -598,26 +616,36 @@ function endGame(winner, reason) {
   const bannerIcon = reasonIcon(reason);
   const flashBot = reason === 'chest_me' || reason === 'hp_me';
   const focusView = flashBot ? 'bot' : 'top';
+  const isLethalTrap = reason === 'hp_me' || reason === 'hp_foe';
 
-  // Immediate BIG climax card (clear what just happened)
   const banner = $('end-banner');
   const overlay = $('result-overlay');
   if (overlay) overlay.classList.remove('show', 'win', 'lose');
-  if (banner) {
-    banner.classList.remove('fade-out');
-    banner.classList.add('show', iWon ? 'win' : 'lose');
-    const chip = $('end-banner-chip');
-    if (chip) chip.textContent = iWon ? 'あなたの勝ち' : 'あなたの負け';
-    $('end-banner-icon').textContent = bannerIcon;
-    const ev = $('end-banner-event');
-    if (ev) ev.textContent = eventTitle;
-    $('end-banner-text').textContent = iWon ? '勝ち！' : '負け…';
-    $('end-banner-detail').textContent = reasonText;
+  if (banner) banner.classList.remove('show', 'fade-out', 'win', 'lose');
+
+  // Last-life trap death: keep hero focus alive + stronger slow-mo BEFORE the card
+  if (isLethalTrap) {
+    if (S.heroFocus && S.heroFocus.kind === 'trap') {
+      S.heroFocus.lethal = true;
+      S.heroFocus.until = performance.now() + 4200;
+      S.heroFocus.view = focusView;
+    } else if (S.lastTrapHit) {
+      const t = S.lastTrapHit;
+      startHeroFocus({
+        view: focusView,
+        kind: 'trap',
+        x: t.x,
+        y: t.y,
+        floor: t.floor,
+        trapKind: t.kind,
+        lethal: true,
+        ms: 4200,
+      });
+    }
   }
 
-  // Slow-mo behind the card
   S.slowMo = true;
-  S.timeScale = 0.15;
+  S.timeScale = isLethalTrap ? 0.1 : 0.15;
   S.slowMoFocus = focusView;
   S.slowMoPulse = 0;
   sfx('slowMo');
@@ -630,8 +658,9 @@ function endGame(winner, reason) {
     match.classList.toggle('slow-mo-top', !flashBot);
   }
 
-  addFx(focusView, eventTitle, '#ffe08a', 3000);
-  flashOverlay($(flashBot ? 'flash-bot' : 'flash-top'), eventTitle, 2000);
+  addFx(focusView, eventTitle, '#ffe08a', 3500);
+  // Softer flash so enlarged trap/char stays visible
+  flashOverlay($(flashBot ? 'flash-bot' : 'flash-top'), eventTitle, isLethalTrap ? 900 : 2000);
 
   if (S.mode && S.mode.startsWith('online') && S.net) {
     S.net.send({
@@ -644,20 +673,39 @@ function endGame(winner, reason) {
 
   clearTimeout(S._endTimer);
   clearTimeout(S._slowTimer);
+  clearTimeout(S._bannerTimer);
 
-  // Hold climax card, then result (skip weak middle phase)
-  S._slowTimer = setTimeout(() => {
-    S.slowMo = false;
-    S.timeScale = 1;
-    if (match) match.classList.remove('slow-mo', 'slow-mo-bot', 'slow-mo-top');
-    sfx(iWon ? 'win' : 'lose');
-
-    if (banner) {
-      banner.classList.add('fade-out');
-      setTimeout(() => banner.classList.remove('show', 'fade-out', 'win', 'lose'), 350);
-    }
-    showResultScreen(iWon, reasonText);
-  }, 2800);
+  if (isLethalTrap) {
+    // Phase 1: watch giant trap + char in slow-mo (no big card yet)
+    // Phase 2: climax card, then result
+    S._bannerTimer = setTimeout(() => {
+      showClimaxBanner(iWon, reasonText, eventTitle, bannerIcon);
+    }, 2000);
+    S._slowTimer = setTimeout(() => {
+      S.slowMo = false;
+      S.timeScale = 1;
+      if (match) match.classList.remove('slow-mo', 'slow-mo-bot', 'slow-mo-top');
+      sfx(iWon ? 'win' : 'lose');
+      if (banner) {
+        banner.classList.add('fade-out');
+        setTimeout(() => banner.classList.remove('show', 'fade-out', 'win', 'lose'), 350);
+      }
+      showResultScreen(iWon, reasonText);
+    }, 4000);
+  } else {
+    showClimaxBanner(iWon, reasonText, eventTitle, bannerIcon);
+    S._slowTimer = setTimeout(() => {
+      S.slowMo = false;
+      S.timeScale = 1;
+      if (match) match.classList.remove('slow-mo', 'slow-mo-bot', 'slow-mo-top');
+      sfx(iWon ? 'win' : 'lose');
+      if (banner) {
+        banner.classList.add('fade-out');
+        setTimeout(() => banner.classList.remove('show', 'fade-out', 'win', 'lose'), 350);
+      }
+      showResultScreen(iWon, reasonText);
+    }, 2800);
+  }
 }
 
 function endReasonLabel(reason, iWon) {
@@ -709,6 +757,8 @@ function onTrapHit(who, tr) {
   const ex = who === 'me' ? S.me : S.foe;
   const willEnd = who === 'me' ? S.myHp <= 1 : S.foeHp <= 1;
 
+  S.lastTrapHit = { who, floor: tr.floor, x: tr.x, y: tr.y, kind };
+
   startHeroFocus({
     view,
     kind: 'trap',
@@ -718,7 +768,8 @@ function onTrapHit(who, tr) {
     trapKind: kind,
     px: ex ? ex.x : tr.x,
     py: ex ? ex.y : tr.y,
-    ms: willEnd ? 3000 : 1400,
+    lethal: willEnd,
+    ms: willEnd ? 4200 : 1400,
   });
 
   if (who === 'me') {
@@ -908,6 +959,13 @@ function handleNetMessage(msg) {
         S.foeTriggered.add(key);
         S.foeHp = typeof msg.myHp === 'number' ? msg.myHp : Math.max(0, S.foeHp - 1);
         const willEnd = S.foeHp <= 0;
+        S.lastTrapHit = {
+          who: 'foe',
+          floor: msg.floor,
+          x: msg.x,
+          y: msg.y,
+          kind: msg.kind === TRAP_PIT ? TRAP_PIT : TRAP_NORMAL,
+        };
         startHeroFocus({
           view: 'top',
           kind: 'trap',
@@ -915,7 +973,8 @@ function handleNetMessage(msg) {
           y: msg.y,
           floor: msg.floor,
           trapKind: msg.kind === TRAP_PIT ? TRAP_PIT : TRAP_NORMAL,
-          ms: willEnd ? 3000 : 1400,
+          lethal: willEnd,
+          ms: willEnd ? 4200 : 1400,
         });
         if (msg.kind === TRAP_PIT) {
           addFx('top', '落とし穴作動！', '#aa66ff');
@@ -1054,7 +1113,9 @@ function startMatch() {
   S.slowMo = false;
   S.timeScale = 1;
   S.heroFocus = null;
+  S.lastTrapHit = null;
   clearTimeout(S._pitTimer);
+  clearTimeout(S._bannerTimer);
   const matchEl = $('screen-match');
   if (matchEl) matchEl.classList.remove('slow-mo', 'slow-mo-bot', 'slow-mo-top');
   $('btn-ready').disabled = false;
