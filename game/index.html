@@ -5,9 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
+  <meta http-equiv="Cache-Control" content="no-cache" />
   <meta name="theme-color" content="#120e18" />
   <title>ハウスハウス</title>
-  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/style.css?v=20260919a" />
 </head>
 <body>
   <div id="app">
@@ -129,7 +130,7 @@
   </div>
 
   <script type="module">
-    import { init } from './js/game.js';
+    import { init } from './js/game.js?v=20260919a';
     init().catch((e) => {
       console.error(e);
       const n = document.getElementById('peer-note');
