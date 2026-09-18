@@ -8,10 +8,10 @@ import {
   createBlueprint, createEmptyHouseData, isWalkable, isPlaceable,
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
-} from './house.js?v=20260919p';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260919p';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260919p';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260919p';
+} from './house.js?v=20260919q';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260919q';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260919q';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260919q';
 
 const blueprint = createBlueprint();
 
@@ -1219,21 +1219,6 @@ function bindControls() {
     S.mode = 'com';
     startSetup();
   });
-  const startLocalPractice = () => {
-    try { unlockAudio(); } catch (_) {}
-    try { sfx('tap'); } catch (_) {}
-    S.mode = 'local';
-    startSetup();
-  };
-  // pointerup only (avoids missed click + double-fire on some phones)
-  const localBtn = $('btn-local');
-  if (localBtn) {
-    localBtn.addEventListener('pointerup', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      startLocalPractice();
-    }, { passive: false });
-  }
   bindTap($('btn-join-go'), () => joinRoom());
   bindTap($('btn-lobby-back'), () => goTitle());
 
