@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#120e18" />
+  <title>ハウスハウス</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- タイトル -->
+    <section id="screen-title" class="screen active">
+      <h1 class="title-logo">ハウスハウス</h1>
+      <p class="title-sub">家に罠を仕掛けて<br />相手の宝箱を探せ！</p>
+      <div class="btn-col">
+        <button type="button" class="btn btn-com" id="btn-com">COM対戦</button>
+        <button type="button" class="btn btn-secondary" id="btn-create">ルームを作成</button>
+        <button type="button" class="btn btn-secondary" id="btn-join">ルームに参加</button>
+        <button type="button" class="btn btn-ghost" id="btn-local">両方設計して練習</button>
+      </div>
+      <p class="peer-note" id="peer-note">通信準備中…</p>
+    </section>
+
+    <!-- ロビー -->
+    <section id="screen-lobby" class="screen">
+      <p class="lobby-label">オンライン対戦</p>
+      <div id="lobby-code-wrap">
+        <p class="lobby-label">ルームコード</p>
+        <div class="room-code" id="room-code-display">----</div>
+      </div>
+      <div id="lobby-join-wrap" class="hidden">
+        <p class="lobby-label">コードを入力</p>
+        <input
+          class="join-input allow-scroll"
+          id="join-code-input"
+          type="text"
+          maxlength="4"
+          inputmode="text"
+          autocomplete="off"
+          autocapitalize="characters"
+          placeholder="ABCD"
+          aria-label="ルームコード"
+        />
+        <div class="btn-col" style="margin-top:14px;max-width:280px">
+          <button type="button" class="btn btn-primary" id="btn-join-go">参加する</button>
+        </div>
+      </div>
+      <p class="status-msg" id="net-status"></p>
+      <div class="btn-col" style="max-width:280px;margin-top:8px">
+        <button type="button" class="btn btn-ghost" id="btn-lobby-back">タイトルへ</button>
+      </div>
+    </section>
+
+    <!-- セットアップ -->
+    <section id="screen-setup" class="screen">
+      <div class="setup-header">
+        <h2 id="setup-title">あなたの家を設計</h2>
+        <div class="setup-counts">
+          <span>宝箱 <strong id="setup-chest-count">—</strong></span>
+          <span>罠 <strong id="setup-trap-count">0/5</strong></span>
+        </div>
+      </div>
+      <div class="floor-tabs">
+        <button type="button" class="floor-tab active" data-floor="0">1F</button>
+        <button type="button" class="floor-tab" data-floor="1">2F</button>
+        <button type="button" class="floor-tab" data-floor="2">3F</button>
+      </div>
+      <div class="tool-row">
+        <button type="button" class="tool-btn active" data-tool="chest">📦 宝箱</button>
+        <button type="button" class="tool-btn" data-tool="trap">💥 罠</button>
+        <button type="button" class="tool-btn" data-tool="erase">🗑 消す</button>
+      </div>
+      <div id="setup-canvas-wrap">
+        <canvas id="setup-canvas" class="active-canvas"></canvas>
+      </div>
+      <p class="legend">緑▲=上階へ　青▼=下階へ　茶色=ドア　床をタップして配置</p>
+      <p class="status-msg" id="setup-status"></p>
+      <div class="setup-actions">
+        <button type="button" class="btn btn-ghost" id="btn-setup-back">戻る</button>
+        <button type="button" class="btn btn-primary" id="btn-ready">準備完了</button>
+      </div>
+    </section>
+
+    <!-- マッチ -->
+    <section id="screen-match" class="screen">
+      <div class="match-half top">
+        <div class="match-hud">
+          <span class="label">相手の体力</span>
+          <span class="hearts" id="hp-top"></span>
+        </div>
+        <div class="match-canvas-wrap">
+          <canvas id="canvas-top"></canvas>
+          <div class="flash-fx" id="flash-top"></div>
+        </div>
+      </div>
+      <div class="match-half bot">
+        <div class="match-hud">
+          <span class="label">あなたの体力</span>
+          <span class="hearts" id="hp-bot"></span>
+        </div>
+        <div class="match-canvas-wrap">
+          <canvas id="canvas-bot"></canvas>
+          <div class="flash-fx" id="flash-bot"></div>
+          <div class="dpad" id="dpad" aria-label="移動パッド">
+            <button type="button" class="dpad-btn up" data-dir="u" aria-label="上">▲</button>
+            <button type="button" class="dpad-btn down" data-dir="d" aria-label="下">▼</button>
+            <button type="button" class="dpad-btn left" data-dir="l" aria-label="左">◀</button>
+            <button type="button" class="dpad-btn right" data-dir="r" aria-label="右">▶</button>
+          </div>
+          <p class="match-hint">階段で階を移動<br />宝箱を探せ</p>
+        </div>
+      </div>
+
+      <div id="result-overlay">
+        <div id="result-title">勝利！</div>
+        <p id="result-sub"></p>
+        <div class="btn-col" style="max-width:260px">
+          <button type="button" class="btn btn-primary" id="btn-again">もう一度</button>
+          <button type="button" class="btn btn-ghost" id="btn-title">タイトルへ</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script type="module">
+    import { init } from './js/game.js';
+    init().catch((e) => {
+      console.error(e);
+      const n = document.getElementById('peer-note');
+      if (n) n.textContent = '起動エラー: ' + (e && e.message ? e.message : e);
+    });
+  </script>
+</body>
+</html>
