@@ -8,10 +8,10 @@ import {
   createBlueprint, createEmptyHouseData, isWalkable, isPlaceable,
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
-} from './house.js?v=20260920a';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920a';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920a';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920a';
+} from './house.js?v=20260920b';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920b';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920b';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920b';
 
 const blueprint = createBlueprint();
 
@@ -748,11 +748,52 @@ function reasonIcon(reason) {
   return '🏁';
 }
 
+function drawResultChestReveal(chest) {
+  const wrap = $('result-chest-reveal');
+  const loc = $('result-chest-loc');
+  const canvas = $('result-chest-canvas');
+  if (!wrap || !canvas || !chest) {
+    if (wrap) wrap.classList.add('hidden');
+    return;
+  }
+  wrap.classList.remove('hidden');
+  if (loc) {
+    loc.textContent = `${floorLabel(chest.floor)} ／ マス (${chest.x + 1}, ${chest.y + 1})`;
+  }
+
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cssW = canvas.clientWidth || 260;
+  const cssH = Math.max(120, Math.floor(cssW * 0.7));
+  canvas.width = Math.floor(cssW * dpr);
+  canvas.height = Math.floor(cssH * dpr);
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = '#101820';
+  ctx.fillRect(0, 0, cssW, cssH);
+
+  const cs = Math.max(1, Math.floor(Math.min(cssW / COLS, cssH / ROWS)));
+  const ox = Math.floor((cssW - COLS * cs) / 2);
+  const oy = Math.floor((cssH - ROWS * cs) / 2);
+  drawHouse(ctx, blueprint, null, chest.floor, {
+    showChest: false,
+    showTraps: false,
+    ox, oy, cellSize: cs,
+  });
+  // Highlight chest cell
+  ctx.fillStyle = 'rgba(255, 210, 80, 0.28)';
+  ctx.fillRect(ox + chest.x * cs, oy + chest.y * cs, cs, cs);
+  ctx.strokeStyle = '#ffe08a';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(ox + chest.x * cs + 1, oy + chest.y * cs + 1, cs - 2, cs - 2);
+  drawChestSprite(ctx, ox + chest.x * cs, oy + chest.y * cs, cs);
+}
+
 function showResultScreen(iWon, reasonText) {
   const overlay = $('result-overlay');
   const title = $('result-title');
   const reasonEl = $('result-reason');
   const sub = $('result-sub');
+  const chestReveal = $('result-chest-reveal');
   if (!overlay) return;
   overlay.classList.add('show', iWon ? 'win' : 'lose');
   overlay.classList.remove(iWon ? 'lose' : 'win');
@@ -760,10 +801,18 @@ function showResultScreen(iWon, reasonText) {
     title.textContent = '勝利！';
     title.className = 'win';
     sub.textContent = 'もう一度挑戦するか、タイトルへ戻れます';
+    if (chestReveal) chestReveal.classList.add('hidden');
   } else {
     title.textContent = '敗北…';
     title.className = 'lose';
     sub.textContent = '罠の置き方や探索ルートを変えて再挑戦！';
+    // Opponent-placed chest = the one in their house (you were searching for it)
+    const chest = S.theirHouse && S.theirHouse.chest;
+    if (chest) {
+      requestAnimationFrame(() => drawResultChestReveal(chest));
+    } else if (chestReveal) {
+      chestReveal.classList.add('hidden');
+    }
   }
   if (reasonEl) reasonEl.textContent = '理由：' + reasonText;
 }
@@ -1170,6 +1219,8 @@ function startMatch() {
 
   showScreen('screen-match');
   $('result-overlay').classList.remove('show', 'win', 'lose');
+  const rcr = $('result-chest-reveal');
+  if (rcr) rcr.classList.add('hidden');
   const eb = $('end-banner');
   if (eb) eb.classList.remove('show', 'fade-out', 'win', 'lose');
   clearTimeout(S._endTimer);
