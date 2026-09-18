@@ -589,8 +589,8 @@ a.btn.link-btn {
   border: 1px solid rgba(255, 224, 138, 0.35);
   margin-bottom: 4px;
 }
-#result-overlay.lose #result-chest-reveal:not(.hidden) {
-  display: flex;
+#result-overlay.lose #result-chest-reveal.visible {
+  display: flex !important;
 }
 .result-chest-label {
   font-size: clamp(0.75rem, 2vh, 0.9rem);

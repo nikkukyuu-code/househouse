@@ -8,10 +8,10 @@ import {
   createBlueprint, createEmptyHouseData, isWalkable, isPlaceable,
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
-} from './house.js?v=20260920c';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920c';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920c';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920c';
+} from './house.js?v=20260920d';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920d';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920d';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920d';
 
 const blueprint = createBlueprint();
 
@@ -746,22 +746,36 @@ function reasonIcon(reason) {
   return '🏁';
 }
 
-function drawResultChestReveal(chest) {
+function drawResultChestReveal(chest, reason) {
   const wrap = $('result-chest-reveal');
   const loc = $('result-chest-loc');
   const canvas = $('result-chest-canvas');
+  const label = wrap && wrap.querySelector('.result-chest-label');
   if (!wrap || !canvas || !chest) {
-    if (wrap) wrap.classList.add('hidden');
+    if (wrap) {
+      wrap.classList.add('hidden');
+      wrap.classList.remove('visible');
+    }
     return;
   }
   wrap.classList.remove('hidden');
+  wrap.classList.add('visible');
+  if (label) {
+    label.textContent = reason === 'hp_me'
+      ? '体力ゼロ…相手が仕掛けた宝箱はここ'
+      : '相手が仕掛けた宝箱';
+  }
   if (loc) {
     loc.textContent = `${floorLabel(chest.floor)} ／ マス (${chest.x + 1}, ${chest.y + 1})`;
   }
 
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  const cssW = canvas.clientWidth || 260;
+  // Parent may still be laying out — fall back to fixed size so map always draws
+  let cssW = canvas.clientWidth || wrap.clientWidth || 260;
+  if (cssW < 80) cssW = 260;
   const cssH = Math.max(120, Math.floor(cssW * 0.7));
+  canvas.style.width = cssW + 'px';
+  canvas.style.height = cssH + 'px';
   canvas.width = Math.floor(cssW * dpr);
   canvas.height = Math.floor(cssH * dpr);
   const ctx = canvas.getContext('2d');
@@ -777,7 +791,6 @@ function drawResultChestReveal(chest) {
     showTraps: false,
     ox, oy, cellSize: cs,
   });
-  // Highlight chest cell
   ctx.fillStyle = 'rgba(255, 210, 80, 0.28)';
   ctx.fillRect(ox + chest.x * cs, oy + chest.y * cs, cs, cs);
   ctx.strokeStyle = '#ffe08a';
@@ -786,6 +799,7 @@ function drawResultChestReveal(chest) {
   drawChestSprite(ctx, ox + chest.x * cs, oy + chest.y * cs, cs);
 }
 
+/** On ANY loss (宝箱を取られた／体力ゼロなど), show opponent chest location. */
 function showResultScreen(iWon, reasonText) {
   const overlay = $('result-overlay');
   const title = $('result-title');
@@ -799,17 +813,26 @@ function showResultScreen(iWon, reasonText) {
     title.textContent = '勝利！';
     title.className = 'win';
     sub.textContent = 'もう一度挑戦するか、タイトルへ戻れます';
-    if (chestReveal) chestReveal.classList.add('hidden');
+    if (chestReveal) {
+      chestReveal.classList.add('hidden');
+      chestReveal.classList.remove('visible');
+    }
   } else {
     title.textContent = '敗北…';
     title.className = 'lose';
     sub.textContent = '罠の置き方や探索ルートを変えて再挑戦！';
-    // Opponent-placed chest = the one in their house (you were searching for it)
     const chest = S.theirHouse && S.theirHouse.chest;
-    if (chest) {
-      requestAnimationFrame(() => drawResultChestReveal(chest));
+    const reason = S.endReason || '';
+    if (chest && chestReveal) {
+      chestReveal.classList.remove('hidden');
+      chestReveal.classList.add('visible');
+      // Double rAF so overlay layout is ready (incl. hp_me after long climax)
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => drawResultChestReveal(chest, reason));
+      });
     } else if (chestReveal) {
       chestReveal.classList.add('hidden');
+      chestReveal.classList.remove('visible');
     }
   }
   if (reasonEl) reasonEl.textContent = '理由：' + reasonText;
@@ -1234,7 +1257,7 @@ function startMatch() {
   showScreen('screen-match');
   $('result-overlay').classList.remove('show', 'win', 'lose');
   const rcr = $('result-chest-reveal');
-  if (rcr) rcr.classList.add('hidden');
+  if (rcr) { rcr.classList.add('hidden'); rcr.classList.remove('visible'); }
   const eb = $('end-banner');
   if (eb) eb.classList.remove('show', 'fade-out', 'win', 'lose');
   clearTimeout(S._endTimer);
