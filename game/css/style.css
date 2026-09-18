@@ -439,9 +439,6 @@ body {
   z-index: 10;
   min-height: clamp(96px, 16vh, 120px);
 }
-.match-half.bot {
-  /* top map + controls: give map more room by shrinking max slightly via flex */
-}
 .match-half.bot .match-canvas-wrap {
   flex: 1 1 auto;
   min-height: 0;
