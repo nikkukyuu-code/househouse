@@ -8,10 +8,10 @@ import {
   createBlueprint, createEmptyHouseData, isWalkable, isPlaceable,
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
-} from './house.js?v=20260920i';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920i';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920i';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920i';
+} from './house.js?v=20260920j';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920j';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920j';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920j';
 
 const blueprint = createBlueprint();
 
@@ -241,34 +241,27 @@ function aiFloorUnvisited(floor, visited) {
 }
 
 /**
- * BFS on one floor from (sx,sy) to nearest goal matching predicate.
- * Returns first step {dx,dy} or null. Optionally avoid reversing last move.
+ * Cost to enter (floor,x,y). Prefer already-triggered (known-safe) cells.
+ * Mild weights: short unknown paths still win; equal-length prefers triggered.
+ * Door/spawn caution is a tiny tie-break only (do not trap COM in spawn).
  */
-function aiBfsNextStep(floor, sx, sy, isGoal, preferNotDx, preferNotDy) {
-  const startKey = `${sx},${sy}`;
-  if (isGoal(sx, sy)) return null;
-  const q = [{ x: sx, y: sy }];
-  const prev = new Map();
-  prev.set(startKey, null);
-  let found = null;
-  while (q.length) {
-    const cur = q.shift();
-    for (const n of aiNeighbors(floor, cur.x, cur.y)) {
-      const k = `${n.x},${n.y}`;
-      if (prev.has(k)) continue;
-      prev.set(k, { x: cur.x, y: cur.y, stepDx: n.dx, stepDy: n.dy });
-      if (isGoal(n.x, n.y)) {
-        found = { x: n.x, y: n.y };
-        q.length = 0;
-        break;
-      }
-      q.push({ x: n.x, y: n.y });
-    }
+function aiEnterCost(ex, floor, x, y) {
+  if (aiIsCellTriggered(ex, floor, x, y)) return 0.75; // spent trap — safe corridor
+  const key = `${floor},${x},${y}`;
+  const visited = ex && ex.visited && ex.visited.has(key);
+  let c = visited ? 1.0 : 1.3;
+  if (!visited && (aiIsDoorAdjacent(floor, x, y) || aiNearSpawnExit(floor, x, y))) {
+    c += 0.05;
   }
-  if (!found) return null;
-  // Walk back to reconstruct first step from start
-  let cx = found.x;
-  let cy = found.y;
+  return c;
+}
+
+/**
+ * Reconstruct first step from Dijkstra prev map.
+ */
+function aiFirstStepFromPrev(prev, sx, sy, goalX, goalY) {
+  let cx = goalX;
+  let cy = goalY;
   let first = null;
   while (true) {
     const p = prev.get(`${cx},${cy}`);
@@ -278,53 +271,102 @@ function aiBfsNextStep(floor, sx, sy, isGoal, preferNotDx, preferNotDy) {
     cx = p.x;
     cy = p.y;
   }
+  return first;
+}
+
+/**
+ * Weighted shortest path on one floor toward nearest goal.
+ * Prefer paths through triggered cells; still explores unvisited goals.
+ * Returns first step {dx,dy} or null. Optionally avoid reversing last move.
+ */
+function aiBfsNextStep(ex, floor, sx, sy, isGoal, preferNotDx, preferNotDy) {
+  if (isGoal(sx, sy)) return null;
+  const startKey = `${sx},${sy}`;
+  const dist = new Map();
+  const prev = new Map();
+  dist.set(startKey, 0);
+  prev.set(startKey, null);
+  // Small grid — linear scan for min is fine
+  const open = [{ x: sx, y: sy, d: 0 }];
+  let found = null;
+
+  while (open.length) {
+    let mi = 0;
+    for (let i = 1; i < open.length; i++) {
+      if (open[i].d < open[mi].d) mi = i;
+    }
+    const cur = open.splice(mi, 1)[0];
+    const ck = `${cur.x},${cur.y}`;
+    if (cur.d > (dist.get(ck) ?? Infinity)) continue;
+
+    if (!(cur.x === sx && cur.y === sy) && isGoal(cur.x, cur.y)) {
+      found = { x: cur.x, y: cur.y };
+      break;
+    }
+
+    for (const n of aiNeighbors(floor, cur.x, cur.y)) {
+      const k = `${n.x},${n.y}`;
+      const nd = cur.d + aiEnterCost(ex, floor, n.x, n.y);
+      if (nd < (dist.get(k) ?? Infinity)) {
+        dist.set(k, nd);
+        prev.set(k, { x: cur.x, y: cur.y, stepDx: n.dx, stepDy: n.dy });
+        open.push({ x: n.x, y: n.y, d: nd });
+      }
+    }
+  }
+
+  if (!found) return null;
+  const first = aiFirstStepFromPrev(prev, sx, sy, found.x, found.y);
   if (!first) return null;
-  // Prefer not reversing: if first step is reverse and another equally-short path exists, try alt
+  // Prefer not reversing: if first step is reverse and another path exists, try alt
   if (
     preferNotDx != null && preferNotDy != null
     && first.dx === -preferNotDx && first.dy === -preferNotDy
   ) {
-    const alt = aiBfsNextStepAvoidReverse(floor, sx, sy, isGoal, preferNotDx, preferNotDy);
+    const alt = aiBfsNextStepAvoidReverse(ex, floor, sx, sy, isGoal, preferNotDx, preferNotDy);
     if (alt) return alt;
   }
   return first;
 }
 
-/** Second BFS that forbids the immediate reverse as the first edge from start. */
-function aiBfsNextStepAvoidReverse(floor, sx, sy, isGoal, lastDx, lastDy) {
+/** Weighted search that forbids the immediate reverse as the first edge from start. */
+function aiBfsNextStepAvoidReverse(ex, floor, sx, sy, isGoal, lastDx, lastDy) {
   const startKey = `${sx},${sy}`;
-  const q = [{ x: sx, y: sy }];
+  const dist = new Map();
   const prev = new Map();
+  dist.set(startKey, 0);
   prev.set(startKey, null);
+  const open = [{ x: sx, y: sy, d: 0 }];
   let found = null;
-  while (q.length) {
-    const cur = q.shift();
+
+  while (open.length) {
+    let mi = 0;
+    for (let i = 1; i < open.length; i++) {
+      if (open[i].d < open[mi].d) mi = i;
+    }
+    const cur = open.splice(mi, 1)[0];
+    const ck = `${cur.x},${cur.y}`;
+    if (cur.d > (dist.get(ck) ?? Infinity)) continue;
+
+    if (!(cur.x === sx && cur.y === sy) && isGoal(cur.x, cur.y)) {
+      found = { x: cur.x, y: cur.y };
+      break;
+    }
+
     for (const n of aiNeighbors(floor, cur.x, cur.y)) {
       if (cur.x === sx && cur.y === sy && n.dx === -lastDx && n.dy === -lastDy) continue;
       const k = `${n.x},${n.y}`;
-      if (prev.has(k)) continue;
-      prev.set(k, { x: cur.x, y: cur.y, stepDx: n.dx, stepDy: n.dy });
-      if (isGoal(n.x, n.y)) {
-        found = { x: n.x, y: n.y };
-        q.length = 0;
-        break;
+      const nd = cur.d + aiEnterCost(ex, floor, n.x, n.y);
+      if (nd < (dist.get(k) ?? Infinity)) {
+        dist.set(k, nd);
+        prev.set(k, { x: cur.x, y: cur.y, stepDx: n.dx, stepDy: n.dy });
+        open.push({ x: n.x, y: n.y, d: nd });
       }
-      q.push({ x: n.x, y: n.y });
     }
   }
+
   if (!found) return null;
-  let cx = found.x;
-  let cy = found.y;
-  let first = null;
-  while (true) {
-    const p = prev.get(`${cx},${cy}`);
-    if (!p) break;
-    first = { dx: p.stepDx, dy: p.stepDy };
-    if (p.x === sx && p.y === sy) break;
-    cx = p.x;
-    cy = p.y;
-  }
-  return first;
+  return aiFirstStepFromPrev(prev, sx, sy, found.x, found.y);
 }
 
 function aiFindTile(floor, kind) {
@@ -508,7 +550,7 @@ function aiStep(ex) {
 
     const goalSet = new Set(goalPool.map((c) => `${c.x},${c.y}`));
     let step = aiBfsNextStep(
-      ex.floor, ex.x, ex.y,
+      ex, ex.floor, ex.x, ex.y,
       (x, y) => goalSet.has(`${x},${y}`),
       lastDx, lastDy
     );
@@ -516,7 +558,7 @@ function aiStep(ex) {
     if (!step && goalPool !== unvisHere) {
       const allSet = new Set(unvisHere.map((c) => `${c.x},${c.y}`));
       step = aiBfsNextStep(
-        ex.floor, ex.x, ex.y,
+        ex, ex.floor, ex.x, ex.y,
         (x, y) => allSet.has(`${x},${y}`),
         lastDx, lastDy
       );
@@ -530,7 +572,7 @@ function aiStep(ex) {
     const up = aiFindTile(ex.floor, T.STAIRS_UP);
     if (up) {
       const step = aiBfsNextStep(
-        ex.floor, ex.x, ex.y,
+        ex, ex.floor, ex.x, ex.y,
         (x, y) => x === up.x && y === up.y,
         lastDx, lastDy
       );
@@ -556,7 +598,7 @@ function aiStep(ex) {
     const down = aiFindTile(ex.floor, T.STAIRS_DOWN);
     if (down) {
       const step = aiBfsNextStep(
-        ex.floor, ex.x, ex.y,
+        ex, ex.floor, ex.x, ex.y,
         (x, y) => x === down.x && y === down.y,
         lastDx, lastDy
       );
@@ -580,7 +622,7 @@ function aiPlanToward(ex, goal, lastDx, lastDy) {
   if (!goal) return null;
   if (goal.floor === ex.floor) {
     return aiBfsNextStep(
-      ex.floor, ex.x, ex.y,
+      ex, ex.floor, ex.x, ex.y,
       (x, y) => x === goal.x && y === goal.y,
       lastDx, lastDy
     );
@@ -594,7 +636,7 @@ function aiPlanToward(ex, goal, lastDx, lastDy) {
       return null;
     }
     return aiBfsNextStep(
-      ex.floor, ex.x, ex.y,
+      ex, ex.floor, ex.x, ex.y,
       (x, y) => x === up.x && y === up.y,
       lastDx, lastDy
     );
@@ -603,7 +645,7 @@ function aiPlanToward(ex, goal, lastDx, lastDy) {
   if (!down) return null;
   if (ex.x === down.x && ex.y === down.y) return null;
   return aiBfsNextStep(
-    ex.floor, ex.x, ex.y,
+    ex, ex.floor, ex.x, ex.y,
     (x, y) => x === down.x && y === down.y,
     lastDx, lastDy
   );
@@ -620,7 +662,7 @@ function aiWanderStep(ex, lastDx, lastDy) {
     if (t === T.STAIRS_UP || t === T.STAIRS_DOWN) s += 0.5;
     const nk = `${ex.floor},${n.x},${n.y}`;
     if (!ex.visited.has(nk)) s += 10;
-    if (aiIsCellTriggered(ex, ex.floor, n.x, n.y)) s += 3; // known safe
+    if (aiIsCellTriggered(ex, ex.floor, n.x, n.y)) s += 8; // known-safe corridor (strong when revisiting)
     else s -= aiCautionCost(ex, ex.floor, n.x, n.y);
     // If only one neighbor (dead end / corridor), don't let caution block
     if (neighbors.length <= 1) s += 5;
