@@ -3,8 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Cache-Control" content="no-cache" />
   <meta name="theme-color" content="#120e18" />
-  <title>ハウスと罠 — フォルダ構成</title>
+  <meta name="description" content="ハウスと罠 — 家に罠を仕掛けて、相手の宝箱を探すスマホ向け2人対戦ゲーム" />
+  <title>ハウスと罠 — 遊び方</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -12,56 +14,27 @@
       background: linear-gradient(180deg, #1a1424 0%, #120e18 100%);
       color: #f5f0e8;
       font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", sans-serif;
-      line-height: 1.6;
-      padding: 24px 16px 40px;
+      line-height: 1.65;
+      padding: 24px 16px 48px;
     }
-    main {
-      max-width: 520px;
-      margin: 0 auto;
-    }
+    main { max-width: 520px; margin: 0 auto; }
     h1 {
-      font-size: 1.75rem;
+      font-size: clamp(1.6rem, 6vw, 2rem);
       color: #ffe08a;
       letter-spacing: 0.06em;
+      text-shadow: 0 2px 0 #8b5a1a;
       margin-bottom: 8px;
     }
-    .sub {
-      color: #b8a890;
-      margin-bottom: 24px;
-      font-size: 0.95rem;
+    .lead {
+      color: #d4c4a8;
+      font-size: 1rem;
+      margin-bottom: 8px;
     }
-    h2 {
-      font-size: 1.05rem;
-      color: #c9a227;
-      margin: 28px 0 10px;
+    .tagline {
+      color: #887868;
+      font-size: 0.88rem;
+      margin-bottom: 20px;
     }
-    p, li { color: #ddd; font-size: 0.95rem; }
-    ul { padding-left: 1.2em; margin-bottom: 12px; }
-    li { margin-bottom: 4px; }
-    .tree {
-      background: rgba(0,0,0,0.35);
-      border: 1px solid rgba(201,162,39,0.35);
-      border-radius: 12px;
-      padding: 14px 16px;
-      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-      font-size: 0.82rem;
-      line-height: 1.55;
-      color: #e8dcc8;
-      overflow-x: auto;
-      white-space: pre;
-      margin: 12px 0 20px;
-    }
-    .tree .dir { color: #8ddea0; }
-    .tree .file { color: #b8d4ff; }
-    .tree .note { color: #887868; }
-    .card {
-      background: rgba(255,255,255,0.06);
-      border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 12px;
-      padding: 14px 16px;
-      margin-bottom: 16px;
-    }
-    .card strong { color: #ffe08a; }
     a.play {
       display: block;
       text-align: center;
@@ -69,63 +42,124 @@
       background: linear-gradient(180deg, #5ecf8a, #2e9a58);
       color: #0a1a10;
       font-weight: 800;
+      font-size: 1.1rem;
+      padding: 16px 16px;
+      border-radius: 14px;
+      box-shadow: 0 4px 0 #1a6a38;
+      margin: 8px 0 28px;
+    }
+    a.play:active { transform: translateY(2px); box-shadow: 0 2px 0 #1a6a38; }
+    h2 {
       font-size: 1.05rem;
-      padding: 14px 16px;
+      color: #c9a227;
+      margin: 0 0 10px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid rgba(201,162,39,0.35);
+    }
+    section { margin-bottom: 26px; }
+    p, li { color: #ddd; font-size: 0.95rem; }
+    ul, ol { padding-left: 1.25em; margin: 8px 0 0; }
+    li { margin-bottom: 8px; }
+    .card {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
       border-radius: 12px;
-      box-shadow: 0 3px 0 #1a6a38;
-      margin: 20px 0 8px;
+      padding: 14px 16px;
     }
-    a.play:active { transform: translateY(1px); }
-    .muted { color: #887868; font-size: 0.8rem; text-align: center; }
-    code {
-      background: rgba(0,0,0,0.35);
-      padding: 1px 6px;
-      border-radius: 4px;
-      font-size: 0.88em;
+    .card + .card { margin-top: 10px; }
+    .num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.4em;
+      height: 1.4em;
+      border-radius: 50%;
+      background: #c9a227;
+      color: #1a1008;
+      font-weight: 800;
+      font-size: 0.85rem;
+      margin-right: 6px;
     }
+    .split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .split .card { margin: 0; font-size: 0.88rem; }
+    .split .card strong { display: block; color: #ffe08a; margin-bottom: 4px; }
+    .hint { color: #b8a890; font-size: 0.88rem; margin-top: 10px; }
+    .win { color: #8ddea0; font-weight: 700; }
+    .lose { color: #ff8a7a; }
   </style>
 </head>
 <body>
   <main>
     <h1>ハウスと罠</h1>
-    <p class="sub">リポジトリ内のフォルダ構成と、ゲームファイルの置き場所です。</p>
+    <p class="lead">自分の家に宝箱と罠を仕掛けて、相手の家から宝箱を探し合う対戦ゲームです。</p>
+    <p class="tagline">スマホ向け・タッチ操作／COM対戦・ネット対戦あり</p>
 
-    <a class="play" href="game/">ゲームを遊ぶ（game/）</a>
-    <p class="muted">本体は下の <code>game/</code> フォルダにあります</p>
+    <a class="play" href="game/?v=20260919c">今すぐ遊ぶ</a>
 
-    <h2>フォルダ構成</h2>
-    <div class="tree"><span class="note">nikkukyuu-code/househouse/</span>
-├── <span class="file">index.html</span>          <span class="note">← この説明ページ</span>
-├── <span class="file">README.md</span>
-└── <span class="dir">game/</span>                 <span class="note">← ゲーム本体</span>
-    ├── <span class="file">index.html</span>      <span class="note">起動ファイル</span>
-    ├── <span class="dir">css/</span>
-    │   └── <span class="file">style.css</span>
-    └── <span class="dir">js/</span>
-        ├── <span class="file">game.js</span>
-        ├── <span class="file">house.js</span>
-        ├── <span class="file">net.js</span>
-        └── <span class="file">ui.js</span></div>
+    <section>
+      <h2>どんなゲーム？</h2>
+      <div class="card">
+        <p>お互いが<strong>3階建ての家</strong>を用意します。家のどこかに<strong>宝箱を1つ</strong>、相手を邪魔する<strong>罠を最大5つ</strong>置けます。</p>
+        <p style="margin-top:10px">試合が始まったら、相手の家に入って宝箱を探します。同時に、相手もあなたの家を探索しています。</p>
+      </div>
+    </section>
 
-    <h2>ゲームファイルの場所</h2>
-    <div class="card">
-      <p>ブラウザで動かす本体はすべて <strong>game/</strong> の中にあります。</p>
-      <ul>
-        <li><code>game/index.html</code> … ゲームの入口</li>
-        <li><code>game/css/</code> … 見た目</li>
-        <li><code>game/js/</code> … 対戦・家・通信・UI</li>
-      </ul>
-      <p style="margin-top:10px">ルートの <code>index.html</code> は説明専用で、ゲームのロジックは含みません。</p>
-    </div>
+    <section>
+      <h2>勝ち方</h2>
+      <div class="card">
+        <ul>
+          <li><span class="win">勝ち</span> … 相手の家の<strong>宝箱</strong>に先に触れる</li>
+          <li><span class="win">勝ち</span> … 罠で相手の体力（ハート3つ）を<strong>0</strong>にする</li>
+          <li><span class="lose">負け</span> … 自分の宝箱を取られる／自分の体力が0になる</li>
+        </ul>
+      </div>
+    </section>
 
-    <h2>URL</h2>
-    <div class="card">
-      <ul>
-        <li>説明ページ … <code>/</code>（いまのページ）</li>
-        <li>プレイ … <code>/game/</code></li>
-      </ul>
-      <p style="margin-top:10px">更新するときは <code>game/</code> 内のファイルを差し替えて <code>main</code> に push します。</p>
-    </div>
+    <section>
+      <h2>画面の見方</h2>
+      <div class="split">
+        <div class="card">
+          <strong>上半分</strong>
+          相手があなたの家を歩いている様子。自分が仕掛けた罠や宝箱が見えます。
+        </div>
+        <div class="card">
+          <strong>下半分</strong>
+          あなたが相手の家を探索中。十字キーで移動。相手の罠は踏むまで見えません。
+        </div>
+      </div>
+      <p class="hint">相手が罠に引っかかる瞬間を見られるのが、このゲームの面白さです。</p>
+    </section>
+
+    <section>
+      <h2>はじめ方</h2>
+      <div class="card">
+        <ol>
+          <li><span class="num">1</span>「COM対戦」なら一人で練習できます（おすすめ）</li>
+          <li><span class="num">2</span>家を設計：宝箱1つ＋罠（通常罠／落とし穴）</li>
+          <li><span class="num">3</span>「準備完了」で対戦スタート</li>
+          <li><span class="num">4</span>ネット対戦は「ルームを作成」→ 6桁の数字を相手に伝える</li>
+        </ol>
+      </div>
+    </section>
+
+    <section>
+      <h2>操作・罠の種類</h2>
+      <div class="card">
+        <ul>
+          <li><strong>移動</strong> … 画面右下の十字キー（タップ押しっぱなし可）</li>
+          <li><strong>階の移動</strong> … 階段マスへ乗る（色で1F／2F／3Fが分かります）</li>
+          <li><strong>通常罠</strong> … 踏むとダメージ</li>
+          <li><strong>落とし穴</strong> … ダメージ＋下の階へ落ちる（1Fではダメージのみ）</li>
+        </ul>
+      </div>
+    </section>
+
+    <a class="play" href="game/?v=20260919c">ゲームを始める</a>
   </main>
 </body>
 </html>
