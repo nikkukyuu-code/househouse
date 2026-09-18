@@ -127,6 +127,9 @@ export function validateHouse(data, blueprint) {
   const { floor, x, y } = data.chest;
   if (!isPlaceable(blueprint, floor, x, y)) return { ok: false, msg: '宝箱の位置が不正です' };
   if (data.traps.length > MAX_TRAPS) return { ok: false, msg: `罠は最大${MAX_TRAPS}個です` };
+  if (data.traps.length < MAX_TRAPS) {
+    return { ok: false, msg: `罠を${MAX_TRAPS}個すべて配置してください（いま ${data.traps.length}/${MAX_TRAPS}）` };
+  }
   const seen = new Set();
   seen.add(`${floor},${x},${y}`);
   for (const raw of data.traps) {

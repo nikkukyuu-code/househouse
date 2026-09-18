@@ -8,10 +8,10 @@ import {
   createBlueprint, createEmptyHouseData, isWalkable, isPlaceable,
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
-} from './house.js?v=20260919y';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260919y';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260919y';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260919y';
+} from './house.js?v=20260919z';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260919z';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260919z';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260919z';
 
 const blueprint = createBlueprint();
 
@@ -360,6 +360,12 @@ function updateSetupHud() {
   document.querySelectorAll('.tool-btn').forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.tool === S.setupTool);
   });
+  const readyBtn = $('btn-ready');
+  if (readyBtn) {
+    const ok = !!(house.chest && house.traps.length >= MAX_TRAPS);
+    readyBtn.disabled = !ok;
+    readyBtn.textContent = ok ? '準備完了' : `準備完了（罠 ${house.traps.length}/${MAX_TRAPS}）`;
+  }
 }
 
 function drawSetup() {
@@ -1053,7 +1059,7 @@ function startSetup() {
   requestAnimationFrame(() => {
     drawSetup();
   });
-  setStatus($('setup-status'), 'マスをタップして配置。宝箱1つ必須。罠は爆弾／落とし穴。', '');
+  setStatus($('setup-status'), `マスをタップして配置。宝箱1つ＋罠${MAX_TRAPS}個必須。`, '');
 }
 
 function setupDoneSummary(house) {
