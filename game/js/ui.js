@@ -61,8 +61,9 @@ export function bindTap(el, fn) {
 export function lockTouch(root) {
   if (!root) return;
   const blockMove = (e) => {
-    // Allow text fields only; everything else stays inside fixed viewport
+    // Allow text fields; allow title menu scroll on short phones
     if (e.target.closest('input, textarea')) return;
+    if (e.target.closest('#screen-title')) return;
     e.preventDefault();
   };
   const blockGesture = (e) => e.preventDefault();

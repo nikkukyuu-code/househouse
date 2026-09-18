@@ -8,10 +8,10 @@ import {
   createBlueprint, createEmptyHouseData, isWalkable, isPlaceable,
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
-} from './house.js?v=20260919k';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260919k';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260919k';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260919k';
+} from './house.js?v=20260919o';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260919o';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260919o';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260919o';
 
 const blueprint = createBlueprint();
 
@@ -1219,12 +1219,20 @@ function bindControls() {
     S.mode = 'com';
     startSetup();
   });
-  bindTap($('btn-local'), () => {
-    unlockAudio();
-    sfx('tap');
+  const startLocalPractice = () => {
+    try { unlockAudio(); } catch (_) {}
+    try { sfx('tap'); } catch (_) {}
     S.mode = 'local';
     startSetup();
-  });
+  };
+  bindTap($('btn-local'), startLocalPractice);
+  const localBtn = $('btn-local');
+  if (localBtn) {
+    localBtn.addEventListener('pointerup', (e) => {
+      e.preventDefault();
+      startLocalPractice();
+    }, { passive: false });
+  }
   bindTap($('btn-join-go'), () => joinRoom());
   bindTap($('btn-lobby-back'), () => goTitle());
 
