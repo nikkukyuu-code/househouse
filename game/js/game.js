@@ -8,10 +8,10 @@ import {
   createBlueprint, createEmptyHouseData, isWalkable, isPlaceable,
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
-} from './house.js?v=20260920o';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920o';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920o';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920o';
+} from './house.js?v=20260920p';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920p';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920p';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920p';
 
 const blueprint = createBlueprint();
 
@@ -1062,22 +1062,59 @@ function redrawMatchView(ctx, canvas, explorer, houseShown, showSecrets, trigger
     }
   }
 
-  // Soft red pulse over chest room while explorer is inside
+  // Strong red alarm while explorer is inside the chest room
   const alarmOn = isOpponentView
     ? !!(S.chestAlarm && S.chestAlarm.top)
     : !!(S.chestAlarm && S.chestAlarm.bot);
   const alarmChest = isOpponentView
     ? (S.myHouse && S.myHouse.chest)
     : (S.theirHouse && S.theirHouse.chest);
-  if (alarmOn && alarmChest && alarmChest.floor === drawFloor) {
-    const cells = roomCells(alarmChest.floor, alarmChest.x, alarmChest.y);
-    const cycle = 1300;
+  if (alarmOn && alarmChest) {
+    const cycle = 900;
     const phase = (S.time % cycle) / cycle;
-    const pulseA = 0.1 + 0.22 * (0.5 + 0.5 * Math.sin(phase * Math.PI * 2));
-    ctx.fillStyle = `rgba(210, 28, 40, ${pulseA})`;
-    for (const cell of cells) {
-      ctx.fillRect(ox + cell.x * cs, oy + cell.y * cs, cs, cs);
+    const wave = 0.5 + 0.5 * Math.sin(phase * Math.PI * 2);
+    // Panel-wide red flash (css pixel space — ctx already setTransform to dpr)
+    const cssW = canvas.clientWidth || 300;
+    const cssH = canvas.clientHeight || 200;
+    ctx.fillStyle = `rgba(160, 0, 18, ${0.18 + 0.32 * wave})`;
+    ctx.fillRect(0, 0, cssW, cssH);
+    if (alarmChest.floor === drawFloor) {
+      const cells = roomCells(alarmChest.floor, alarmChest.x, alarmChest.y);
+      ctx.fillStyle = `rgba(255, 16, 36, ${0.4 + 0.5 * wave})`;
+      for (const cell of cells) {
+        ctx.fillRect(ox + cell.x * cs, oy + cell.y * cs, cs, cs);
+      }
+      ctx.strokeStyle = `rgba(255, 230, 90, ${0.65 + 0.35 * wave})`;
+      ctx.lineWidth = Math.max(2, cs * 0.14);
+      for (const cell of cells) {
+        ctx.strokeRect(ox + cell.x * cs + 1, oy + cell.y * cs + 1, cs - 2, cs - 2);
+      }
     }
+    // Big floating warning (always, even if other floor — still screams alarm)
+    const label = isOpponentView ? '⚠ 宝箱アラーム！' : '⚠ 侵入アラーム！';
+    ctx.save();
+    const fs = Math.max(18, Math.floor((canvas.clientWidth || 300) * 0.07));
+    ctx.font = `900 ${fs}px "Hiragino Sans", "Noto Sans JP", sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const lx = (canvas.clientWidth || 300) / 2;
+    const ly = Math.max(28, fs * 1.2);
+    const tw = ctx.measureText(label).width + 28;
+    const th = fs * 1.5;
+    ctx.fillStyle = `rgba(40, 0, 0, ${0.7 + 0.2 * wave})`;
+    ctx.strokeStyle = `rgba(255, 60, 60, ${0.7 + 0.3 * wave})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    if (typeof ctx.roundRect === 'function') ctx.roundRect(lx - tw / 2, ly - th / 2, tw, th, 10);
+    else ctx.rect(lx - tw / 2, ly - th / 2, tw, th);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = `rgb(255, ${Math.floor(120 + 100 * wave)}, 60)`;
+    ctx.strokeStyle = '#200000';
+    ctx.lineWidth = 4;
+    ctx.strokeText(label, lx, ly);
+    ctx.fillText(label, lx, ly);
+    ctx.restore();
   }
 
   const color = isOpponentView ? COLORS.player2 : COLORS.player1;
@@ -1648,6 +1685,18 @@ function tick(ts) {
   }
   if (ctxBot && S.me) {
     redrawMatchView(ctxBot, canvBot, S.me, S.theirHouse, false, S.myTriggered, false);
+  }
+
+  // Repeat alarm blip while anyone is in a chest room
+  if (!S.ended && S.chestAlarm && (S.chestAlarm.top || S.chestAlarm.bot)) {
+    if (S._alarmPulseAt == null) S._alarmPulseAt = 0;
+    S._alarmPulseAt += dt;
+    if (S._alarmPulseAt > 900) {
+      S._alarmPulseAt = 0;
+      try { sfx('alarm'); } catch (_) {}
+    }
+  } else {
+    S._alarmPulseAt = 0;
   }
 }
 

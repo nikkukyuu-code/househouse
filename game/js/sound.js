@@ -151,9 +151,10 @@ export const SFX = {
     beep({ type: 'sine', freq: 200, freqEnd: 100, dur: 0.5, gain: 0.1 });
   },
   alarm() {
-    beep({ type: 'square', freq: 920, dur: 0.09, gain: 0.11 });
-    beep({ type: 'square', freq: 690, dur: 0.09, gain: 0.1, delay: 0.1 });
-    beep({ type: 'square', freq: 920, dur: 0.12, gain: 0.12, delay: 0.2 });
+    beep({ type: 'square', freq: 980, dur: 0.14, gain: 0.18 });
+    beep({ type: 'square', freq: 720, dur: 0.14, gain: 0.16, delay: 0.12 });
+    beep({ type: 'square', freq: 1100, dur: 0.18, gain: 0.2, delay: 0.24 });
+    beep({ type: 'sawtooth', freq: 440, freqEnd: 220, dur: 0.28, gain: 0.1, delay: 0.35 });
   },
 };
 
