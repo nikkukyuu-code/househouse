@@ -8,7 +8,7 @@
   <meta http-equiv="Cache-Control" content="no-cache" />
   <meta name="theme-color" content="#120e18" />
   <title>ハウスと罠</title>
-  <link rel="stylesheet" href="css/style.css?v=20260919f" />
+  <link rel="stylesheet" href="css/style.css?v=20260919g" />
 </head>
 <body>
   <div id="app">
@@ -22,6 +22,7 @@
         <button type="button" class="btn btn-secondary" id="btn-create">ルームを作成</button>
         <button type="button" class="btn btn-secondary" id="btn-join">ルームに参加</button>
         <button type="button" class="btn btn-ghost" id="btn-local">両方設計して練習</button>
+        <button type="button" class="btn btn-ghost" id="btn-mute" aria-pressed="false">🔊 音オン</button>
       </div>
       <p class="peer-note" id="peer-note">通信準備中…</p>
     </section>
@@ -139,7 +140,7 @@
   </div>
 
   <script type="module">
-    import { init } from './js/game.js?v=20260919f';
+    import { init } from './js/game.js?v=20260919g';
     init().catch((e) => {
       console.error(e);
       const n = document.getElementById('peer-note');
