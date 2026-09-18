@@ -918,16 +918,17 @@ export function generateComHouse(blueprint) {
   function pickKind(c) {
     const doorAdj = isAdjTo(c, T.DOOR);
     const spawnExit = nearSpawnExit(c);
-    // Door / spawn-exit: strongly prefer bomb (~90%)
+    // 1F pits only deal damage (no drop) — almost always use bombs on floor 0
+    if (c.floor === 0) return TRAP_BOMB;
+    // Door / spawn-exit on upper floors: still prefer bomb
     if (doorAdj || spawnExit) {
-      if (Math.random() < 0.9) return TRAP_BOMB;
+      if (Math.random() < 0.85) return TRAP_BOMB;
       return TRAP_PIT;
     }
-    // Upper floors: pits more often (keep pit mix where it makes sense)
-    if (c.floor >= 2 && Math.random() < 0.55) return TRAP_PIT;
-    if (c.floor === 1 && Math.random() < 0.4) return TRAP_PIT;
-    if (c.floor === 0 && Math.random() < 0.15) return TRAP_PIT;
-    if (Math.random() < 0.3) return TRAP_PIT;
+    // Pits shine on 2F/3F (drop + damage)
+    if (c.floor >= 2 && Math.random() < 0.62) return TRAP_PIT;
+    if (c.floor === 1 && Math.random() < 0.48) return TRAP_PIT;
+    if (Math.random() < 0.22) return TRAP_PIT;
     return TRAP_BOMB;
   }
 
@@ -1090,16 +1091,22 @@ export function generateComHouse(blueprint) {
     }
   }
 
-  // Guarantee mix of bomb + pit
+  // Convert any leftover 1F pits → bombs (1F pit has little value)
+  for (const tr of traps) {
+    if (tr.floor === 0 && tr.kind === TRAP_PIT) tr.kind = TRAP_BOMB;
+  }
+
+  // Guarantee mix of bomb + pit (pit only on 2F/3F when possible)
   if (traps.length >= 2) {
     const hasPit = traps.some((t) => t.kind === TRAP_PIT);
     const hasBomb = traps.some((t) => t.kind === TRAP_BOMB);
     if (!hasPit) {
       const idx = traps.findIndex((t) => {
         const c = { floor: t.floor, x: t.x, y: t.y };
-        return !isAdjTo(c, T.DOOR) && !nearSpawnExit(c);
+        return t.floor > 0 && !isAdjTo(c, T.DOOR) && !nearSpawnExit(c);
       });
-      traps[idx >= 0 ? idx : 0].kind = TRAP_PIT;
+      const idx2 = traps.findIndex((t) => t.floor > 0);
+      traps[(idx >= 0 ? idx : idx2 >= 0 ? idx2 : 0)].kind = TRAP_PIT;
     }
     if (!hasBomb) traps[traps.length - 1].kind = TRAP_BOMB;
   }
