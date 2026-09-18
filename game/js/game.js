@@ -8,9 +8,9 @@ import {
   createBlueprint, createEmptyHouseData, isWalkable, isPlaceable,
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
-} from './house.js?v=20260919e';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260919e';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260919e';
+} from './house.js?v=20260919f';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260919f';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260919f';
 
 const blueprint = createBlueprint();
 
@@ -395,6 +395,18 @@ function redrawMatchView(ctx, canvas, explorer, houseShown, showSecrets, trigger
   const h = canvas.clientHeight;
   ctx.fillStyle = isOpponentView ? '#1a1020' : '#101820';
   ctx.fillRect(0, 0, w, h);
+
+  const focus = S.slowMoFocus;
+  const thisFocus = (isOpponentView && focus === 'top') || (!isOpponentView && focus === 'bot');
+  let zoom = 1;
+  if (S.slowMo && thisFocus) {
+    zoom = 1.08 + 0.04 * Math.sin((S.slowMoPulse || 0) * 0.008);
+    ctx.save();
+    ctx.translate(w / 2, h / 2);
+    ctx.scale(zoom, zoom);
+    ctx.translate(-w / 2, -h / 2);
+  }
+
   const cs = cellSizeFor(canvas);
   const ox = Math.floor((w - COLS * cs) / 2);
   const oy = Math.floor((h - ROWS * cs) / 2) + 6;
@@ -442,6 +454,18 @@ function redrawMatchView(ctx, canvas, explorer, houseShown, showSecrets, trigger
     ctx.fillText(f.text, w / 2, Math.max(50, h * 0.4 - f.age * 0.05));
     ctx.globalAlpha = 1;
   }
+
+  if (S.slowMo && thisFocus) {
+    // Climax ring
+    ctx.strokeStyle = 'rgba(255, 224, 138, 0.55)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(w / 2, h / 2, Math.min(w, h) * 0.38, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255, 200, 80, 0.08)';
+    ctx.fillRect(0, 0, w, h);
+    ctx.restore();
+  }
 }
 
 function drawHouseItems(ctx, houseData, floor, triggered, showAllTraps, showChest, ox, oy, cs) {
@@ -459,8 +483,8 @@ function drawHouseItems(ctx, houseData, floor, triggered, showAllTraps, showChes
   }
 }
 
-function addFx(view, text, color) {
-  S.fx.push({ view, text, color, age: 0, life: 1000 });
+function addFx(view, text, color, life = 1000) {
+  S.fx.push({ view, text, color, age: 0, life });
 }
 
 function updateHpBars() {
@@ -483,26 +507,28 @@ function endGame(winner, reason) {
   const iWon = winner === 'me';
   const reasonText = endReasonLabel(reason, iWon);
   const bannerIcon = reasonIcon(reason);
-  const bannerLead = iWon ? '勝ち！' : '負け…';
+  const flashBot = reason === 'chest_me' || reason === 'hp_me';
+  const focusView = flashBot ? 'bot' : 'top';
 
-  // Phase 1: dramatic banner (keep playing view visible underneath)
-  const banner = $('end-banner');
-  const overlay = $('result-overlay');
-  if (overlay) overlay.classList.remove('show', 'win', 'lose');
-  if (banner) {
-    banner.classList.remove('fade-out', 'win', 'lose');
-    banner.classList.add('show', iWon ? 'win' : 'lose');
-    $('end-banner-icon').textContent = bannerIcon;
-    $('end-banner-text').textContent = bannerLead;
-    $('end-banner-detail').textContent = reasonText;
+  // Phase 0: SLOW-MO climax — freeze play, stretch the moment
+  S.slowMo = true;
+  S.timeScale = 0.18;
+  S.slowMoFocus = focusView;
+  S.slowMoPulse = 0;
+  const match = $('screen-match');
+  if (match) {
+    match.classList.add('slow-mo');
+    match.classList.toggle('slow-mo-bot', flashBot);
+    match.classList.toggle('slow-mo-top', !flashBot);
   }
 
-  // Flash the relevant half longer
-  const flashBot = reason === 'chest_me' || reason === 'hp_me';
+  // Long-lived FX that drift slowly while timeScale is low
+  addFx(focusView, reason === 'chest_me' || reason === 'chest_foe' ? '宝箱！' : '体力ゼロ！', '#ffe08a', 2800);
+  addFx(focusView, reasonText, iWon ? '#8ddea0' : '#ff8a7a', 2800);
   flashOverlay(
     $(flashBot ? 'flash-bot' : 'flash-top'),
     bannerIcon + ' ' + reasonText,
-    1600
+    2400
   );
 
   if (S.mode && S.mode.startsWith('online') && S.net) {
@@ -514,15 +540,35 @@ function endGame(winner, reason) {
     });
   }
 
-  // Phase 2: full result screen after drama
   clearTimeout(S._endTimer);
-  S._endTimer = setTimeout(() => {
+  clearTimeout(S._slowTimer);
+
+  // Phase 1: after slow-mo, show win/lose banner
+  S._slowTimer = setTimeout(() => {
+    S.slowMo = false;
+    S.timeScale = 1;
+    if (match) match.classList.remove('slow-mo', 'slow-mo-bot', 'slow-mo-top');
+
+    const banner = $('end-banner');
+    const overlay = $('result-overlay');
+    if (overlay) overlay.classList.remove('show', 'win', 'lose');
     if (banner) {
-      banner.classList.add('fade-out');
-      setTimeout(() => banner.classList.remove('show', 'fade-out', 'win', 'lose'), 380);
+      banner.classList.remove('fade-out', 'win', 'lose');
+      banner.classList.add('show', iWon ? 'win' : 'lose');
+      $('end-banner-icon').textContent = bannerIcon;
+      $('end-banner-text').textContent = iWon ? '勝ち！' : '負け…';
+      $('end-banner-detail').textContent = reasonText;
     }
-    showResultScreen(iWon, reasonText);
-  }, 2200);
+
+    // Phase 2: result screen
+    S._endTimer = setTimeout(() => {
+      if (banner) {
+        banner.classList.add('fade-out');
+        setTimeout(() => banner.classList.remove('show', 'fade-out', 'win', 'lose'), 380);
+      }
+      showResultScreen(iWon, reasonText);
+    }, 2000);
+  }, 2100);
 }
 
 function endReasonLabel(reason, iWon) {
@@ -659,33 +705,37 @@ let aiTimer = 0;
 
 function tick(ts) {
   animId = requestAnimationFrame(tick);
-  const dt = Math.min(50, ts - (lastTs || ts));
+  const rawDt = Math.min(50, ts - (lastTs || ts));
   lastTs = ts;
+  const scale = S.slowMo ? (S.timeScale || 0.18) : 1;
+  const dt = rawDt * scale;
   S.time += dt;
+  if (S.slowMo) S.slowMoPulse = (S.slowMoPulse || 0) + rawDt;
 
   if (S.phase !== 'match') return;
 
-  S.moveCooldown = Math.max(0, S.moveCooldown - dt);
-  applyMoveFromInput();
+  if (!S.ended) {
+    S.moveCooldown = Math.max(0, S.moveCooldown - dt);
+    applyMoveFromInput();
 
-  if ((S.mode === 'local' || S.mode === 'com') && S.foe && !S.ended) {
-    aiTimer += dt;
-    if (aiTimer > (S.mode === 'com' ? 420 : 380)) {
-      aiTimer = 0;
-      aiStep(S.foe);
-      checkHazards(S.foe, S.foeTriggered, (tr) => onTrapHit('foe', tr), () => onChestFound('foe'));
+    if ((S.mode === 'local' || S.mode === 'com') && S.foe) {
+      aiTimer += dt;
+      if (aiTimer > (S.mode === 'com' ? 420 : 380)) {
+        aiTimer = 0;
+        aiStep(S.foe);
+        checkHazards(S.foe, S.foeTriggered, (tr) => onTrapHit('foe', tr), () => onChestFound('foe'));
+      }
     }
   }
 
+  // FX age in sim-time so they hang during slow-mo
   for (const f of S.fx) f.age += dt;
   S.fx = S.fx.filter((f) => f.age < f.life);
 
   if (ctxTop && S.foe) {
-    // Top: opponent exploring YOUR house — you see your secrets
     redrawMatchView(ctxTop, canvTop, S.foe, S.myHouse, true, S.foeTriggered, true);
   }
   if (ctxBot && S.me) {
-    // Bottom: you exploring THEIR house — hide secrets except triggered
     redrawMatchView(ctxBot, canvBot, S.me, S.theirHouse, false, S.myTriggered, false);
   }
 }
@@ -842,6 +892,11 @@ function startMatch() {
   const eb = $('end-banner');
   if (eb) eb.classList.remove('show', 'fade-out', 'win', 'lose');
   clearTimeout(S._endTimer);
+  clearTimeout(S._slowTimer);
+  S.slowMo = false;
+  S.timeScale = 1;
+  const matchEl = $('screen-match');
+  if (matchEl) matchEl.classList.remove('slow-mo', 'slow-mo-bot', 'slow-mo-top');
   $('btn-ready').disabled = false;
 
   canvTop = $('canvas-top');

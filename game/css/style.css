@@ -656,3 +656,37 @@ body {
   border-color: rgba(255, 120, 100, 0.45);
   color: #ffc0b4;
 }
+
+
+/* Slow-mo climax */
+#screen-match.slow-mo .match-half {
+  transition: filter 0.2s;
+}
+#screen-match.slow-mo-bot .match-half.bot .match-canvas-wrap,
+#screen-match.slow-mo-top .match-half.top .match-canvas-wrap {
+  box-shadow: inset 0 0 0 3px rgba(255, 224, 138, 0.75);
+  filter: saturate(1.25) contrast(1.08);
+}
+#screen-match.slow-mo-bot .match-half.top,
+#screen-match.slow-mo-top .match-half.bot {
+  filter: grayscale(0.35) brightness(0.72);
+}
+#screen-match.slow-mo::after {
+  content: 'スロー';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 40;
+  pointer-events: none;
+  font-weight: 900;
+  font-size: clamp(1.2rem, 4vh, 1.6rem);
+  letter-spacing: 0.35em;
+  color: rgba(255, 224, 138, 0.85);
+  text-shadow: 0 2px 12px rgba(0,0,0,0.8);
+  animation: slowMoLabel 0.8s ease-in-out infinite alternate;
+}
+@keyframes slowMoLabel {
+  from { opacity: 0.55; }
+  to { opacity: 1; }
+}
