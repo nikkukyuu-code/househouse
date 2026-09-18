@@ -372,7 +372,7 @@ function drawStairsTile(ctx, px, py, cellSize, up, floor = 0) {
   ctx.fillText(up ? '▲' : '▼', px + cellSize / 2, py + cellSize * 0.72);
 }
 
-/** Draw a trap sprite (normal spike / pit hole) */
+/** Draw a trap sprite (bomb / pit hole) */
 export function drawTrapSprite(ctx, tr, triggered, px, py, cellSize) {
   const kind = tr.kind === TRAP_PIT ? TRAP_PIT : TRAP_NORMAL;
   const cx = px + cellSize / 2;
@@ -425,42 +425,57 @@ export function drawTrapSprite(ctx, tr, triggered, px, py, cellSize) {
     return;
   }
 
-  // Normal spike / warning mark
+  // Bomb (was normal trap)
   if (triggered) {
-    ctx.fillStyle = '#555';
+    // Scorch mark after boom
+    ctx.fillStyle = 'rgba(40, 25, 15, 0.75)';
     ctx.beginPath();
-    ctx.arc(cx, cy, cellSize * 0.26, 0, Math.PI * 2);
+    ctx.arc(cx, cy, cellSize * 0.32, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = '#333';
-    ctx.font = `bold ${Math.floor(cellSize * 0.35)}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('×', cx, cy + 1);
-  } else {
-    // Spikes
-    ctx.fillStyle = COLORS.trapArmed;
+    ctx.fillStyle = '#2a1810';
     ctx.beginPath();
-    ctx.arc(cx, cy, cellSize * 0.3, 0, Math.PI * 2);
+    ctx.arc(cx, cy, cellSize * 0.2, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = '#ff8888';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.fillStyle = '#ffdddd';
-    const spikeH = cellSize * 0.22;
-    for (let i = -1; i <= 1; i++) {
-      const sx = cx + i * cellSize * 0.16;
-      ctx.beginPath();
-      ctx.moveTo(sx - cellSize * 0.06, cy + cellSize * 0.08);
-      ctx.lineTo(sx, cy - spikeH);
-      ctx.lineTo(sx + cellSize * 0.06, cy + cellSize * 0.08);
-      ctx.closePath();
-      ctx.fill();
-    }
-    ctx.fillStyle = '#fff';
+    ctx.fillStyle = '#ff8844';
     ctx.font = `bold ${Math.floor(cellSize * 0.28)}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('!', cx, cy + cellSize * 0.18);
+    ctx.fillText('爆', cx, cy + 1);
+  } else {
+    // Round bomb body
+    const r = cellSize * 0.28;
+    ctx.fillStyle = '#1a1a22';
+    ctx.beginPath();
+    ctx.arc(cx, cy + cellSize * 0.04, r, 0, Math.PI * 2);
+    ctx.fill();
+    // Highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.18)';
+    ctx.beginPath();
+    ctx.ellipse(cx - r * 0.28, cy - r * 0.15, r * 0.35, r * 0.22, -0.4, 0, Math.PI * 2);
+    ctx.fill();
+    // Fuse
+    ctx.strokeStyle = '#c9a227';
+    ctx.lineWidth = Math.max(1.5, cellSize * 0.05);
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - r * 0.75);
+    ctx.quadraticCurveTo(cx + r * 0.45, cy - r * 1.15, cx + r * 0.15, cy - r * 1.35);
+    ctx.stroke();
+    // Spark
+    ctx.fillStyle = '#ffcc44';
+    ctx.beginPath();
+    ctx.arc(cx + r * 0.15, cy - r * 1.35, cellSize * 0.07, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ff6622';
+    ctx.beginPath();
+    ctx.arc(cx + r * 0.15, cy - r * 1.35, cellSize * 0.035, 0, Math.PI * 2);
+    ctx.fill();
+    // Label
+    ctx.fillStyle = '#ffe08a';
+    ctx.font = `bold ${Math.floor(cellSize * 0.22)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('弾', cx, cy + cellSize * 0.06);
   }
 }
 
@@ -702,7 +717,7 @@ function shuffle(arr) {
 
 /**
  * COM house generation: prefer upper floors / corner rooms for chest,
- * traps near doors, stairs approaches — mix of normal + pit.
+ * traps near doors, stairs approaches — mix of bomb + pit.
  */
 export function generateComHouse(blueprint) {
   const cells = listPlaceable(blueprint);
@@ -747,7 +762,7 @@ export function generateComHouse(blueprint) {
     const key = `${c.floor},${c.x},${c.y}`;
     if (used.has(key)) continue;
     used.add(key);
-    // Mix: prefer pit on 2F/3F (~45%), normal otherwise; ensure both kinds appear often
+    // Mix: prefer pit on 2F/3F (~45%), bomb otherwise; ensure both kinds appear often
     let kind = TRAP_NORMAL;
     if (c.floor > 0 && Math.random() < 0.55) kind = TRAP_PIT;
     else if (c.floor === 0 && Math.random() < 0.25) kind = TRAP_PIT;

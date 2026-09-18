@@ -8,10 +8,10 @@ import {
   createBlueprint, createEmptyHouseData, isWalkable, isPlaceable,
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
-} from './house.js?v=20260919r';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260919r';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260919r';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260919r';
+} from './house.js?v=20260919s';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260919s';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260919s';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260919s';
 
 const blueprint = createBlueprint();
 
@@ -319,7 +319,7 @@ function placeAt(floor, x, y) {
     house.traps.push({ floor, x, y, kind });
     setStatus(
       $('setup-status'),
-      kind === TRAP_PIT ? '落とし穴を配置しました' : '通常罠を配置しました',
+      kind === TRAP_PIT ? '落とし穴を配置しました' : '爆弾を配置しました',
       'ok'
     );
     sfx('place');
@@ -795,8 +795,8 @@ function onTrapHit(who, tr) {
       flashOverlay($('flash-bot'), '🕳 落とし穴！', 700);
       if (S.myHp > 0) sfx('pit');
     } else {
-      addFx('bot', '罠だ！', '#ff4444');
-      flashOverlay($('flash-bot'), '💥 罠！', 600);
+      addFx('bot', '爆弾だ！', '#ff4444');
+      flashOverlay($('flash-bot'), '💥 爆弾！', 600);
       if (S.myHp > 0) sfx('trap');
     }
     if (S.myHp <= 0) endGame('foe', 'hp_me');
@@ -812,8 +812,8 @@ function onTrapHit(who, tr) {
       flashOverlay($('flash-top'), '🕳 落とし穴！', 700);
       if (S.foeHp > 0) sfx('pit');
     } else {
-      addFx('top', '罠作動！', '#ffaa00');
-      flashOverlay($('flash-top'), '💥 罠作動！', 600);
+      addFx('top', '爆弾作動！', '#ffaa00');
+      flashOverlay($('flash-top'), '💥 爆弾作動！', 600);
       if (S.foeHp > 0) sfx('trap');
     }
     if (S.foeHp <= 0) endGame('me', 'hp_foe');
@@ -981,7 +981,7 @@ function handleNetMessage(msg) {
           addFx('top', '落とし穴作動！', '#aa66ff');
           // Floor drop arrives via later pos sync after peer's delayed drop
         } else {
-          addFx('top', '罠作動！', '#ffaa00');
+          addFx('top', '爆弾作動！', '#ffaa00');
         }
         updateHpBars();
         if (S.foeHp <= 0) endGame('me', 'hp_foe');
@@ -1040,7 +1040,7 @@ function startSetup() {
   requestAnimationFrame(() => {
     drawSetup();
   });
-  setStatus($('setup-status'), 'マスをタップして配置。宝箱1つ必須。罠は通常／落とし穴。', '');
+  setStatus($('setup-status'), 'マスをタップして配置。宝箱1つ必須。罠は爆弾／落とし穴。', '');
 }
 
 function onReadySetup() {

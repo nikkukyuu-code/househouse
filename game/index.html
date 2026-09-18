@@ -9,7 +9,7 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta name="theme-color" content="#120e18" />
   <title>ハウスと罠</title>
-  <link rel="stylesheet" href="css/style.css?v=20260919r" />
+  <link rel="stylesheet" href="css/style.css?v=20260919s" />
 </head>
 <body>
   <div id="app">
@@ -28,7 +28,7 @@
         </div>
       </div>
       <p class="peer-note" id="peer-note">通信準備中…</p>
-      <p class="build-stamp" id="build-stamp">build 20260919r</p>
+      <p class="build-stamp" id="build-stamp">build 20260919s</p>
     </section>
 
     <!-- ロビー -->
@@ -78,14 +78,14 @@
       </div>
       <div class="tool-row">
         <button type="button" class="tool-btn active" data-tool="chest">📦 宝箱</button>
-        <button type="button" class="tool-btn" data-tool="trap-normal">⚠ 通常罠</button>
+        <button type="button" class="tool-btn" data-tool="trap-normal">💣 爆弾</button>
         <button type="button" class="tool-btn" data-tool="trap-pit">🕳 落とし穴</button>
         <button type="button" class="tool-btn" data-tool="erase">🗑 消す</button>
       </div>
       <div id="setup-canvas-wrap">
         <canvas id="setup-canvas" class="active-canvas"></canvas>
       </div>
-      <p class="legend">緑▲上階　青▼下階　⚠通常罠　🕳落とし穴　床をタップ</p>
+      <p class="legend">緑▲上階　青▼下階　💣爆弾　🕳落とし穴　床をタップ</p>
       <p class="status-msg" id="setup-status"></p>
       <div class="setup-actions">
         <button type="button" class="btn btn-ghost" id="btn-setup-back">戻る</button>
@@ -147,7 +147,7 @@
   </div>
 
   <script type="module">
-    import { init } from './js/game.js?v=20260919r';
+    import { init } from './js/game.js?v=20260919s';
     init().catch((e) => {
       console.error(e);
       const n = document.getElementById('peer-note');
