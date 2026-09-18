@@ -1,5 +1,5 @@
 /**
- * ハウスハウス — Mobile-first UI screens & overlays
+ * ハウスと罠 — Mobile-first UI screens & overlays
  */
 
 export function $(id) {

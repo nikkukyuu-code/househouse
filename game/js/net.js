@@ -1,5 +1,5 @@
 /**
- * ハウスハウス — PeerJS networking (optional; graceful fallback)
+ * ハウスと罠 — PeerJS networking (optional; graceful fallback)
  */
 
 const PEER_CDN = 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js';
