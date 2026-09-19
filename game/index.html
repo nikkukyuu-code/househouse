@@ -9,7 +9,7 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta name="theme-color" content="#120e18" />
   <title>ハウスと罠</title>
-  <link rel="stylesheet" href="css/style.css?v=20260920p" />
+  <link rel="stylesheet" href="css/style.css?v=20260920q" />
 </head>
 <body>
   <div id="app">
@@ -28,7 +28,7 @@
         </div>
       </div>
       <p class="peer-note" id="peer-note">通信準備中…</p>
-      <p class="build-stamp" id="build-stamp">build 20260920o</p>
+      <p class="build-stamp" id="build-stamp">build 20260920q</p>
     </section>
 
     <!-- ロビー -->
@@ -155,10 +155,15 @@
         </div>
       </div>
     </section>
+  <footer id="game-meta" aria-label="バージョンとアクセス数">
+      <span id="meta-version">ver 20260920q</span>
+      <span class="meta-sep" aria-hidden="true">｜</span>
+      <span id="meta-visits">アクセス …</span>
+    </footer>
   </div>
 
   <script type="module">
-    import { init } from './js/game.js?v=20260920p';
+    import { init } from './js/game.js?v=20260920q';
     init().catch((e) => {
       console.error(e);
       const n = document.getElementById('peer-note');

@@ -886,3 +886,33 @@ a.btn.link-btn {
   to { opacity: 0; transform: scale(1.04); }
 }
 #screen-setup { position: relative; }
+
+
+/* Persistent version + visit count */
+#game-meta {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 4px 10px calc(4px + env(safe-area-inset-bottom, 0px));
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #9a8a78;
+  background: rgba(10, 8, 14, 0.82);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  pointer-events: none;
+  text-align: center;
+}
+#game-meta .meta-sep { opacity: 0.5; }
+#meta-version { color: #c9b89a; }
+#meta-visits { color: #a89880; }
+/* leave space so controls aren't covered */
+#app { padding-bottom: 28px; }
+.build-stamp { display: none; } /* replaced by #game-meta */

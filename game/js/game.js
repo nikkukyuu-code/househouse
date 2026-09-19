@@ -8,10 +8,12 @@ import {
   createBlueprint, createEmptyHouseData, isWalkable, isPlaceable,
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
-} from './house.js?v=20260920p';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920p';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920p';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920p';
+} from './house.js?v=20260920q';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920q';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920q';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920q';
+
+export const GAME_VERSION = '20260920q';
 
 const blueprint = createBlueprint();
 
@@ -2126,6 +2128,27 @@ function bindControls() {
     resizeCanvases();
     if (S.phase === 'setup') drawSetup();
   });
+}
+
+
+async function refreshGameMeta() {
+  const verEl = $('meta-version');
+  const visitEl = $('meta-visits');
+  if (verEl) verEl.textContent = 'ver ' + GAME_VERSION;
+  if (!visitEl) return;
+  try {
+    const res = await fetch('https://abacus.jasoncameron.dev/hit/nikkukyuu/househouse', {
+      method: 'GET',
+      mode: 'cors',
+      cache: 'no-store',
+    });
+    if (!res.ok) throw new Error('counter ' + res.status);
+    const data = await res.json();
+    const n = Number(data && data.value);
+    visitEl.textContent = Number.isFinite(n) ? ('アクセス ' + n.toLocaleString('ja-JP')) : 'アクセス —';
+  } catch (_) {
+    visitEl.textContent = 'アクセス —';
+  }
 }
 
 export async function init() {
