@@ -8,12 +8,12 @@ import {
   createBlueprint, createEmptyHouseData, isWalkable, isPlaceable,
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
-} from './house.js?v=20260920s';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920s';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920s';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920s';
+} from './house.js?v=20260920t';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920t';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920t';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920t';
 
-export const GAME_VERSION = '20260920s';
+export const GAME_VERSION = '20260920t';
 
 const blueprint = createBlueprint();
 
@@ -195,32 +195,20 @@ function roomCells(floor, sx, sy) {
   return cells;
 }
 
-/** Update top/bot chest-room alarms; play SFX once on enter. */
+/** Alarm only when opponent enters YOUR chest room (top view). No player-side alarm. */
 function updateChestAlarms() {
   const prev = S.chestAlarm || { top: false, bot: false };
   let top = false;
-  let bot = false;
-  if (!S.ended) {
-    if (S.foe && S.myHouse && S.myHouse.chest) {
-      const c = S.myHouse.chest;
-      if (S.foe.floor === c.floor && sameRoom(c.floor, c.x, c.y, S.foe.x, S.foe.y)) {
-        top = true;
-      }
-    }
-    if (S.me && S.theirHouse && S.theirHouse.chest) {
-      const c = S.theirHouse.chest;
-      if (S.me.floor === c.floor && sameRoom(c.floor, c.x, c.y, S.me.x, S.me.y)) {
-        bot = true;
-      }
+  if (!S.ended && S.foe && S.myHouse && S.myHouse.chest) {
+    const c = S.myHouse.chest;
+    if (S.foe.floor === c.floor && sameRoom(c.floor, c.x, c.y, S.foe.x, S.foe.y)) {
+      top = true;
     }
   }
   if (top && !prev.top) {
     try { sfx('alarm'); } catch (_) {}
   }
-  if (bot && !prev.bot) {
-    try { sfx('alarm'); } catch (_) {}
-  }
-  S.chestAlarm = { top, bot };
+  S.chestAlarm = { top, bot: false };
 }
 
 /**
@@ -1065,12 +1053,9 @@ function redrawMatchView(ctx, canvas, explorer, houseShown, showSecrets, trigger
   }
 
   // Strong red alarm while explorer is inside the chest room
-  const alarmOn = isOpponentView
-    ? !!(S.chestAlarm && S.chestAlarm.top)
-    : !!(S.chestAlarm && S.chestAlarm.bot);
-  const alarmChest = isOpponentView
-    ? (S.myHouse && S.myHouse.chest)
-    : (S.theirHouse && S.theirHouse.chest);
+  // Player view (bottom): never show chest-room alarm
+  const alarmOn = !!(isOpponentView && S.chestAlarm && S.chestAlarm.top);
+  const alarmChest = isOpponentView ? (S.myHouse && S.myHouse.chest) : null;
   if (alarmOn && alarmChest) {
     const cycle = 900;
     const phase = (S.time % cycle) / cycle;
@@ -1093,7 +1078,7 @@ function redrawMatchView(ctx, canvas, explorer, houseShown, showSecrets, trigger
       }
     }
     // Big floating warning (always, even if other floor — still screams alarm)
-    const label = isOpponentView ? '⚠ 宝箱アラーム！' : '⚠ 侵入アラーム！';
+    const label = '⚠ 宝箱アラーム！';
     ctx.save();
     const fs = Math.max(18, Math.floor((canvas.clientWidth || 300) * 0.07));
     ctx.font = `900 ${fs}px "Hiragino Sans", "Noto Sans JP", sans-serif`;
@@ -1690,7 +1675,7 @@ function tick(ts) {
   }
 
   // Repeat alarm blip while anyone is in a chest room
-  if (!S.ended && S.chestAlarm && (S.chestAlarm.top || S.chestAlarm.bot)) {
+  if (!S.ended && S.chestAlarm && S.chestAlarm.top) {
     if (S._alarmPulseAt == null) S._alarmPulseAt = 0;
     S._alarmPulseAt += dt;
     if (S._alarmPulseAt > 900) {
