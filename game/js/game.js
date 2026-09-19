@@ -8,12 +8,12 @@ import {
   createBlueprint, createEmptyHouseData, isWalkable, isPlaceable,
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
-} from './house.js?v=20260920q';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920q';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920q';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920q';
+} from './house.js?v=20260920r';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920r';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920r';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920r';
 
-export const GAME_VERSION = '20260920q';
+export const GAME_VERSION = '20260920r';
 
 const blueprint = createBlueprint();
 
@@ -2132,23 +2132,28 @@ function bindControls() {
 
 
 async function refreshGameMeta() {
-  const verEl = $('meta-version');
-  const visitEl = $('meta-visits');
+  const verEl = document.getElementById('meta-version');
+  const visitEl = document.getElementById('meta-visits');
   if (verEl) verEl.textContent = 'ver ' + GAME_VERSION;
   if (!visitEl) return;
-  try {
-    const res = await fetch('https://abacus.jasoncameron.dev/hit/nikkukyuu/househouse', {
-      method: 'GET',
-      mode: 'cors',
-      cache: 'no-store',
-    });
-    if (!res.ok) throw new Error('counter ' + res.status);
-    const data = await res.json();
-    const n = Number(data && data.value);
-    visitEl.textContent = Number.isFinite(n) ? ('アクセス ' + n.toLocaleString('ja-JP')) : 'アクセス —';
-  } catch (_) {
-    visitEl.textContent = 'アクセス —';
+  visitEl.textContent = 'アクセス読み込み中…';
+  const urls = [
+    'https://abacus.jasoncameron.dev/hit/nikkukyuu/househouse',
+    'https://abacus.jasoncameron.dev/get/nikkukyuu/househouse',
+  ];
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, { method: 'GET', mode: 'cors', cache: 'no-store' });
+      if (!res.ok) continue;
+      const data = await res.json();
+      const n = Number(data && data.value);
+      if (Number.isFinite(n)) {
+        visitEl.textContent = 'アクセス ' + n.toLocaleString('ja-JP') + '回';
+        return;
+      }
+    } catch (_) { /* try next */ }
   }
+  visitEl.textContent = 'アクセス取得失敗';
 }
 
 export async function init() {

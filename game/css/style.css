@@ -888,31 +888,33 @@ a.btn.link-btn {
 #screen-setup { position: relative; }
 
 
-/* Persistent version + visit count */
+/* Persistent version + visit count — outside #app */
 #game-meta {
   position: fixed;
-  left: 0;
-  right: 0;
+  left: 50%;
+  transform: translateX(-50%);
   bottom: 0;
-  z-index: 50;
+  width: min(100vw, 480px);
+  z-index: 9999;
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   flex-wrap: wrap;
-  padding: 4px 10px calc(4px + env(safe-area-inset-bottom, 0px));
-  font-size: 0.7rem;
-  font-weight: 600;
+  padding: 6px 12px calc(6px + env(safe-area-inset-bottom, 0px));
+  font-size: 0.78rem;
+  font-weight: 700;
   letter-spacing: 0.04em;
-  color: #9a8a78;
-  background: rgba(10, 8, 14, 0.82);
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  color: #f0e6d4;
+  background: rgba(0, 0, 0, 0.88);
+  border-top: 1px solid rgba(255, 200, 80, 0.35);
   pointer-events: none;
   text-align: center;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.45);
 }
-#game-meta .meta-sep { opacity: 0.5; }
-#meta-version { color: #c9b89a; }
-#meta-visits { color: #a89880; }
-/* leave space so controls aren't covered */
-#app { padding-bottom: 28px; }
-.build-stamp { display: none; } /* replaced by #game-meta */
+#game-meta .meta-sep { opacity: 0.55; color: #c9a227; }
+#meta-version { color: #ffe08a; }
+#meta-visits { color: #fff; font-variant-numeric: tabular-nums; }
+#app { padding-bottom: 34px; }
+.build-stamp { display: none; }
+
