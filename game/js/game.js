@@ -8,12 +8,12 @@ import {
   createBlueprint, createEmptyHouseData, isWalkable, isPlaceable,
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
-} from './house.js?v=20260920r';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920r';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920r';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920r';
+} from './house.js?v=20260920s';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920s';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920s';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920s';
 
-export const GAME_VERSION = '20260920r';
+export const GAME_VERSION = '20260920s';
 
 const blueprint = createBlueprint();
 
@@ -2131,32 +2131,63 @@ function bindControls() {
 }
 
 
-async function refreshGameMeta() {
+function refreshGameMeta() {
   const verEl = document.getElementById('meta-version');
-  const visitEl = document.getElementById('meta-visits');
   if (verEl) verEl.textContent = 'ver ' + GAME_VERSION;
-  if (!visitEl) return;
-  visitEl.textContent = 'アクセス読み込み中…';
-  const urls = [
-    'https://abacus.jasoncameron.dev/hit/nikkukyuu/househouse',
-    'https://abacus.jasoncameron.dev/get/nikkukyuu/househouse',
-  ];
-  for (const url of urls) {
-    try {
-      const res = await fetch(url, { method: 'GET', mode: 'cors', cache: 'no-store' });
-      if (!res.ok) continue;
-      const data = await res.json();
-      const n = Number(data && data.value);
-      if (Number.isFinite(n)) {
-        visitEl.textContent = 'アクセス ' + n.toLocaleString('ja-JP') + '回';
-        return;
+
+  const badge = document.getElementById('meta-visits-badge');
+  const visitEl = document.getElementById('meta-visits');
+  const badgeUrl =
+    'https://visitor-badge.laobi.icu/badge?page_id=nikkukyuu.househouse.game&left_text=Access&left_color=%23333&right_color=%23c9a227';
+
+  if (badge) {
+    badge.referrerPolicy = 'no-referrer-when-downgrade';
+    badge.loading = 'eager';
+    badge.alt = 'access';
+    badge.src = badgeUrl + '&t=' + Date.now();
+    badge.onload = () => {
+      // keep badge visible; optional numeric overlay not required
+    };
+    badge.onerror = () => {
+      try {
+        const key = 'househouse-local-visits';
+        const n = (Number(localStorage.getItem(key)) || 0) + 1;
+        localStorage.setItem(key, String(n));
+        if (visitEl) visitEl.textContent = 'アクセス(端末) ' + n.toLocaleString('ja-JP') + '回';
+      } catch (_) {
+        if (visitEl) visitEl.textContent = 'アクセス —';
       }
-    } catch (_) { /* try next */ }
+    };
+  } else if (visitEl) {
+    visitEl.textContent = 'アクセス —';
   }
-  visitEl.textContent = 'アクセス取得失敗';
+
+  // Best-effort number (2s timeout). If it works, replace badge with Japanese text.
+  let done = false;
+  const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = setTimeout(() => {
+    try { if (ctrl) ctrl.abort(); } catch (_) {}
+  }, 2000);
+  fetch('https://abacus.jasoncameron.dev/hit/nikkukyuu/househouse', {
+    method: 'GET',
+    mode: 'cors',
+    cache: 'no-store',
+    signal: ctrl ? ctrl.signal : undefined,
+  })
+    .then((res) => (res.ok ? res.json() : null))
+    .then((data) => {
+      clearTimeout(timer);
+      if (done) return;
+      const n = Number(data && data.value);
+      if (!Number.isFinite(n) || !visitEl) return;
+      done = true;
+      visitEl.textContent = 'アクセス ' + n.toLocaleString('ja-JP') + '回';
+    })
+    .catch(() => { clearTimeout(timer); });
 }
 
 export async function init() {
+  refreshGameMeta();
   lockTouch($('app'));
   let lastTouch = 0;
   document.addEventListener(
