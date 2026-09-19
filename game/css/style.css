@@ -918,3 +918,12 @@ a.btn.link-btn {
 #app { padding-bottom: 34px; }
 .build-stamp { display: none; }
 
+
+.meta-visits { display: inline-flex; align-items: center; gap: 6px; color: #fff; }
+.meta-visits-label { color: #fff; }
+#meta-visits-badge {
+  height: 18px;
+  width: auto;
+  vertical-align: middle;
+  border-radius: 3px;
+}
