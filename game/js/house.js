@@ -1131,10 +1131,18 @@ function shuffle(arr) {
  * spawn exits, door choke points, stairs on the climb, chest approaches.
  * Uses BFS player-traffic heat from spawn (stairs connect floors).
  * Door-adjacent / spawn-exit cells prefer bombs; pits prefer upper floors.
+ * Optional memoryBias.pathHeat / level bias traps toward player habits.
+ * @param {object} blueprint
+ * @param {{ pathHeat?: Record<string,number>, level?: number }|null} [memoryBias]
  */
-export function generateComHouse(blueprint) {
+export function generateComHouse(blueprint, memoryBias = null) {
   const cells = listPlaceable(blueprint);
   const spawn = getSpawn();
+  const memLevel = Math.max(1, Math.min(11, Math.floor(Number(memoryBias && memoryBias.level) || 1)));
+  const lvT = Math.min(1, (memLevel - 1) / 10);
+  const pathHeatMap = (memoryBias && memoryBias.pathHeat && typeof memoryBias.pathHeat === 'object')
+    ? memoryBias.pathHeat
+    : {};
   // Stronger upper-floor bias for chest distance
   const dist = (c) => Math.abs(c.x - spawn.x) + Math.abs(c.y - spawn.y) + c.floor * 8;
 
@@ -1291,15 +1299,23 @@ export function generateComHouse(blueprint) {
     return cd >= 1 && cd <= 3;
   }
 
+  function pathHabit(c) {
+    const k = keyOf(c.floor, c.x, c.y);
+    return Number(pathHeatMap[k]) || 0;
+  }
+
   function trapScore(c) {
     let s = 0;
     const doorAdj = isAdjTo(c, T.DOOR);
     const stairsAdj = nearStairs(c);
     // Player traffic heat (primary catch signal)
     s += heatOf(c) * 10;
-    if (doorAdj) s += 7;
-    if (stairsAdj && c.floor <= chest.floor) s += 6;
-    if (nearSpawnExit(c)) s += 6;
+    // Cross-session path habits: bias traps toward cells the player walks often
+    const ph = pathHabit(c);
+    if (ph > 0) s += Math.min(9, ph * (0.55 + lvT * 0.55));
+    if (doorAdj) s += 7 + lvT * 1.5;
+    if (stairsAdj && c.floor <= chest.floor) s += 6 + lvT * 1.2;
+    if (nearSpawnExit(c)) s += 6 + lvT * 1.5;
     if (nearChest(c)) s += 5;
     if (onPathToChest(c)) s += 3;
     if (c.floor === chest.floor) s += 2;
@@ -1310,7 +1326,7 @@ export function generateComHouse(blueprint) {
     // Prefer floors the player must visit
     if (c.floor > chest.floor) s -= 4;
     else if (c.floor > 0) s += 1;
-    s += Math.random() * 1.2;
+    s += Math.random() * (1.2 - lvT * 0.4); // slightly less random at high Lv
     return s;
   }
 
@@ -1365,12 +1381,13 @@ export function generateComHouse(blueprint) {
   }
 
   // --- Quota placement (fill catch spots first) ---
-  // 1) ~3 bombs on spawn-exit / first-room-exit
+  // 1) bombs on spawn-exit / first-room-exit (more at higher Lv / pathHeat)
   {
-    const pool = ranked(nearSpawnExit, (c) => heatOf(c) * 8 + trapScore(c));
+    const spawnQuota = 3 + (lvT >= 0.4 ? 1 : 0) + (lvT >= 0.8 ? 1 : 0); // 3..5
+    const pool = ranked(nearSpawnExit, (c) => heatOf(c) * 8 + pathHabit(c) * (2 + lvT * 3) + trapScore(c));
     let n = 0;
     for (const { c } of pool) {
-      if (traps.length >= want || n >= 3) break;
+      if (traps.length >= want || n >= spawnQuota) break;
       if (!canPlace(c)) continue;
       placeTrap(c, TRAP_BOMB);
       n += 1;
@@ -1379,13 +1396,14 @@ export function generateComHouse(blueprint) {
 
   // 2) ~2–3 bombs on door-adjacent (any floor, prefer path to chest; spread floors)
   {
-    const doorQuota = 2 + ((Math.random() < 0.5) ? 1 : 0); // 2 or 3
+    const doorQuota = 2 + (lvT >= 0.3 ? 1 : 0) + ((Math.random() < 0.45 + lvT * 0.2) ? 1 : 0); // 2..4
     const usedDoorFloors = new Set();
     const pool = ranked(
       (c) => isAdjTo(c, T.DOOR) && !nearSpawnExit(c) && c.floor <= chest.floor,
       (c) =>
         (onPathToChest(c) ? 5 : 0) +
         heatOf(c) * 5 +
+        pathHabit(c) * (2 + lvT * 3) +
         (c.floor > 0 ? 4 : 0) + // prefer climb floors after spawn-exit bombs
         (countFloor(c.floor) >= 4 ? -8 : 0) +
         (usedDoorFloors.has(c.floor) ? -3 : 2) +
@@ -1465,6 +1483,8 @@ export function generateComHouse(blueprint) {
       if (c.floor <= chest.floor && fc === 0) s += 5; // cover empty climb floors
       if (fc >= 4) s -= 6;
       if (c.floor === 0 && fc >= 5) s -= 8;
+      // Higher Lv: pile remaining bombs on habitual high-traffic cells
+      if (lvT > 0) s += pathHabit(c) * lvT * 2.5;
       return s;
     });
     const perFloor = {};

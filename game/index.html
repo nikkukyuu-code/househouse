@@ -9,7 +9,7 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta name="theme-color" content="#120e18" />
   <title>ハウスと罠</title>
-  <link rel="stylesheet" href="css/style.css?v=20260920x" />
+  <link rel="stylesheet" href="css/style.css?v=20260920y" />
 </head>
 <body>
   <div id="app">
@@ -19,6 +19,7 @@
       <h1 class="title-logo">ハウスと罠</h1>
       <p class="title-sub">家に罠を仕掛けて<br />相手の宝箱を探せ！</p>
       <p class="title-points" id="title-points">ポイント 0</p>
+      <p class="title-com-memory" id="title-com-memory">COM記憶 Lv.1（対戦0回）</p>
       <div class="btn-col">
         <button type="button" class="btn btn-com" id="btn-com">COM対戦</button>
         <button type="button" class="btn btn-ghost" id="btn-tutorial">チュートリアル</button>
@@ -31,7 +32,7 @@
         </div>
       </div>
       <p class="peer-note" id="peer-note">通信準備中…</p>
-      <p class="build-stamp" id="build-stamp">build 20260920x</p>
+      <p class="build-stamp" id="build-stamp">build 20260920y</p>
     </section>
 
 
@@ -109,6 +110,7 @@
           <span>宝箱 <strong id="setup-chest-count">—</strong></span>
           <span>罠 <strong id="setup-trap-count">0/10</strong></span>
         </div>
+        <p class="setup-com-memory hidden" id="setup-com-memory">COM記憶 Lv.1（対戦0回）</p>
       </div>
       <div class="floor-tabs">
         <button type="button" class="floor-tab floor-1f active" data-floor="0">1F</button>
@@ -211,13 +213,13 @@
   </div>
 
   <footer id="game-meta" aria-label="バージョンとアクセス数">
-    <span id="meta-version">ver 20260920x</span>
+    <span id="meta-version">ver 20260920y</span>
     <span class="meta-sep" aria-hidden="true">｜</span>
     <span id="meta-visits" class="meta-visits"><span class="meta-visits-label">アクセス</span> <img id="meta-visits-badge" alt="access" width="70" height="20" /></span>
   </footer>
 
   <script type="module">
-    import { init } from './js/game.js?v=20260920x';
+    import { init } from './js/game.js?v=20260920y';
     init().catch((e) => {
       console.error(e);
       const n = document.getElementById('peer-note');

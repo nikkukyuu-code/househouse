@@ -9,12 +9,12 @@ import {
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
   HOUSE_SKINS, getHouseSkin,
-} from './house.js?v=20260920x';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920x';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920x';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920x';
+} from './house.js?v=20260920y';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920y';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920y';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920y';
 
-export const GAME_VERSION = '20260920x';
+export const GAME_VERSION = '20260920y';
 
 const blueprint = createBlueprint();
 
@@ -295,45 +295,187 @@ function checkHazards(ex, triggeredSet, onTrap, onChest) {
 }
 
 
-/* ---------- Cross-match player trap heat (localStorage) ---------- */
-const TRAP_HEAT_KEY = 'househouse-player-trap-heat-v1';
-const TRAP_HEAT_CELL_CAP = 14;
+/* ---------- Cross-match COM memory (localStorage) ---------- */
+const COM_MEMORY_KEY = 'househouse-com-memory-v1';
+const LEGACY_TRAP_HEAT_KEY = 'househouse-player-trap-heat-v1';
+const COM_HEAT_CELL_CAP = 18;
+const COM_PATH_HEAT_CELL_CAP = 24;
+const COM_LEVEL_MAX = 11; // 1 + min(10, floor(matches/2))
 
-function loadTrapHeat() {
-  try {
-    const raw = localStorage.getItem(TRAP_HEAT_KEY);
-    if (!raw) return {};
-    const o = JSON.parse(raw);
-    return o && typeof o === 'object' && !Array.isArray(o) ? o : {};
-  } catch {
-    return {};
-  }
+function emptyComMemory() {
+  return {
+    matches: 0,
+    trapHeat: {},
+    chestHeat: {},
+    pathHeat: {},
+    level: 1,
+  };
 }
 
-function saveTrapHeat(heat) {
+function comLevelFromMatches(matches) {
+  const m = Math.max(0, Math.floor(Number(matches) || 0));
+  return 1 + Math.min(10, Math.floor(m / 2));
+}
+
+function sanitizeHeatMap(o, cap) {
+  if (!o || typeof o !== 'object' || Array.isArray(o)) return {};
+  const out = {};
+  for (const [k, v] of Object.entries(o)) {
+    if (typeof k !== 'string' || !/^\d+,\d+,\d+$/.test(k)) continue;
+    const n = Number(v);
+    if (!Number.isFinite(n) || n <= 0) continue;
+    out[k] = Math.min(cap, Math.floor(n));
+  }
+  return out;
+}
+
+function loadComMemory() {
   try {
-    localStorage.setItem(TRAP_HEAT_KEY, JSON.stringify(heat));
+    const raw = localStorage.getItem(COM_MEMORY_KEY);
+    if (raw) {
+      const o = JSON.parse(raw);
+      if (o && typeof o === 'object' && !Array.isArray(o)) {
+        const mem = emptyComMemory();
+        mem.matches = Math.max(0, Math.floor(Number(o.matches) || 0));
+        mem.trapHeat = sanitizeHeatMap(o.trapHeat, COM_HEAT_CELL_CAP);
+        mem.chestHeat = sanitizeHeatMap(o.chestHeat, COM_HEAT_CELL_CAP);
+        mem.pathHeat = sanitizeHeatMap(o.pathHeat, COM_PATH_HEAT_CELL_CAP);
+        mem.level = comLevelFromMatches(mem.matches);
+        return mem;
+      }
+    }
+  } catch {
+    /* fall through */
+  }
+  // Migrate legacy trap-only heat once
+  const mem = emptyComMemory();
+  try {
+    const legacy = localStorage.getItem(LEGACY_TRAP_HEAT_KEY);
+    if (legacy) {
+      const o = JSON.parse(legacy);
+      mem.trapHeat = sanitizeHeatMap(o, COM_HEAT_CELL_CAP);
+    }
+  } catch {
+    /* ignore */
+  }
+  return mem;
+}
+
+function saveComMemory(mem) {
+  try {
+    const clean = {
+      matches: Math.max(0, Math.floor(Number(mem.matches) || 0)),
+      trapHeat: sanitizeHeatMap(mem.trapHeat, COM_HEAT_CELL_CAP),
+      chestHeat: sanitizeHeatMap(mem.chestHeat, COM_HEAT_CELL_CAP),
+      pathHeat: sanitizeHeatMap(mem.pathHeat, COM_PATH_HEAT_CELL_CAP),
+      level: comLevelFromMatches(mem.matches),
+    };
+    localStorage.setItem(COM_MEMORY_KEY, JSON.stringify(clean));
   } catch {
     /* ignore quota / private mode */
   }
 }
 
-/** Record where the player placed traps this match (COM explores myHouse). */
-function recordPlayerTrapHeat(house) {
-  if (!house || !Array.isArray(house.traps) || !house.traps.length) return;
-  const heat = loadTrapHeat();
-  for (const raw of house.traps) {
-    const tr = normalizeTrap(raw);
-    if (!tr) continue;
-    const k = `${tr.floor},${tr.x},${tr.y}`;
-    heat[k] = Math.min(TRAP_HEAT_CELL_CAP, (heat[k] || 0) + 1);
+function bumpHeatMap(map, key, amount, cap) {
+  map[key] = Math.min(cap, (map[key] || 0) + amount);
+}
+
+/** Record player's house traps + chest at COM match start (for next sessions). */
+function recordPlayerHouseHeat(house) {
+  if (!house) return;
+  const mem = loadComMemory();
+  if (Array.isArray(house.traps)) {
+    for (const raw of house.traps) {
+      const tr = normalizeTrap(raw);
+      if (!tr) continue;
+      bumpHeatMap(mem.trapHeat, `${tr.floor},${tr.x},${tr.y}`, 1, COM_HEAT_CELL_CAP);
+    }
   }
-  saveTrapHeat(heat);
+  if (house.chest && Number.isFinite(house.chest.floor)) {
+    const c = house.chest;
+    bumpHeatMap(mem.chestHeat, `${c.floor},${c.x},${c.y}`, 1, COM_HEAT_CELL_CAP);
+  }
+  mem.level = comLevelFromMatches(mem.matches);
+  saveComMemory(mem);
+  // Do NOT write trap/chest heat into S._comMemory here — pathfinding must
+  // keep the pre-match snapshot only (no current-layout maphack).
+}
+
+/** Light pathHeat bump while the player explores (sampled). */
+function maybeRecordPlayerPathHeat(ex) {
+  if (S.mode !== 'com' || !ex || ex !== S.me) return;
+  if (!S._comMemory) return;
+  // Sample ~1/3 of successful steps to avoid spam
+  if (Math.random() > 0.34) return;
+  const k = `${ex.floor},${ex.x},${ex.y}`;
+  if (!S._comMemory.pathHeat) S._comMemory.pathHeat = {};
+  bumpHeatMap(S._comMemory.pathHeat, k, 1, COM_PATH_HEAT_CELL_CAP);
+  S._pathHeatDirty = true;
+}
+
+function flushPathHeatToStorage() {
+  if (!S._pathHeatDirty || !S._comMemory) return;
+  const mem = loadComMemory();
+  mem.pathHeat = sanitizeHeatMap(S._comMemory.pathHeat, COM_PATH_HEAT_CELL_CAP);
+  mem.level = comLevelFromMatches(mem.matches);
+  saveComMemory(mem);
+  S._pathHeatDirty = false;
+}
+
+function finalizeComMatchMemory() {
+  if (S.mode !== 'com') return;
+  const mem = loadComMemory(); // already has this match's trap/chest from start
+  // PathHeat was bumped only on S._comMemory during the match
+  if (S._comMemory && S._comMemory.pathHeat) {
+    mem.pathHeat = sanitizeHeatMap(S._comMemory.pathHeat, COM_PATH_HEAT_CELL_CAP);
+  }
+  mem.matches = (mem.matches || 0) + 1;
+  mem.level = comLevelFromMatches(mem.matches);
+  saveComMemory(mem);
+  S._comMemory = mem;
+  S._pathHeatDirty = false;
+  refreshComMemoryUi();
+}
+
+function comMemoryLevel() {
+  if (S._comMemory && S._comMemory.level) return S._comMemory.level;
+  return loadComMemory().level || 1;
 }
 
 function trapHeatAt(floor, x, y) {
-  const heat = S._trapHeat || {};
+  const heat = (S._comMemory && S._comMemory.trapHeat) || {};
   return heat[`${floor},${x},${y}`] || 0;
+}
+
+function chestHeatAt(floor, x, y) {
+  const heat = (S._comMemory && S._comMemory.chestHeat) || {};
+  return heat[`${floor},${x},${y}`] || 0;
+}
+
+function pathHeatAt(floor, x, y) {
+  const heat = (S._comMemory && S._comMemory.pathHeat) || {};
+  return heat[`${floor},${x},${y}`] || 0;
+}
+
+function refreshComMemoryUi() {
+  const mem = S._comMemory || loadComMemory();
+  const lv = mem.level || 1;
+  const m = mem.matches || 0;
+  const line = `COM記憶 Lv.${lv}（対戦${m}回）`;
+  const titleEl = $('title-com-memory');
+  if (titleEl) {
+    titleEl.textContent = line;
+    titleEl.classList.remove('hidden');
+  }
+  const setupEl = $('setup-com-memory');
+  if (setupEl) {
+    if (S.mode === 'com') {
+      setupEl.textContent = line;
+      setupEl.classList.remove('hidden');
+    } else {
+      setupEl.classList.add('hidden');
+    }
+  }
 }
 
 
@@ -609,10 +751,13 @@ function aiTriggeredCount(ex) {
 }
 
 function aiEnterCost(ex, floor, x, y) {
+  const lv = comMemoryLevel();
+  const lvT = Math.min(1, (lv - 1) / 10); // 0 at Lv1 → 1 at Lv11
   if (aiIsCellTriggered(ex, floor, x, y)) {
-    // Strengthen mid-match: more triggered → safer highways (cheaper)
+    // Prefer known-safe highways more as level / traps-hit rise
     const trigN = aiTriggeredCount(ex);
-    return Math.max(0.52, 0.75 - Math.min(trigN, 10) * 0.022);
+    const base = 0.75 - Math.min(trigN, 10) * 0.022 - lvT * 0.12;
+    return Math.max(0.42, base);
   }
   const key = `${floor},${x},${y}`;
   const visited = ex && ex.visited && ex.visited.has(key);
@@ -620,15 +765,28 @@ function aiEnterCost(ex, floor, x, y) {
   if (!visited && (aiIsDoorAdjacent(floor, x, y) || aiNearSpawnExit(floor, x, y))) {
     c += 0.05;
   }
-  // Cross-match heat: moderate extra cost on unknown high-heat cells (capped)
-  if (!visited) {
+  // Softlock guard: near spawn, don't over-penalize exit cells
+  const nearSpawnSoft = aiNearSpawnExit(floor, x, y) && ex && ex.floor === 0
+    && (ex.visited ? ex.visited.size < 14 : true);
+
+  // Cross-match heat: stronger avoidance of unknown high-heat as level rises
+  if (!visited && !nearSpawnSoft) {
     const past = trapHeatAt(floor, x, y);
-    if (past > 0) c += Math.min(0.32, past * 0.055);
+    if (past > 0) {
+      const mult = 0.055 + lvT * 0.045;
+      const cap = 0.32 + lvT * 0.28;
+      c += Math.min(cap, past * mult);
+    }
+    const ch = chestHeatAt(floor, x, y);
+    if (ch > 0) c += Math.min(0.12 + lvT * 0.1, ch * (0.03 + lvT * 0.02));
+  } else if (!visited && nearSpawnSoft) {
+    const past = trapHeatAt(floor, x, y);
+    if (past > 0) c += Math.min(0.12, past * 0.02);
   }
-  // Same-match learning: temporary danger bias near recent hits
+  // Same-match dangerHeat (scales mildly with level)
   if (ex && ex.memory && ex.memory.dangerHeat) {
     const dh = ex.memory.dangerHeat[key] || 0;
-    if (dh > 0) c += Math.min(0.38, dh);
+    if (dh > 0) c += Math.min(0.38 + lvT * 0.12, dh * (1 + lvT * 0.25));
   }
   return c;
 }
@@ -1073,13 +1231,21 @@ function aiWanderStep(ex, lastDx, lastDy) {
     const nk = `${ex.floor},${n.x},${n.y}`;
     if (!ex.visited.has(nk)) s += 10;
     if (aiIsCellTriggered(ex, ex.floor, n.x, n.y)) {
-      s += 8 + Math.min(4, aiTriggeredCount(ex) * 0.4); // stronger highway bias mid-match
+      const lvT2 = Math.min(1, (comMemoryLevel() - 1) / 10);
+      s += 8 + Math.min(4, aiTriggeredCount(ex) * 0.4) + lvT2 * 3; // safer highways at higher Lv
     } else {
       s -= aiCautionCost(ex, ex.floor, n.x, n.y);
       const dh = (ex.memory.dangerHeat && ex.memory.dangerHeat[nk]) || 0;
       s -= dh * 4;
-      const past = trapHeatAt(ex.floor, n.x, n.y);
-      if (past > 0 && !ex.visited.has(nk)) s -= Math.min(2.5, past * 0.35);
+      {
+        const lv = comMemoryLevel();
+        const lvT = Math.min(1, (lv - 1) / 10);
+        const past = trapHeatAt(ex.floor, n.x, n.y);
+        if (past > 0 && !ex.visited.has(nk)) {
+          const pen = Math.min(2.5 + lvT * 2.2, past * (0.35 + lvT * 0.25));
+          s -= neighbors.length <= 2 ? pen * 0.35 : pen;
+        }
+      }
     }
     // If only one neighbor (dead end / corridor), don't let caution block
     if (neighbors.length <= 1) s += 5;
@@ -1506,6 +1672,7 @@ function endGame(winner, reason) {
 
   // Remaining life (HP hearts) → points wallet (1 heart ≈ 1 pt, rounded)
   awardMatchPointsFromHp();
+  finalizeComMatchMemory();
 
   const iWon = winner === 'me';
   const reasonText = endReasonLabel(reason, iWon);
@@ -1849,6 +2016,7 @@ function applyMoveFromInput() {
   if (!d) return;
   if (tryMove(S.me, d[0], d[1])) {
     S.moveCooldown = 140;
+    maybeRecordPlayerPathHeat(S.me);
     checkHazards(S.me, S.myTriggered, (tr) => onTrapHit('me', tr), () => onChestFound('me'));
     syncPos();
   }
@@ -1867,17 +2035,19 @@ function syncPos() {
 }
 
 let aiTimer = 0;
-/** COM step interval: slightly faster late if healthy (smarter paths do most work). */
+/** COM step interval: slightly faster with memory level + late healthy (capped). */
 function aiStepIntervalMs() {
   if (S.mode !== 'com') return 380;
   const ex = S.foe;
-  if (!ex || !ex.memory) return 270;
+  const lv = comMemoryLevel();
+  const lvCut = Math.min(55, (lv - 1) * 5); // Lv1:0 … Lv11:50ms faster base
+  if (!ex || !ex.memory) return Math.max(210, 270 - lvCut);
   const phase = ex.memory.phase || 0;
   const visited = ex.visited ? ex.visited.size : 0;
   const healthy = (S.foeHp || 0) >= MAX_HP * 0.6;
-  if (healthy && (phase > 80 || visited >= 48)) return 200;
-  if (healthy && phase > 55) return 235;
-  return 270;
+  if (healthy && (phase > 80 || visited >= 48)) return Math.max(175, 200 - lvCut * 0.45);
+  if (healthy && phase > 55) return Math.max(190, 235 - lvCut * 0.55);
+  return Math.max(210, 270 - lvCut);
 }
 
 
@@ -2283,6 +2453,7 @@ function goTitle() {
   if (S.net) { S.net.destroy(); S.net = null; }
   showScreen('screen-title');
   refreshPointsUi();
+  refreshComMemoryUi();
   cancelAnimationFrame(animId);
   const home = $('btn-tutorial-home');
   if (home) home.textContent = '戻る';
@@ -2309,6 +2480,7 @@ function startSetup() {
     readyBtn.textContent = `準備完了（罠 0/${MAX_TRAPS}）`;
   }
   showScreen('screen-setup');
+  refreshComMemoryUi();
   updateSetupHud();
   requestAnimationFrame(() => {
     drawSetup();
@@ -2379,8 +2551,13 @@ function onReadySetup() {
   }
 
   if (S.mode === 'com') {
-    S.theirHouse = generateComHouse(blueprint);
+    S._comMemory = loadComMemory();
+    S.theirHouse = generateComHouse(blueprint, {
+      pathHeat: S._comMemory.pathHeat || {},
+      level: S._comMemory.level || 1,
+    });
     setStatus($('setup-status'), 'COMが家を設計しました…', 'ok');
+    refreshComMemoryUi();
     try { sfx('ready'); } catch (_) {}
     startMatch();
     return;
@@ -2435,11 +2612,12 @@ function startMatch() {
   S.me = makeExplorer(S.theirHouse, 'me');
   S.foe = makeExplorer(S.myHouse, 'foe');
 
-  // Pathfinding uses PAST heat only (no current-layout maphack).
-  // Persist this match's placements afterward for the next match.
-  S._trapHeat = loadTrapHeat();
-  if ((S.mode === 'com' || S.mode === 'local') && S.myHouse && S.myHouse.traps) {
-    recordPlayerTrapHeat(S.myHouse);
+  // Pathfinding uses PAST memory only (no live untriggered maphack).
+  // Record this match's placements into heat for future sessions.
+  S._comMemory = loadComMemory();
+  S._pathHeatDirty = false;
+  if (S.mode === 'com' && S.myHouse) {
+    recordPlayerHouseHeat(S.myHouse);
   }
   if (S.foe) {
     if (!S.foe.memory) {
@@ -2765,7 +2943,9 @@ export async function init() {
 
   bindControls();
   showScreen('screen-title');
+  S._comMemory = loadComMemory();
   refreshPointsUi();
+  refreshComMemoryUi();
   loadMutePref();
   syncMuteButton();
 
