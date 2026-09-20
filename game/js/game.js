@@ -8,12 +8,12 @@ import {
   createBlueprint, createEmptyHouseData, isWalkable, isPlaceable,
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
-} from './house.js?v=20260920u';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920u';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920u';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920u';
+} from './house.js?v=20260920v';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920v';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920v';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920v';
 
-export const GAME_VERSION = '20260920u';
+export const GAME_VERSION = '20260920v';
 
 const blueprint = createBlueprint();
 
@@ -37,6 +37,7 @@ const S = {
   ended: false,
   winner: null,
   holdDir: null,
+  ingameTipOpen: false,
   moveCooldown: 0,
   fx: [],
   time: 0,
@@ -207,6 +208,7 @@ function updateChestAlarms() {
   }
   if (top && !prev.top) {
     try { sfx('alarm'); } catch (_) {}
+    enqueueTip('match-alarm');
   }
   S.chestAlarm = { top, bot: false };
 }
@@ -859,6 +861,7 @@ function aiWanderStep(ex, lastDx, lastDy) {
 
 /* ---------- Setup placement ---------- */
 function placeAt(floor, x, y) {
+  if (S.ingameTipOpen) return;
   const house = S.setupWhich === 'mine' ? S.myHouse : S.theirHouse;
   if (!isPlaceable(blueprint, floor, x, y)) {
     setStatus($('setup-status'), '床のマスにだけ置けます（壁・ドア・階段は不可）', 'warn');
@@ -896,6 +899,7 @@ function placeAt(floor, x, y) {
     sfx('place');
     updateSetupHud();
     drawSetup();
+    if (house.traps.length < MAX_TRAPS) enqueueTip('setup-chest');
     maybeCelebrateSetupComplete(house);
     return;
   }
@@ -1647,7 +1651,7 @@ function tick(ts) {
 
   if (S.phase !== 'match') return;
 
-  if (!S.ended) {
+  if (!S.ended && !S.ingameTipOpen) {
     S.moveCooldown = Math.max(0, S.moveCooldown - dt);
     applyMoveFromInput();
 
@@ -1817,12 +1821,67 @@ const TUTORIAL_STEPS = [
 ];
 
 let tutorialStep = 0;
+/** When help is opened mid-game: { screen, phase } to restore */
+let tutorialReturn = null;
 
-function openTutorial() {
+function openTutorial(fromGame = false) {
+  if (!fromGame) tutorialReturn = null;
   tutorialStep = 0;
   S.phase = 'tutorial';
+  S.holdDir = null;
   renderTutorial();
   showScreen('screen-tutorial');
+  const home = $('btn-tutorial-home');
+  if (home) home.textContent = tutorialReturn ? 'ゲームへ戻る' : '戻る';
+}
+
+function openTutorialFromGame() {
+  if (S.phase !== 'setup' && S.phase !== 'match') return;
+  const screen = S.phase === 'setup' ? 'screen-setup' : 'screen-match';
+  tutorialReturn = { screen, phase: S.phase };
+  // Hide tip card while browsing full tutorial (keep queue)
+  const tipEl = $('ingame-tip');
+  if (tipEl) tipEl.classList.add('hidden');
+  S.ingameTipOpen = false;
+  openTutorial(true);
+}
+
+function leaveTutorial() {
+  if (tutorialReturn) {
+    const ret = tutorialReturn;
+    tutorialReturn = null;
+    S.phase = ret.phase;
+    showScreen(ret.screen);
+    const home = $('btn-tutorial-home');
+    if (home) home.textContent = '戻る';
+    if (ret.phase === 'setup') {
+      requestAnimationFrame(() => {
+        drawSetup();
+        updateSetupHud();
+      });
+      // Resume tip if one was mid-show
+      if (tipShowing) {
+        const tipEl = $('ingame-tip');
+        if (tipEl) tipEl.classList.remove('hidden');
+        S.ingameTipOpen = true;
+      } else {
+        maybeShowNextTip();
+      }
+    } else if (ret.phase === 'match') {
+      resizeCanvases();
+      updateHpBars();
+      lastTs = 0;
+      if (tipShowing) {
+        const tipEl = $('ingame-tip');
+        if (tipEl) tipEl.classList.remove('hidden');
+        S.ingameTipOpen = true;
+      } else {
+        maybeShowNextTip();
+      }
+    }
+    return;
+  }
+  goTitle();
 }
 
 function renderTutorial() {
@@ -1853,14 +1912,14 @@ function renderTutorial() {
   }
   if (prev) prev.disabled = step <= 0;
   const last = step >= total - 1;
-  if (next) next.textContent = last ? 'タイトルへ' : '次へ';
-  if (extra) extra.classList.toggle('hidden', !last);
+  if (next) next.textContent = last ? (tutorialReturn ? 'ゲームへ戻る' : 'タイトルへ') : '次へ';
+  if (extra) extra.classList.toggle('hidden', !last || !!tutorialReturn);
   if (card) card.scrollTop = 0;
 }
 
 function tutorialNext() {
   if (tutorialStep >= TUTORIAL_STEPS.length - 1) {
-    goTitle();
+    leaveTutorial();
     return;
   }
   tutorialStep += 1;
@@ -1873,12 +1932,117 @@ function tutorialPrev() {
   renderTutorial();
 }
 
+/* ---------- In-game guided tips ---------- */
+const INGAME_TUT_KEY = 'househouse-ingame-tut-v1';
+const INGAME_TIPS = {
+  'setup-enter': '宝箱1つ＋罠10個を置く。全部置くと対戦開始できる',
+  'setup-chest': '次は爆弾や落とし穴を10個',
+  'setup-ready': '準備完了を押して対戦へ',
+  'match-start': '上＝相手があなたの家／下＝あなたが探索。十字キーで移動',
+  'match-trap': '罠は1回だけ、あとは安全',
+  'match-alarm': '相手が宝箱部屋に入ると上画面が赤く点滅',
+};
+const INGAME_TIP_IDS = Object.keys(INGAME_TIPS);
+
+function loadIngameTut() {
+  try {
+    const raw = localStorage.getItem(INGAME_TUT_KEY);
+    if (!raw) return { done: false, seen: {} };
+    if (raw === '1' || raw === 'done' || raw === 'skip') return { done: true, seen: {} };
+    const data = JSON.parse(raw);
+    if (data === true || data === 1) return { done: true, seen: {} };
+    if (data && typeof data === 'object') {
+      return { done: !!data.done, seen: data.seen && typeof data.seen === 'object' ? data.seen : {} };
+    }
+  } catch (_) {}
+  return { done: false, seen: {} };
+}
+
+function saveIngameTut(state) {
+  try {
+    localStorage.setItem(INGAME_TUT_KEY, JSON.stringify(state));
+  } catch (_) {}
+}
+
+let ingameTut = loadIngameTut();
+let tipQueue = [];
+let tipShowing = null;
+
+function isIngameTutActive() {
+  return !ingameTut.done;
+}
+
+function enqueueTip(id) {
+  if (!isIngameTutActive()) return;
+  if (!INGAME_TIPS[id]) return;
+  if (ingameTut.seen[id]) return;
+  if (tipShowing === id || tipQueue.includes(id)) return;
+  tipQueue.push(id);
+  maybeShowNextTip();
+}
+
+function maybeShowNextTip() {
+  if (tipShowing) return;
+  if (!isIngameTutActive()) return;
+  if (S.phase !== 'setup' && S.phase !== 'match') return;
+  while (tipQueue.length) {
+    const id = tipQueue.shift();
+    if (ingameTut.seen[id]) continue;
+    tipShowing = id;
+    const el = $('ingame-tip');
+    const text = $('ingame-tip-text');
+    const okBtn = $('btn-ingame-tip-ok');
+    if (text) text.textContent = INGAME_TIPS[id] || '';
+    if (okBtn) okBtn.textContent = tipQueue.length ? '次へ' : 'わかった';
+    if (el) el.classList.remove('hidden');
+    S.ingameTipOpen = true;
+    S.holdDir = null;
+    return;
+  }
+}
+
+function dismissCurrentTip() {
+  if (!tipShowing) return;
+  ingameTut.seen[tipShowing] = true;
+  if (INGAME_TIP_IDS.every((id) => ingameTut.seen[id])) {
+    ingameTut.done = true;
+  }
+  saveIngameTut(ingameTut);
+  tipShowing = null;
+  const el = $('ingame-tip');
+  if (el) el.classList.add('hidden');
+  S.ingameTipOpen = false;
+  maybeShowNextTip();
+}
+
+function skipAllIngameTips() {
+  tipQueue = [];
+  tipShowing = null;
+  ingameTut.done = true;
+  saveIngameTut(ingameTut);
+  const el = $('ingame-tip');
+  if (el) el.classList.add('hidden');
+  S.ingameTipOpen = false;
+}
+
+function hideIngameTipUi() {
+  tipQueue = [];
+  tipShowing = null;
+  const el = $('ingame-tip');
+  if (el) el.classList.add('hidden');
+  S.ingameTipOpen = false;
+}
+
 /* ---------- Flow ---------- */
 function goTitle() {
   S.phase = 'title';
+  tutorialReturn = null;
+  hideIngameTipUi();
   if (S.net) { S.net.destroy(); S.net = null; }
   showScreen('screen-title');
   cancelAnimationFrame(animId);
+  const home = $('btn-tutorial-home');
+  if (home) home.textContent = '戻る';
 }
 
 function startSetup() {
@@ -1906,6 +2070,7 @@ function startSetup() {
   requestAnimationFrame(() => {
     drawSetup();
     updateSetupHud(); // again after paint — avoid stale enabled state from last match
+    enqueueTip('setup-enter');
   });
   setStatus($('setup-status'), `マスをタップして配置。宝箱1つ＋罠${MAX_TRAPS}個必須。`, '');
 }
@@ -1922,6 +2087,7 @@ function maybeCelebrateSetupComplete(house) {
   if (S._celebratedSetup) return; // once until incomplete again
   S._celebratedSetup = true;
   setStatus($('setup-status'), `仕掛け完了！ 宝箱＋罠${MAX_TRAPS}個`, 'ok');
+  enqueueTip('setup-ready');
   showSetupDone(
     `${setupDoneSummary(house)}\n準備完了で対戦へ`,
     null
@@ -2066,6 +2232,19 @@ function startMatch() {
   lastTs = 0;
   cancelAnimationFrame(animId);
   animId = requestAnimationFrame(tick);
+
+  // Drop any leftover setup tip UI before match tips
+  if (tipShowing && String(tipShowing).startsWith('setup-')) {
+    ingameTut.seen[tipShowing] = true;
+    tipShowing = null;
+    const tipEl = $('ingame-tip');
+    if (tipEl) tipEl.classList.add('hidden');
+    S.ingameTipOpen = false;
+    saveIngameTut(ingameTut);
+  }
+  tipQueue = tipQueue.filter((id) => !String(id).startsWith('setup-'));
+  enqueueTip('match-start');
+  enqueueTip('match-trap');
 }
 
 /* ---------- Online room UI ---------- */
@@ -2129,7 +2308,7 @@ function bindControls() {
     const dir = btn.dataset.dir;
     bindHold(
       btn,
-      () => { S.holdDir = dir; },
+      () => { if (!S.ingameTipOpen) S.holdDir = dir; },
       () => { if (S.holdDir === dir) S.holdDir = null; }
     );
   });
@@ -2139,7 +2318,7 @@ function bindControls() {
     w: 'u', W: 'u', s: 'd', S: 'd', a: 'l', A: 'l', d: 'r', D: 'r',
   };
   window.addEventListener('keydown', (e) => {
-    if (keyMap[e.key] && S.phase === 'match') {
+    if (keyMap[e.key] && S.phase === 'match' && !S.ingameTipOpen) {
       e.preventDefault();
       S.holdDir = keyMap[e.key];
     }
@@ -2163,7 +2342,7 @@ function bindControls() {
   });
   bindTap($('btn-tutorial-home'), () => {
     sfx('tap');
-    goTitle();
+    leaveTutorial();
   });
   bindTap($('btn-tutorial-prev'), () => {
     sfx('tap');
@@ -2201,8 +2380,29 @@ function bindControls() {
     bindTap(btn, select);
     btn.addEventListener('pointerdown', select, { passive: false });
   });
-  bindTap($('btn-ready'), () => onReadySetup());
+  bindTap($('btn-ready'), () => {
+    if (S.ingameTipOpen) return;
+    onReadySetup();
+  });
   bindTap($('btn-setup-back'), () => goTitle());
+  bindTap($('btn-help-setup'), () => {
+    unlockAudio();
+    sfx('tap');
+    openTutorialFromGame();
+  });
+  bindTap($('btn-help-match'), () => {
+    unlockAudio();
+    sfx('tap');
+    openTutorialFromGame();
+  });
+  bindTap($('btn-ingame-tip-ok'), () => {
+    sfx('tap');
+    dismissCurrentTip();
+  });
+  bindTap($('btn-ingame-tip-skip'), () => {
+    sfx('tap');
+    skipAllIngameTips();
+  });
 
   const sc = $('setup-canvas');
   let lastPlaceTs = 0;

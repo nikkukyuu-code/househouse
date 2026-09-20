@@ -290,6 +290,14 @@ a.btn.link-btn {
   text-align: center;
   flex: 0 0 auto;
 }
+.setup-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  position: relative;
+  padding: 0 36px;
+}
 .setup-header h2 {
   font-size: clamp(0.95rem, 2.6vh, 1.1rem);
   color: #ffe08a;
@@ -415,13 +423,14 @@ a.btn.link-btn {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 6px;
   padding: 2px 8px;
   background: linear-gradient(180deg, rgba(0,0,0,0.7), rgba(0,0,0,0.5));
   flex: 0 0 auto;
   z-index: 2;
   height: clamp(22px, 3.5vh, 28px);
 }
-.match-hud .label { font-size: clamp(0.65rem, 1.8vh, 0.75rem); color: #cbb896; }
+.match-hud .label { font-size: clamp(0.65rem, 1.8vh, 0.75rem); color: #cbb896; flex: 1 1 auto; }
 .hearts {
   letter-spacing: 1px;
   font-size: clamp(0.72rem, 1.9vh, 0.95rem);
@@ -988,6 +997,101 @@ a.btn.link-btn {
 .allow-scroll {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
+}
+
+
+/* ---- Help button (setup / match) ---- */
+.btn-help {
+  appearance: none;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(201, 162, 39, 0.7);
+  background: linear-gradient(180deg, rgba(232, 197, 71, 0.35), rgba(80, 55, 20, 0.55));
+  color: #ffe08a;
+  font-size: 0.85rem;
+  font-weight: 900;
+  font-family: inherit;
+  line-height: 1;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,224,138,0.25);
+  padding: 0;
+  z-index: 3;
+}
+.setup-header-row .btn-help {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.btn-help-match {
+  width: 22px;
+  height: 22px;
+  font-size: 0.72rem;
+  border-width: 1px;
+}
+.setup-header-row .btn-help:active {
+  transform: translateY(-50%) scale(0.94);
+}
+.btn-help-match:active {
+  transform: scale(0.94);
+}
+
+/* ---- In-game tip overlay ---- */
+.ingame-tip {
+  position: absolute;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 12px 12px max(16px, env(safe-area-inset-bottom, 0px));
+  background: rgba(8, 6, 12, 0.45);
+  pointer-events: auto;
+}
+.ingame-tip.hidden { display: none !important; }
+.ingame-tip-card {
+  width: 100%;
+  max-width: 340px;
+  background:
+    linear-gradient(180deg, rgba(48, 36, 22, 0.96), rgba(18, 12, 22, 0.98));
+  border: 1.5px solid rgba(201, 162, 39, 0.55);
+  border-radius: 14px;
+  padding: 14px 14px 12px;
+  box-shadow:
+    0 8px 28px rgba(0, 0, 0, 0.55),
+    0 0 20px rgba(201, 162, 39, 0.15),
+    inset 0 1px 0 rgba(255, 224, 138, 0.12);
+  animation: ingame-tip-in 0.22s ease-out;
+}
+@keyframes ingame-tip-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.ingame-tip-text {
+  color: #f5ead4;
+  font-size: clamp(0.88rem, 2.4vh, 1rem);
+  font-weight: 700;
+  line-height: 1.5;
+  margin: 0 0 12px;
+  text-align: left;
+}
+.ingame-tip-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.ingame-tip-actions .btn {
+  min-height: 40px;
+  flex: 1 1 auto;
+  max-width: 140px;
+}
+.ingame-tip-actions .btn-ghost {
+  max-width: 100px;
+  flex: 0 1 auto;
 }
 
 /* Persistent version + visit count — outside #app */

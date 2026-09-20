@@ -9,7 +9,7 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta name="theme-color" content="#120e18" />
   <title>ハウスと罠</title>
-  <link rel="stylesheet" href="css/style.css?v=20260920u" />
+  <link rel="stylesheet" href="css/style.css?v=20260920v" />
 </head>
 <body>
   <div id="app">
@@ -29,7 +29,7 @@
         </div>
       </div>
       <p class="peer-note" id="peer-note">通信準備中…</p>
-      <p class="build-stamp" id="build-stamp">build 20260920u</p>
+      <p class="build-stamp" id="build-stamp">build 20260920v</p>
     </section>
 
 
@@ -86,7 +86,10 @@
     <!-- セットアップ -->
     <section id="screen-setup" class="screen">
       <div class="setup-header">
-        <h2 id="setup-title">あなたの家を設計</h2>
+        <div class="setup-header-row">
+          <h2 id="setup-title">あなたの家を設計</h2>
+          <button type="button" class="btn-help" id="btn-help-setup" title="遊び方" aria-label="遊び方">？</button>
+        </div>
         <div class="setup-counts">
           <span>宝箱 <strong id="setup-chest-count">—</strong></span>
           <span>罠 <strong id="setup-trap-count">0/10</strong></span>
@@ -135,6 +138,7 @@
       <div class="match-half bot">
         <div class="match-hud">
           <span class="label">あなたの体力</span>
+          <button type="button" class="btn-help btn-help-match" id="btn-help-match" title="遊び方" aria-label="遊び方">？</button>
           <span class="hearts" id="hp-bot"></span>
         </div>
         <div class="match-canvas-wrap">
@@ -176,16 +180,27 @@
         </div>
       </div>
     </section>
+
+    <!-- ゲーム中チュートリアル・ヒント -->
+    <div id="ingame-tip" class="ingame-tip hidden" aria-live="polite" role="dialog" aria-modal="true">
+      <div class="ingame-tip-card">
+        <p class="ingame-tip-text" id="ingame-tip-text"></p>
+        <div class="ingame-tip-actions">
+          <button type="button" class="btn btn-ghost btn-compact" id="btn-ingame-tip-skip">スキップ</button>
+          <button type="button" class="btn btn-primary btn-compact" id="btn-ingame-tip-ok">わかった</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <footer id="game-meta" aria-label="バージョンとアクセス数">
-    <span id="meta-version">ver 20260920u</span>
+    <span id="meta-version">ver 20260920v</span>
     <span class="meta-sep" aria-hidden="true">｜</span>
     <span id="meta-visits" class="meta-visits"><span class="meta-visits-label">アクセス</span> <img id="meta-visits-badge" alt="access" width="70" height="20" /></span>
   </footer>
 
   <script type="module">
-    import { init } from './js/game.js?v=20260920u';
+    import { init } from './js/game.js?v=20260920v';
     init().catch((e) => {
       console.error(e);
       const n = document.getElementById('peer-note');
