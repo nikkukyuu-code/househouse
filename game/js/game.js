@@ -9,12 +9,12 @@ import {
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
   HOUSE_SKINS, getHouseSkin,
-} from './house.js?v=20260920y';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920y';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920y';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920y';
+} from './house.js?v=20260920z';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920z';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920z';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920z';
 
-export const GAME_VERSION = '20260920y';
+export const GAME_VERSION = '20260920z';
 
 const blueprint = createBlueprint();
 
@@ -499,9 +499,9 @@ function savePoints(n) {
   }
 }
 
-/** 1 heart = 1 point; half-hearts use Math.round (e.g. 7.5 → 8). */
-function awardMatchPointsFromHp() {
-  const gained = Math.max(0, Math.round(S.myHp));
+/** Win only: 1 heart = 1 point; half-hearts use Math.round (e.g. 7.5 → 8). Loss → 0. */
+function awardMatchPointsFromHp(iWon) {
+  const gained = iWon ? Math.max(0, Math.round(S.myHp)) : 0;
   S._pointsGained = gained;
   if (gained > 0) {
     const total = loadPoints() + gained;
@@ -521,10 +521,10 @@ function refreshPointsUi(gained) {
   const gainEl = $('result-points-gain');
   if (gainEl) {
     if (typeof gained === 'number' && gained > 0) {
-      gainEl.textContent = 'ライフ残り → +' + gained + ' pt';
+      gainEl.textContent = '勝利ボーナス：ライフ残り → +' + gained + ' pt';
       gainEl.classList.remove('hidden');
     } else if (typeof gained === 'number' && gained === 0) {
-      gainEl.textContent = 'ライフ残り → +0 pt';
+      gainEl.textContent = '敗北のためポイントなし';
       gainEl.classList.remove('hidden');
     } else {
       gainEl.textContent = '';
@@ -1670,11 +1670,11 @@ function endGame(winner, reason) {
   S.revealSecrets = true;
   S.holdDir = null;
 
-  // Remaining life (HP hearts) → points wallet (1 heart ≈ 1 pt, rounded)
-  awardMatchPointsFromHp();
   finalizeComMatchMemory();
 
   const iWon = winner === 'me';
+  // Remaining life → points only on win
+  awardMatchPointsFromHp(iWon);
   const reasonText = endReasonLabel(reason, iWon);
   const eventTitle = climaxEventTitle(reason);
   const bannerIcon = reasonIcon(reason);
