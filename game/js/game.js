@@ -9,12 +9,12 @@ import {
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
   HOUSE_SKINS, getHouseSkin, preloadTextures,
-} from './house.js?v=20260921j';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260921j';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260921j';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260921j';
+} from './house.js?v=20260921k';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260921k';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260921k';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260921k';
 
-export const GAME_VERSION = '20260921j';
+export const GAME_VERSION = '20260921k';
 
 const blueprint = createBlueprint();
 
@@ -481,33 +481,21 @@ function refreshComMemoryUi() {
 
 /* ---------- Points wallet (remaining life → points after match) ---------- */
 const POINTS_KEY = 'househouse-points-v1';
-/** Link not public yet — start testers with 1000 pt. Flip false before public launch. */
-const POINTS_TEST_MODE = true;
-const POINTS_TEST_START = 1000;
-const POINTS_TEST_GRANT_KEY = 'househouse-points-test-grant-v1';
+/** One-time wipe so browsers that had test 1000 pt reset to 0. */
+const POINTS_RESET_KEY = 'househouse-points-reset-0-v1';
 
 function loadPoints() {
   try {
-    if (POINTS_TEST_MODE) {
-      const granted = localStorage.getItem(POINTS_TEST_GRANT_KEY);
-      if (!granted) {
-        const existing = parseInt(localStorage.getItem(POINTS_KEY), 10);
-        const base = Number.isFinite(existing) && existing >= 0 ? existing : 0;
-        const start = Math.max(base, POINTS_TEST_START);
-        localStorage.setItem(POINTS_KEY, String(start));
-        localStorage.setItem(POINTS_TEST_GRANT_KEY, '1');
-        return start;
-      }
+    if (!localStorage.getItem(POINTS_RESET_KEY)) {
+      localStorage.setItem(POINTS_KEY, '0');
+      localStorage.removeItem('househouse-points-test-grant-v1');
+      localStorage.setItem(POINTS_RESET_KEY, '1');
+      return 0;
     }
     const n = parseInt(localStorage.getItem(POINTS_KEY), 10);
-    if (Number.isFinite(n) && n >= 0) return n;
-    if (POINTS_TEST_MODE) {
-      localStorage.setItem(POINTS_KEY, String(POINTS_TEST_START));
-      return POINTS_TEST_START;
-    }
-    return 0;
+    return Number.isFinite(n) && n >= 0 ? n : 0;
   } catch {
-    return POINTS_TEST_MODE ? POINTS_TEST_START : 0;
+    return 0;
   }
 }
 
@@ -533,11 +521,7 @@ function awardMatchPointsFromHp(iWon) {
 function refreshPointsUi(gained) {
   const total = loadPoints();
   const titleEl = $('title-points');
-  if (titleEl) {
-    titleEl.textContent = POINTS_TEST_MODE
-      ? ('ポイント ' + total + '（テスト）')
-      : ('ポイント ' + total);
-  }
+  if (titleEl) titleEl.textContent = 'ポイント ' + total;
   const resEl = $('result-points');
   if (resEl) resEl.textContent = 'ポイント ' + total;
   const shopEl = $('shop-points');
