@@ -872,18 +872,31 @@ export function drawChestSprite(ctx, px, py, cellSize) {
  * make skins visually obvious at a glance.
  */
 const FURNITURE_BY_SKIN = {
-  // ふつうの家（無料）— ほぼ空っぽ。有料家との差をはっきり出す
+  // ふつうの家（無料）— 初期レイアウトのおよそ半分
   basic: [
-    // 1F: 植物1つだけ
+    // 1F living（元の約半分）
     [
+      { x: 6, y: 1, kind: 'sofa' },
+      { x: 5, y: 3, kind: 'table' },
       { x: 3, y: 1, kind: 'plant' },
+      { x: 1, y: 3, kind: 'shelf' },
     ],
-    // 2F: 簡素なベッド1つだけ
+    // 2F bedrooms + study（元の約半分）
     [
       { x: 1, y: 1, kind: 'bed' },
+      { x: 5, y: 1, kind: 'desk' },
+      { x: 6, y: 1, kind: 'chair' },
+      { x: 9, y: 6, kind: 'bed' },
+      { x: 3, y: 5, kind: 'plant' },
     ],
-    // 3F: なし
-    [],
+    // 3F attic（元の約半分）
+    [
+      { x: 1, y: 1, kind: 'crate' },
+      { x: 3, y: 1, kind: 'trunk' },
+      { x: 7, y: 1, kind: 'trunk' },
+      { x: 9, y: 6, kind: 'trunk' },
+      { x: 11, y: 5, kind: 'crate' },
+    ],
   ],
   // こざっぱり — warm wood, curtains, cozy rugs; kitchen-ish 1F
   cottage: [
