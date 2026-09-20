@@ -550,28 +550,64 @@ function drawWallTile(ctx, px, py, cellSize, floor = 0, skinId = 'basic', bluepr
   }
 
   if (id === 'mansion') {
-    // Elegant wallpaper stripes + dark trim / wainscot
-    const stripe = floor === 1 ? 'rgba(90,70,110,0.14)' : floor === 2 ? 'rgba(140,60,70,0.14)' : 'rgba(100,70,40,0.12)';
-    ctx.fillStyle = stripe;
+    // Wallpaper + molding oriented to wall run (H vs V)
+    const stripe = floor === 1 ? 'rgba(90,70,110,0.16)' : floor === 2 ? 'rgba(140,60,70,0.16)' : 'rgba(100,70,40,0.14)';
     const sw = Math.max(2, cellSize * 0.12);
-    for (let sx = px + 3; sx < px + cellSize - 2; sx += sw * 2) {
-      ctx.fillRect(sx, py + topH * 0.4, sw, cellSize - baseH - topH * 0.5);
+    const mold = Math.max(2, cellSize * 0.1);
+    const wain = cellSize * 0.34;
+    ctx.fillStyle = stripe;
+
+    if (axis === 'v') {
+      // Vertical wall (N–S): stripes run along the wall → horizontal bands
+      for (let sy = py + 3; sy < py + cellSize - 2; sy += sw * 2) {
+        ctx.fillRect(px + mold * 0.5, sy, cellSize - mold, sw);
+      }
+      // Moldings on north/south ends of the run segment + room-facing long sides as trim
+      ctx.fillStyle = th.wallTop;
+      ctx.fillRect(px, py, cellSize, mold);
+      ctx.fillStyle = th.wallEdge;
+      ctx.fillRect(px, py + mold, cellSize, 2);
+      // Wainscot along east or west face (room side) — prefer thicker on facing sides
+      ctx.fillStyle = shadeColor(th.baseboard, 18);
+      if (orient.faceW) {
+        ctx.fillRect(px, py + mold, wain, cellSize - mold * 2);
+        ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(px + 2, py + mold + 3, wain - 4, cellSize - mold * 2 - 6);
+      }
+      if (orient.faceE) {
+        ctx.fillRect(px + cellSize - wain, py + mold, wain, cellSize - mold * 2);
+        ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(px + cellSize - wain + 2, py + mold + 3, wain - 4, cellSize - mold * 2 - 6);
+      }
+      if (!orient.faceW && !orient.faceE) {
+        // Interior of thick wall: light center panel only
+        ctx.fillStyle = 'rgba(255,255,255,0.06)';
+        ctx.fillRect(px + 4, py + mold + 2, cellSize - 8, cellSize - mold * 2 - 4);
+      }
+      ctx.fillStyle = th.baseboard;
+      ctx.fillRect(px, py + cellSize - mold, cellSize, mold);
+    } else {
+      // Horizontal wall (E–W) or corner: classic vertical wallpaper stripes
+      const y0 = py + mold * 0.4;
+      const h = cellSize - mold - baseH * 0.5;
+      for (let sx = px + 3; sx < px + cellSize - 2; sx += sw * 2) {
+        ctx.fillRect(sx, y0, sw, Math.max(4, h));
+      }
+      ctx.fillStyle = th.wallTop;
+      ctx.fillRect(px, py, cellSize, mold);
+      ctx.fillStyle = th.wallEdge;
+      ctx.fillRect(px, py + mold, cellSize, 2);
+      ctx.fillStyle = shadeColor(th.baseboard, 18);
+      ctx.fillRect(px + 1, py + cellSize - baseH - wain, cellSize - 2, wain);
+      ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(px + 4, py + cellSize - baseH - wain + 3, cellSize - 8, wain - 6);
+      ctx.fillStyle = th.baseboard;
+      ctx.fillRect(px, py + cellSize - baseH, cellSize, baseH);
     }
-    // Upper molding
-    ctx.fillStyle = th.wallTop;
-    ctx.fillRect(px, py, cellSize, Math.max(2, cellSize * 0.1));
-    ctx.fillStyle = th.wallEdge;
-    ctx.fillRect(px, py + Math.max(2, cellSize * 0.1), cellSize, 2);
-    // Dark wainscot panel
-    const wainH = cellSize * 0.38;
-    ctx.fillStyle = shadeColor(th.baseboard, 18);
-    ctx.fillRect(px + 1, py + cellSize - baseH - wainH, cellSize - 2, wainH);
-    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(px + 4, py + cellSize - baseH - wainH + 3, cellSize - 8, wainH - 6);
-    ctx.fillStyle = th.baseboard;
-    ctx.fillRect(px, py + cellSize - baseH, cellSize, baseH);
-    // Facing trim edges (left AND right room walls)
+
     const tw = Math.max(2, cellSize * 0.08);
     drawFacingWallEdges(ctx, px, py, cellSize, th, orient, tw);
     return;
