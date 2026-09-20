@@ -9,7 +9,7 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta name="theme-color" content="#120e18" />
   <title>ハウスと罠</title>
-  <link rel="stylesheet" href="css/style.css?v=20260920w" />
+  <link rel="stylesheet" href="css/style.css?v=20260920x" />
 </head>
 <body>
   <div id="app">
@@ -22,6 +22,7 @@
       <div class="btn-col">
         <button type="button" class="btn btn-com" id="btn-com">COM対戦</button>
         <button type="button" class="btn btn-ghost" id="btn-tutorial">チュートリアル</button>
+        <button type="button" class="btn btn-secondary" id="btn-shop">家ショップ</button>
         <button type="button" class="btn btn-secondary" id="btn-create">ルームを作成</button>
         <button type="button" class="btn btn-secondary" id="btn-join">ルームに参加</button>
         <div class="title-footer-row">
@@ -30,7 +31,7 @@
         </div>
       </div>
       <p class="peer-note" id="peer-note">通信準備中…</p>
-      <p class="build-stamp" id="build-stamp">build 20260920w</p>
+      <p class="build-stamp" id="build-stamp">build 20260920x</p>
     </section>
 
 
@@ -50,6 +51,19 @@
       </div>
       <div class="tutorial-extra hidden" id="tutorial-extra">
         <button type="button" class="btn btn-com" id="btn-tutorial-com">COMで遊ぶ</button>
+      </div>
+    </section>
+
+
+    <!-- 家ショップ -->
+    <section id="screen-shop" class="screen">
+      <h2 class="shop-heading">家ショップ</h2>
+      <p class="shop-lead">見た目だけのスキンです。罠・階層・歩ける場所は変わりません。</p>
+      <p class="title-points shop-points" id="shop-points">ポイント 0</p>
+      <div class="shop-list allow-scroll" id="shop-list"></div>
+      <p class="status-msg" id="shop-status"></p>
+      <div class="btn-col" style="max-width:280px;margin-top:8px">
+        <button type="button" class="btn btn-ghost" id="btn-shop-back">タイトルへ</button>
       </div>
     </section>
 
@@ -197,13 +211,13 @@
   </div>
 
   <footer id="game-meta" aria-label="バージョンとアクセス数">
-    <span id="meta-version">ver 20260920w</span>
+    <span id="meta-version">ver 20260920x</span>
     <span class="meta-sep" aria-hidden="true">｜</span>
     <span id="meta-visits" class="meta-visits"><span class="meta-visits-label">アクセス</span> <img id="meta-visits-badge" alt="access" width="70" height="20" /></span>
   </footer>
 
   <script type="module">
-    import { init } from './js/game.js?v=20260920w';
+    import { init } from './js/game.js?v=20260920x';
     init().catch((e) => {
       console.error(e);
       const n = document.getElementById('peer-note');

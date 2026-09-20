@@ -73,6 +73,7 @@ export function lockTouch(root) {
     // Allow text fields; allow title/tutorial scroll on short phones
     if (e.target.closest('input, textarea')) return;
     if (e.target.closest('#screen-title')) return;
+    if (e.target.closest('#screen-shop')) return;
     if (e.target.closest('#screen-tutorial .allow-scroll, .allow-scroll')) return;
     e.preventDefault();
   };
@@ -83,7 +84,7 @@ export function lockTouch(root) {
   document.addEventListener('gesturechange', blockGesture, { passive: false });
   // Kill wheel / trackpad scroll on desktop embeds (except tutorial card)
   document.addEventListener('wheel', (e) => {
-    if (e.target.closest('#screen-tutorial .allow-scroll, .allow-scroll, input, textarea')) return;
+    if (e.target.closest('#screen-shop .allow-scroll, #screen-tutorial .allow-scroll, .allow-scroll, input, textarea')) return;
     e.preventDefault();
   }, { passive: false });
 }

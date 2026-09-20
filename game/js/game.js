@@ -8,12 +8,13 @@ import {
   createBlueprint, createEmptyHouseData, isWalkable, isPlaceable,
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
-} from './house.js?v=20260920w';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920w';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920w';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920w';
+  HOUSE_SKINS, getHouseSkin,
+} from './house.js?v=20260920x';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920x';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920x';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920x';
 
-export const GAME_VERSION = '20260920w';
+export const GAME_VERSION = '20260920x';
 
 const blueprint = createBlueprint();
 
@@ -373,6 +374,8 @@ function refreshPointsUi(gained) {
   if (titleEl) titleEl.textContent = 'ポイント ' + total;
   const resEl = $('result-points');
   if (resEl) resEl.textContent = 'ポイント ' + total;
+  const shopEl = $('shop-points');
+  if (shopEl) shopEl.textContent = 'ポイント ' + total;
   const gainEl = $('result-points-gain');
   if (gainEl) {
     if (typeof gained === 'number' && gained > 0) {
@@ -384,6 +387,182 @@ function refreshPointsUi(gained) {
     } else {
       gainEl.textContent = '';
       gainEl.classList.add('hidden');
+    }
+  }
+}
+
+/* ---------- House skin shop (cosmetic only) ---------- */
+const OWNED_HOUSES_KEY = 'househouse-houses-owned-v1';
+const SELECTED_HOUSE_KEY = 'househouse-house-selected-v1';
+
+function loadOwnedHouses() {
+  try {
+    const raw = localStorage.getItem(OWNED_HOUSES_KEY);
+    let arr = raw ? JSON.parse(raw) : ['basic'];
+    if (!Array.isArray(arr)) arr = ['basic'];
+    const valid = new Set(HOUSE_SKINS.map((s) => s.id));
+    arr = arr.filter((id) => valid.has(id));
+    if (!arr.includes('basic')) arr.unshift('basic');
+    return arr;
+  } catch {
+    return ['basic'];
+  }
+}
+
+function saveOwnedHouses(ids) {
+  try {
+    const uniq = [...new Set(ids)];
+    if (!uniq.includes('basic')) uniq.unshift('basic');
+    localStorage.setItem(OWNED_HOUSES_KEY, JSON.stringify(uniq));
+  } catch {
+    /* ignore */
+  }
+}
+
+function loadSelectedHouseId() {
+  try {
+    const id = localStorage.getItem(SELECTED_HOUSE_KEY) || 'basic';
+    const owned = loadOwnedHouses();
+    return owned.includes(id) ? id : 'basic';
+  } catch {
+    return 'basic';
+  }
+}
+
+function saveSelectedHouseId(id) {
+  try {
+    localStorage.setItem(SELECTED_HOUSE_KEY, id);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Player cosmetic skin for myHouse views. Opponent/COM stays basic. */
+function playerSkinId() {
+  return loadSelectedHouseId();
+}
+
+function buyHouseSkin(skinId) {
+  const skin = getHouseSkin(skinId);
+  if (!skin || skin.id === 'basic') return { ok: false, msg: '購入不要です' };
+  const owned = loadOwnedHouses();
+  if (owned.includes(skin.id)) return { ok: false, msg: 'すでに所持しています' };
+  const pts = loadPoints();
+  if (pts < skin.price) return { ok: false, msg: 'ポイントが足りません' };
+  savePoints(pts - skin.price);
+  owned.push(skin.id);
+  saveOwnedHouses(owned);
+  saveSelectedHouseId(skin.id);
+  refreshPointsUi();
+  return { ok: true };
+}
+
+function equipHouseSkin(skinId) {
+  const owned = loadOwnedHouses();
+  if (!owned.includes(skinId)) return { ok: false, msg: '未所持です' };
+  saveSelectedHouseId(skinId);
+  return { ok: true };
+}
+
+function openHouseShop() {
+  S.phase = 'shop';
+  showScreen('screen-shop');
+  renderHouseShop();
+  refreshPointsUi();
+}
+
+function renderHouseShop() {
+  const list = $('shop-list');
+  if (!list) return;
+  const owned = new Set(loadOwnedHouses());
+  const selected = loadSelectedHouseId();
+  const pts = loadPoints();
+  list.innerHTML = '';
+  for (const skin of HOUSE_SKINS) {
+    const row = document.createElement('div');
+    row.className = 'shop-item' + (selected === skin.id ? ' equipped' : '');
+    row.dataset.skinId = skin.id;
+
+    const swatch = document.createElement('div');
+    swatch.className = 'shop-swatch';
+    swatch.setAttribute('aria-hidden', 'true');
+    for (const c of skin.swatch) {
+      const chip = document.createElement('span');
+      chip.className = 'shop-swatch-chip';
+      chip.style.background = c;
+      swatch.appendChild(chip);
+    }
+
+    const info = document.createElement('div');
+    info.className = 'shop-item-info';
+    const name = document.createElement('div');
+    name.className = 'shop-item-name';
+    name.textContent = skin.name;
+    const desc = document.createElement('div');
+    desc.className = 'shop-item-desc';
+    desc.textContent = skin.desc || '';
+    const price = document.createElement('div');
+    price.className = 'shop-item-price';
+    if (skin.price <= 0) price.textContent = '無料';
+    else if (owned.has(skin.id)) price.textContent = '所持済み';
+    else price.textContent = skin.price + ' pt';
+    info.appendChild(name);
+    info.appendChild(desc);
+    info.appendChild(price);
+
+    const actions = document.createElement('div');
+    actions.className = 'shop-item-actions';
+    if (owned.has(skin.id)) {
+      const eq = document.createElement('button');
+      eq.type = 'button';
+      eq.className = 'btn btn-compact ' + (selected === skin.id ? 'btn-primary' : 'btn-ghost');
+      eq.textContent = selected === skin.id ? '装備中' : '装備';
+      eq.disabled = selected === skin.id;
+      eq.dataset.action = 'equip';
+      eq.dataset.skinId = skin.id;
+      actions.appendChild(eq);
+    } else {
+      const buy = document.createElement('button');
+      buy.type = 'button';
+      buy.className = 'btn btn-compact btn-primary';
+      buy.textContent = '購入';
+      buy.disabled = pts < skin.price;
+      buy.dataset.action = 'buy';
+      buy.dataset.skinId = skin.id;
+      actions.appendChild(buy);
+    }
+
+    row.appendChild(swatch);
+    row.appendChild(info);
+    row.appendChild(actions);
+    list.appendChild(row);
+  }
+}
+
+function onShopListClick(e) {
+  const btn = e.target.closest('button[data-action]');
+  if (!btn) return;
+  const action = btn.dataset.action;
+  const skinId = btn.dataset.skinId;
+  if (action === 'buy') {
+    const r = buyHouseSkin(skinId);
+    if (r.ok) sfx('tap');
+    else sfx('tap');
+    renderHouseShop();
+    refreshPointsUi();
+    const st = $('shop-status');
+    if (st) {
+      st.textContent = r.ok ? '購入して装備しました！' : (r.msg || '');
+      st.className = 'status-msg' + (r.ok ? '' : ' warn');
+    }
+  } else if (action === 'equip') {
+    const r = equipHouseSkin(skinId);
+    if (r.ok) sfx('tap');
+    renderHouseShop();
+    const st = $('shop-status');
+    if (st) {
+      st.textContent = r.ok ? '装備しました' : (r.msg || '');
+      st.className = 'status-msg';
     }
   }
 }
@@ -1019,11 +1198,13 @@ function drawSetup() {
   const house = S.setupWhich === 'mine' ? S.myHouse : S.theirHouse;
   ctx.fillStyle = COLORS.bg;
   ctx.fillRect(0, 0, w, h);
+  const skinId = S.setupWhich === 'mine' ? playerSkinId() : 'basic';
   drawHouse(ctx, blueprint, house, S.setupFloor, {
     showChest: true,
     showTraps: true,
     triggeredTraps: new Set(),
     ox, oy, cellSize: cs,
+    skinId,
   });
   c._map = { ox, oy, cs, w, h };
 }
@@ -1091,10 +1272,13 @@ function redrawMatchView(ctx, canvas, explorer, houseShown, showSecrets, trigger
   const drawFloor = hero ? hero.floor : explorer.floor;
 
   // Base tiles only — never leak secrets via drawHouse items
+  // Top (opponent in my house) uses player cosmetic skin; bottom stays basic
+  const skinId = isOpponentView ? playerSkinId() : 'basic';
   drawHouse(ctx, blueprint, null, drawFloor, {
     showChest: false,
     showTraps: false,
     ox, oy, cellSize: cs,
+    skinId,
   });
 
   const skipX = hero ? hero.x : -1;
@@ -2492,6 +2676,16 @@ function bindControls() {
     }
   });
   bindTap($('btn-title'), () => goTitle());
+  bindTap($('btn-shop'), () => {
+    sfx('tap');
+    openHouseShop();
+  });
+  bindTap($('btn-shop-back'), () => {
+    sfx('tap');
+    goTitle();
+  });
+  const shopList = $('shop-list');
+  if (shopList) shopList.addEventListener('click', onShopListClick);
 
   window.addEventListener('resize', () => {
     resizeCanvases();

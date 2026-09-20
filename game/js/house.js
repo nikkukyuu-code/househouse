@@ -238,12 +238,178 @@ export const FLOOR_THEMES = [
   },
 ];
 
-export function themeForFloor(floor) {
-  return FLOOR_THEMES[Math.max(0, Math.min(FLOORS - 1, floor | 0))];
+/** Cosmetic house skins (shop). Gameplay layout unchanged. */
+export const HOUSE_SKINS = [
+  {
+    id: 'basic',
+    name: 'ふつうの家',
+    price: 0,
+    swatch: ['#e8c98a', '#6b4430', '#d9b56e'],
+    ornaments: 'none',
+    desc: 'いまの見た目（無料）',
+  },
+  {
+    id: 'cottage',
+    name: 'こざっぱりした家',
+    price: 15,
+    swatch: ['#f2e0b0', '#8a6548', '#c8d8a8'],
+    ornaments: 'none',
+    desc: '少し立派な住まい',
+  },
+  {
+    id: 'mansion',
+    name: '洋館',
+    price: 40,
+    swatch: ['#d8c8a8', '#5a4a3a', '#8a3040'],
+    ornaments: 'trim',
+    desc: '西洋風の館',
+  },
+  {
+    id: 'villa',
+    name: '大邸宅',
+    price: 80,
+    swatch: ['#e8e4d8', '#6a6870', '#d4af37'],
+    ornaments: 'trim',
+    desc: '広々とした邸宅',
+  },
+  {
+    id: 'castle_keep',
+    name: '天守風の館',
+    price: 150,
+    swatch: ['#c8b090', '#4a4540', '#d4af37'],
+    ornaments: 'keep',
+    desc: '天守を思わせる佇まい',
+  },
+  {
+    id: 'osaka',
+    name: '大阪城風',
+    price: 250,
+    swatch: ['#fff8e0', '#2a2420', '#d4af37'],
+    ornaments: 'castle',
+    desc: '金白壁・黒屋根の城郭風',
+  },
+];
+
+/** Per-skin floor palette overrides (null = use FLOOR_THEMES). */
+const SKIN_FLOOR_OVERRIDES = {
+  basic: null,
+  cottage: [
+    {
+      floor: '#f2e0b0', floorAlt: '#e6d098', floorGrain: 'rgba(100,70,30,0.14)',
+      wall: '#8a6548', wallTop: '#a87858', wallEdge: '#4a3020',
+      baseboard: '#5a3a28', door: '#b08040', doorDark: '#785020', doorLight: '#f0d080',
+      rug: 'rgba(120,160,80,0.24)', glow: 'rgba(255,230,180,0.12)', badge: '#d0b050',
+    },
+    {
+      floor: '#d0dcc8', floorAlt: '#bcc8b4', floorGrain: 'rgba(50,70,40,0.14)',
+      wall: '#5a6a58', wallTop: '#708870', wallEdge: '#303828',
+      baseboard: '#3a4438', door: '#6a8860', doorDark: '#405838', doorLight: '#c8e0b8',
+      rug: 'rgba(80,130,90,0.22)', glow: 'rgba(180,220,160,0.10)', badge: '#88b878',
+    },
+    {
+      floor: '#f0d0c0', floorAlt: '#e0bcac', floorGrain: 'rgba(110,60,40,0.14)',
+      wall: '#8a5a50', wallTop: '#a87068', wallEdge: '#4a2824',
+      baseboard: '#5a3830', door: '#a87060', doorDark: '#6a4038', doorLight: '#f0d0c0',
+      rug: 'rgba(180,100,80,0.22)', glow: 'rgba(255,200,180,0.10)', badge: '#e0a080',
+    },
+  ],
+  mansion: [
+    {
+      floor: '#c8b090', floorAlt: '#b89c78', floorGrain: 'rgba(60,40,20,0.2)',
+      wall: '#e8e0d0', wallTop: '#f5f0e8', wallEdge: '#6a5848',
+      baseboard: '#4a3830', door: '#6a4030', doorDark: '#3a2018', doorLight: '#d4a878',
+      rug: 'rgba(140,40,50,0.28)', glow: 'rgba(255,240,220,0.10)', badge: '#c9a227',
+    },
+    {
+      floor: '#b8a888', floorAlt: '#a89878', floorGrain: 'rgba(50,40,25,0.18)',
+      wall: '#d8d0c4', wallTop: '#ebe6dc', wallEdge: '#585048',
+      baseboard: '#3a3430', door: '#584840', doorDark: '#2a2420', doorLight: '#c8b8a0',
+      rug: 'rgba(90,50,100,0.24)', glow: 'rgba(220,210,240,0.08)', badge: '#a898c8',
+    },
+    {
+      floor: '#d0b898', floorAlt: '#c0a888', floorGrain: 'rgba(70,40,30,0.18)',
+      wall: '#f0e4d8', wallTop: '#fff8f0', wallEdge: '#7a5048',
+      baseboard: '#4a3028', door: '#8a4840', doorDark: '#502820', doorLight: '#e8c0b0',
+      rug: 'rgba(160,50,60,0.26)', glow: 'rgba(255,220,200,0.10)', badge: '#d08080',
+    },
+  ],
+  villa: [
+    {
+      floor: '#e8e4d8', floorAlt: '#d8d4c8', floorGrain: 'rgba(80,70,50,0.12)',
+      wall: '#9a9890', wallTop: '#b0aea8', wallEdge: '#4a4840',
+      baseboard: '#3a3830', door: '#8a7840', doorDark: '#504820', doorLight: '#e8d080',
+      rug: 'rgba(180,150,60,0.22)', glow: 'rgba(255,250,230,0.12)', badge: '#d4af37',
+    },
+    {
+      floor: '#d8e0e8', floorAlt: '#c8d0d8', floorGrain: 'rgba(40,50,70,0.12)',
+      wall: '#7a8088', wallTop: '#949aa0', wallEdge: '#3a4048',
+      baseboard: '#2a3038', door: '#607088', doorDark: '#384858', doorLight: '#c0d0e0',
+      rug: 'rgba(60,100,160,0.22)', glow: 'rgba(200,220,255,0.10)', badge: '#88a8d0',
+    },
+    {
+      floor: '#ece4d0', floorAlt: '#dcd4c0', floorGrain: 'rgba(90,70,40,0.12)',
+      wall: '#a09888', wallTop: '#b8b0a0', wallEdge: '#504840',
+      baseboard: '#383028', door: '#a08840', doorDark: '#605020', doorLight: '#f0e0a0',
+      rug: 'rgba(160,100,40,0.22)', glow: 'rgba(255,240,200,0.10)', badge: '#e0c060',
+    },
+  ],
+  castle_keep: [
+    {
+      floor: '#c8b090', floorAlt: '#b49c78', floorGrain: 'rgba(50,35,20,0.22)',
+      wall: '#5a5548', wallTop: '#706858', wallEdge: '#2a2820',
+      baseboard: '#1a1810', door: '#8a7030', doorDark: '#4a3810', doorLight: '#e0c060',
+      rug: 'rgba(140,50,40,0.28)', glow: 'rgba(255,210,120,0.08)', badge: '#d4af37',
+    },
+    {
+      floor: '#b0a488', floorAlt: '#9c9074', floorGrain: 'rgba(40,35,25,0.2)',
+      wall: '#4a4850', wallTop: '#606068', wallEdge: '#222228',
+      baseboard: '#141418', door: '#707888', doorDark: '#384048', doorLight: '#c0c8d8',
+      rug: 'rgba(60,70,120,0.26)', glow: 'rgba(160,180,220,0.08)', badge: '#a0b0d0',
+    },
+    {
+      floor: '#d0b070', floorAlt: '#bc9c5c', floorGrain: 'rgba(70,45,15,0.22)',
+      wall: '#6a5840', wallTop: '#847058', wallEdge: '#302818',
+      baseboard: '#1c1810', door: '#a08030', doorDark: '#584010', doorLight: '#f0d070',
+      rug: 'rgba(160,60,40,0.28)', glow: 'rgba(255,200,100,0.10)', badge: '#e8c040',
+    },
+  ],
+  osaka: [
+    {
+      floor: '#e8d090', floorAlt: '#d4bc70', floorGrain: 'rgba(90,60,15,0.2)',
+      wall: '#f5f0e0', wallTop: '#fffaf0', wallEdge: '#c9a227',
+      baseboard: '#2a2420', door: '#c9a227', doorDark: '#8a6a12', doorLight: '#ffe08a',
+      rug: 'rgba(180,40,40,0.3)', glow: 'rgba(255,220,100,0.14)', badge: '#ffe08a',
+    },
+    {
+      floor: '#d0c080', floorAlt: '#bcac6c', floorGrain: 'rgba(70,55,20,0.18)',
+      wall: '#f0e8d0', wallTop: '#fff8e8', wallEdge: '#a88820',
+      baseboard: '#282420', door: '#b89830', doorDark: '#6a5810', doorLight: '#f0d870',
+      rug: 'rgba(160,50,50,0.28)', glow: 'rgba(255,230,140,0.12)', badge: '#f0d060',
+    },
+    {
+      floor: '#d4a858', floorAlt: '#c09440', floorGrain: 'rgba(100,60,10,0.22)',
+      wall: '#fff8e0', wallTop: '#fffef5', wallEdge: '#d4af37',
+      baseboard: '#1a1610', door: '#d4af37', doorDark: '#8a6810', doorLight: '#fff0a0',
+      rug: 'rgba(200,40,40,0.32)', glow: 'rgba(255,230,120,0.16)', badge: '#ffd040',
+    },
+  ],
+};
+
+export function getHouseSkin(skinId) {
+  const id = skinId || 'basic';
+  return HOUSE_SKINS.find((s) => s.id === id) || HOUSE_SKINS[0];
 }
 
-function drawWoodFloor(ctx, px, py, cellSize, x, y, floor = 0) {
-  const th = themeForFloor(floor);
+export function themeForFloor(floor, skinId = 'basic') {
+  const fi = Math.max(0, Math.min(FLOORS - 1, floor | 0));
+  const base = FLOOR_THEMES[fi];
+  const overrides = SKIN_FLOOR_OVERRIDES[skinId || 'basic'];
+  if (!overrides || !overrides[fi]) return base;
+  return { ...base, ...overrides[fi] };
+}
+
+function drawWoodFloor(ctx, px, py, cellSize, x, y, floor = 0, skinId = 'basic') {
+  const th = themeForFloor(floor, skinId);
   const alt = (x + y) % 2 === 0;
   ctx.fillStyle = alt ? th.floor : th.floorAlt;
   ctx.fillRect(px, py, cellSize, cellSize);
@@ -265,8 +431,8 @@ function drawWoodFloor(ctx, px, py, cellSize, x, y, floor = 0) {
   ctx.fillRect(px + 1, py + 1, cellSize - 2, cellSize * 0.28);
 }
 
-function drawWallTile(ctx, px, py, cellSize, floor = 0) {
-  const th = themeForFloor(floor);
+function drawWallTile(ctx, px, py, cellSize, floor = 0, skinId = 'basic') {
+  const th = themeForFloor(floor, skinId);
   ctx.fillStyle = th.wall;
   ctx.fillRect(px, py, cellSize, cellSize);
   // Plaster / panel top
@@ -285,9 +451,9 @@ function drawWallTile(ctx, px, py, cellSize, floor = 0) {
   ctx.strokeRect(px + 3, py + cellSize * 0.22, cellSize - 6, cellSize * 0.5);
 }
 
-function drawDoorTile(ctx, px, py, cellSize, floor = 0) {
-  const th = themeForFloor(floor);
-  drawWoodFloor(ctx, px, py, cellSize, 0, 0, floor);
+function drawDoorTile(ctx, px, py, cellSize, floor = 0, skinId = 'basic') {
+  const th = themeForFloor(floor, skinId);
+  drawWoodFloor(ctx, px, py, cellSize, 0, 0, floor, skinId);
   const m = Math.max(3, cellSize * 0.1);
   // Door frame (house trim)
   ctx.fillStyle = th.baseboard;
@@ -315,10 +481,10 @@ function drawDoorTile(ctx, px, py, cellSize, floor = 0) {
 }
 
 /** Clear stairwell: perspective steps + rail + destination label */
-function drawStairsTile(ctx, px, py, cellSize, up, floor = 0) {
-  const th = themeForFloor(floor);
+function drawStairsTile(ctx, px, py, cellSize, up, floor = 0, skinId = 'basic') {
+  const th = themeForFloor(floor, skinId);
   // Landing floor under stairs
-  drawWoodFloor(ctx, px, py, cellSize, 1, 1, floor);
+  drawWoodFloor(ctx, px, py, cellSize, 1, 1, floor, skinId);
 
   const steps = 5;
   const left = px + cellSize * 0.12;
@@ -554,7 +720,7 @@ const FURNITURE_LAYOUT = [
   { x: 11, y: 7, kind: 'plant' },
 ];
 
-function drawRoomFurniture(ctx, blueprint, floor, ox, oy, cellSize) {
+function drawRoomFurniture(ctx, blueprint, floor, ox, oy, cellSize, skinId = 'basic') {
   for (const item of FURNITURE_LAYOUT) {
     const { x, y, kind } = item;
     if (blueprint[floor][y][x] !== T.FLOOR) continue;
@@ -562,12 +728,12 @@ function drawRoomFurniture(ctx, blueprint, floor, ox, oy, cellSize) {
     if (x === 6 && y === 7) continue;
     const px = ox + x * cellSize;
     const py = oy + y * cellSize;
-    drawFurnitureSprite(ctx, kind, px, py, cellSize, floor);
+    drawFurnitureSprite(ctx, kind, px, py, cellSize, floor, skinId);
   }
 }
 
-function drawFurnitureSprite(ctx, kind, px, py, cellSize, floor) {
-  const th = themeForFloor(floor);
+function drawFurnitureSprite(ctx, kind, px, py, cellSize, floor, skinId = 'basic') {
+  const th = themeForFloor(floor, skinId);
   const s = cellSize;
   const m = s * 0.14;
   if (kind === 'bed') {
@@ -657,6 +823,95 @@ function drawFurnitureSprite(ctx, kind, px, py, cellSize, floor) {
   }
 }
 
+
+/** Roof caps / corner gold accents for keep & Osaka-castle skins. */
+function drawSkinOrnaments(ctx, blueprint, floor, ox, oy, cellSize, skin) {
+  if (!skin || skin.ornaments === 'none') return;
+  const kind = skin.ornaments;
+  const roofDark = kind === 'castle' ? '#1a1612' : kind === 'keep' ? '#2a2620' : '#3a3428';
+  const gold = kind === 'castle' ? '#e8c547' : '#d4af37';
+  const goldHi = '#fff0a0';
+
+  // Top-edge roof shingles on outer wall row
+  if (kind === 'castle' || kind === 'keep' || kind === 'trim') {
+    for (let x = 0; x < COLS; x++) {
+      if (blueprint[floor][0][x] !== T.WALL) continue;
+      const px = ox + x * cellSize;
+      const py = oy;
+      const rh = Math.max(3, cellSize * (kind === 'trim' ? 0.12 : 0.2));
+      ctx.fillStyle = kind === 'trim' ? gold : roofDark;
+      ctx.fillRect(px, py, cellSize, rh);
+      if (kind !== 'trim') {
+        ctx.fillStyle = gold;
+        ctx.fillRect(px, py, cellSize, 2);
+        // Tile seams
+        ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(px + cellSize * 0.5, py + 2);
+        ctx.lineTo(px + cellSize * 0.5, py + rh);
+        ctx.stroke();
+      }
+      // Decorative roof corners (castle / keep)
+      if ((kind === 'castle' || kind === 'keep') && (x === 0 || x === COLS - 1)) {
+        const tipY = py - cellSize * (kind === 'castle' ? 0.22 : 0.14);
+        ctx.fillStyle = gold;
+        ctx.beginPath();
+        ctx.moveTo(px + cellSize * 0.5, tipY);
+        ctx.lineTo(px + cellSize * 0.12, py + 2);
+        ctx.lineTo(px + cellSize * 0.88, py + 2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = goldHi;
+        ctx.beginPath();
+        ctx.moveTo(px + cellSize * 0.5, tipY + 2);
+        ctx.lineTo(px + cellSize * 0.35, py);
+        ctx.lineTo(px + cellSize * 0.65, py);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+  }
+
+  // Side / bottom gold edge accents for castle skins
+  if (kind === 'castle' || kind === 'keep') {
+    for (let y = 0; y < ROWS; y++) {
+      for (const x of [0, COLS - 1]) {
+        if (blueprint[floor][y][x] !== T.WALL) continue;
+        const px = ox + x * cellSize;
+        const py = oy + y * cellSize;
+        ctx.fillStyle = gold;
+        if (x === 0) ctx.fillRect(px, py, 2, cellSize);
+        else ctx.fillRect(px + cellSize - 2, py, 2, cellSize);
+      }
+    }
+    // Bottom row dark base
+    for (let x = 0; x < COLS; x++) {
+      if (blueprint[floor][ROWS - 1][x] !== T.WALL) continue;
+      const px = ox + x * cellSize;
+      const py = oy + (ROWS - 1) * cellSize;
+      ctx.fillStyle = roofDark;
+      ctx.fillRect(px, py + cellSize - Math.max(3, cellSize * 0.14), cellSize, Math.max(3, cellSize * 0.14));
+      ctx.fillStyle = gold;
+      ctx.fillRect(px, py + cellSize - 2, cellSize, 2);
+    }
+  }
+
+  // Inner cross-wall gold studs for mansion/villa trim
+  if (kind === 'trim') {
+    const studs = [[4, 0], [8, 0], [0, 4], [12, 4], [4, 8], [8, 8]];
+    for (const [sx, sy] of studs) {
+      if (blueprint[floor][sy][sx] !== T.WALL) continue;
+      const px = ox + sx * cellSize + cellSize * 0.35;
+      const py = oy + sy * cellSize + cellSize * 0.35;
+      ctx.fillStyle = gold;
+      ctx.fillRect(px, py, cellSize * 0.3, cellSize * 0.3);
+      ctx.fillStyle = goldHi;
+      ctx.fillRect(px + 1, py + 1, cellSize * 0.12, cellSize * 0.12);
+    }
+  }
+}
+
 export function drawHouse(ctx, blueprint, houseData, floor, opts = {}) {
   const {
     showChest = false,
@@ -666,10 +921,12 @@ export function drawHouse(ctx, blueprint, houseData, floor, opts = {}) {
     oy = 0,
     cellSize = TILE,
     vignette = true,
+    skinId = 'basic',
   } = opts;
 
   const mapW = COLS * cellSize;
   const mapH = ROWS * cellSize;
+  const skin = getHouseSkin(skinId);
 
   for (let y = 0; y < ROWS; y++) {
     for (let x = 0; x < COLS; x++) {
@@ -678,22 +935,21 @@ export function drawHouse(ctx, blueprint, houseData, floor, opts = {}) {
       const py = oy + y * cellSize;
 
       if (t === T.WALL) {
-        drawWallTile(ctx, px, py, cellSize, floor);
+        drawWallTile(ctx, px, py, cellSize, floor, skinId);
       } else if (t === T.DOOR) {
-        drawDoorTile(ctx, px, py, cellSize, floor);
+        drawDoorTile(ctx, px, py, cellSize, floor, skinId);
       } else if (t === T.STAIRS_UP) {
-        drawStairsTile(ctx, px, py, cellSize, true, floor);
+        drawStairsTile(ctx, px, py, cellSize, true, floor, skinId);
       } else if (t === T.STAIRS_DOWN) {
-        drawStairsTile(ctx, px, py, cellSize, false, floor);
+        drawStairsTile(ctx, px, py, cellSize, false, floor, skinId);
       } else {
-        drawWoodFloor(ctx, px, py, cellSize, x, y, floor);
+        drawWoodFloor(ctx, px, py, cellSize, x, y, floor, skinId);
       }
     }
   }
 
-
   // Soft rugs in room centers (house feel)
-  const th = themeForFloor(floor);
+  const th = themeForFloor(floor, skinId);
   const rugCells = [
     [2, 2], [6, 2], [10, 2],
     [2, 6], [6, 6], [10, 6],
@@ -719,7 +975,10 @@ export function drawHouse(ctx, blueprint, houseData, floor, opts = {}) {
   }
 
   // Decorative furniture (visual only — walk/place unchanged)
-  drawRoomFurniture(ctx, blueprint, floor, ox, oy, cellSize);
+  drawRoomFurniture(ctx, blueprint, floor, ox, oy, cellSize, skinId);
+
+  // Cosmetic skin ornaments (visual only)
+  drawSkinOrnaments(ctx, blueprint, floor, ox, oy, cellSize, skin);
 
   // Soft floor ambient glow in center (tinted per floor)
   if (vignette) {
