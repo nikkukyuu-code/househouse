@@ -431,47 +431,121 @@ function drawWoodFloor(ctx, px, py, cellSize, x, y, floor = 0, skinId = 'basic')
   ctx.fillRect(px + 1, py + 1, cellSize - 2, cellSize * 0.28);
 }
 
-function drawWallTile(ctx, px, py, cellSize, floor = 0, skinId = 'basic') {
+/** Door sits in wall runs — treat as wall for continuity / facing checks. */
+function isWallLikeTile(tile) {
+  return tile === T.WALL || tile === T.DOOR;
+}
+
+/**
+ * Wall run orientation + which sides face a room (non-wall).
+ * More E-W neighbors → horizontal run; more N-S → vertical; tie → corner/both.
+ */
+function wallOrientInfo(blueprint, floor, x, y) {
+  const n = isWallLikeTile(tileAt(blueprint, floor, x, y - 1));
+  const s = isWallLikeTile(tileAt(blueprint, floor, x, y + 1));
+  const e = isWallLikeTile(tileAt(blueprint, floor, x + 1, y));
+  const w = isWallLikeTile(tileAt(blueprint, floor, x - 1, y));
+  const ns = (n ? 1 : 0) + (s ? 1 : 0);
+  const ew = (e ? 1 : 0) + (w ? 1 : 0);
+  let axis = 'both';
+  if (ew > ns) axis = 'h';
+  else if (ns > ew) axis = 'v';
+  return {
+    axis,
+    ns,
+    ew,
+    faceN: !n,
+    faceS: !s,
+    faceE: !e,
+    faceW: !w,
+  };
+}
+
+/** Draw wall-edge highlights only on sides facing a room (non-wall). */
+function drawFacingWallEdges(ctx, px, py, cellSize, th, face, ew = 2) {
+  const t = Math.max(2, ew | 0);
+  ctx.fillStyle = th.wallEdge;
+  if (face.faceN) ctx.fillRect(px, py, cellSize, t);
+  if (face.faceS) ctx.fillRect(px, py + cellSize - t, cellSize, t);
+  if (face.faceW) ctx.fillRect(px, py, t, cellSize);
+  if (face.faceE) ctx.fillRect(px + cellSize - t, py, t, cellSize);
+}
+
+function drawWallTile(ctx, px, py, cellSize, floor = 0, skinId = 'basic', blueprint = null, x = 0, y = 0) {
   const th = themeForFloor(floor, skinId);
   const id = skinId || 'basic';
   const topH = Math.max(3, cellSize * 0.2);
   const baseH = Math.max(4, cellSize * 0.16);
   const gold = th.badge || '#d4af37';
+  const orient = blueprint
+    ? wallOrientInfo(blueprint, floor, x, y)
+    : { axis: 'h', ns: 0, ew: 2, faceN: true, faceS: true, faceE: false, faceW: true };
+  const axis = orient.axis;
+  const drawH = axis === 'h' || axis === 'both';
+  const drawV = axis === 'v' || axis === 'both';
+  const cornerSoft = axis === 'both';
 
   // Base fill (per-skin / per-floor tint via theme)
   ctx.fillStyle = th.wall;
   ctx.fillRect(px, py, cellSize, cellSize);
 
   if (id === 'cottage') {
-    // Warm wood — grain + plank seams
+    // Warm wood — grain + plank seams follow wall run
     ctx.fillStyle = th.wallTop;
-    ctx.fillRect(px, py, cellSize, topH * 0.55);
-    ctx.strokeStyle = 'rgba(60,35,15,0.22)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    for (let i = 1; i <= 4; i++) {
-      const gy = py + cellSize * (0.18 + i * 0.16);
-      const wobble = ((floor + i) % 3) - 1;
-      ctx.moveTo(px + 1, gy);
-      ctx.lineTo(px + cellSize - 1, gy + wobble);
+    if (drawH && !drawV) {
+      ctx.fillRect(px, py, cellSize, topH * 0.55);
+    } else if (drawV && !drawH) {
+      ctx.fillRect(px, py, topH * 0.55, cellSize);
+    } else {
+      ctx.fillRect(px, py, cellSize, topH * 0.4);
     }
-    ctx.stroke();
-    // Vertical plank seams
-    ctx.strokeStyle = 'rgba(40,25,10,0.28)';
-    ctx.beginPath();
-    ctx.moveTo(px + cellSize * 0.33, py + 2);
-    ctx.lineTo(px + cellSize * 0.33, py + cellSize - 2);
-    ctx.moveTo(px + cellSize * 0.66, py + 2);
-    ctx.lineTo(px + cellSize * 0.66, py + cellSize - 2);
-    ctx.stroke();
+    const grainA = cornerSoft ? 0.14 : 0.22;
+    const seamA = cornerSoft ? 0.18 : 0.28;
+    ctx.lineWidth = 1;
+    if (drawH) {
+      // Horizontal run: horizontal plank lines + vertical seams
+      ctx.strokeStyle = `rgba(60,35,15,${grainA})`;
+      ctx.beginPath();
+      for (let i = 1; i <= 4; i++) {
+        const gy = py + cellSize * (0.18 + i * 0.16);
+        const wobble = ((floor + i + x) % 3) - 1;
+        ctx.moveTo(px + 1, gy);
+        ctx.lineTo(px + cellSize - 1, gy + wobble);
+      }
+      ctx.stroke();
+      ctx.strokeStyle = `rgba(40,25,10,${seamA})`;
+      ctx.beginPath();
+      ctx.moveTo(px + cellSize * 0.33, py + 2);
+      ctx.lineTo(px + cellSize * 0.33, py + cellSize - 2);
+      ctx.moveTo(px + cellSize * 0.66, py + 2);
+      ctx.lineTo(px + cellSize * 0.66, py + cellSize - 2);
+      ctx.stroke();
+    }
+    if (drawV) {
+      // Vertical run: vertical plank lines + horizontal seams
+      ctx.strokeStyle = `rgba(60,35,15,${grainA})`;
+      ctx.beginPath();
+      for (let i = 1; i <= 4; i++) {
+        const gx = px + cellSize * (0.18 + i * 0.16);
+        const wobble = ((floor + i + y) % 3) - 1;
+        ctx.moveTo(gx, py + 1);
+        ctx.lineTo(gx + wobble, py + cellSize - 1);
+      }
+      ctx.stroke();
+      ctx.strokeStyle = `rgba(40,25,10,${seamA})`;
+      ctx.beginPath();
+      ctx.moveTo(px + 2, py + cellSize * 0.33);
+      ctx.lineTo(px + cellSize - 2, py + cellSize * 0.33);
+      ctx.moveTo(px + 2, py + cellSize * 0.66);
+      ctx.lineTo(px + cellSize - 2, py + cellSize * 0.66);
+      ctx.stroke();
+    }
     // Soft wood highlight
     ctx.fillStyle = 'rgba(255,220,160,0.10)';
     ctx.fillRect(px + 2, py + 2, cellSize - 4, cellSize * 0.18);
     ctx.fillStyle = th.baseboard;
     ctx.fillRect(px, py + cellSize - baseH, cellSize, baseH);
-    ctx.fillStyle = th.wallEdge;
-    ctx.fillRect(px, py, cellSize, 2);
-    ctx.fillRect(px, py, 2, cellSize);
+    drawFacingWallEdges(ctx, px, py, cellSize, th, orient, 2);
     return;
   }
 
@@ -497,11 +571,9 @@ function drawWallTile(ctx, px, py, cellSize, floor = 0, skinId = 'basic') {
     ctx.strokeRect(px + 4, py + cellSize - baseH - wainH + 3, cellSize - 8, wainH - 6);
     ctx.fillStyle = th.baseboard;
     ctx.fillRect(px, py + cellSize - baseH, cellSize, baseH);
-    // Dark trim edges
-    ctx.fillStyle = th.wallEdge;
-    ctx.fillRect(px, py, cellSize, 2);
-    ctx.fillRect(px, py, Math.max(2, cellSize * 0.08), cellSize);
-    ctx.fillRect(px + cellSize - Math.max(2, cellSize * 0.08), py, Math.max(2, cellSize * 0.08), cellSize);
+    // Facing trim edges (left AND right room walls)
+    const tw = Math.max(2, cellSize * 0.08);
+    drawFacingWallEdges(ctx, px, py, cellSize, th, orient, tw);
     return;
   }
 
@@ -522,12 +594,8 @@ function drawWallTile(ctx, px, py, cellSize, floor = 0, skinId = 'basic') {
     ctx.fillRect(px + cellSize - 3 - g, py + topH + 1, g, g);
     ctx.fillRect(px + 3, py + cellSize - baseH - g - 1, g, g);
     ctx.fillRect(px + cellSize - 3 - g, py + cellSize - baseH - g - 1, g, g);
-    // Gold edge trim
-    ctx.fillStyle = th.wallEdge;
-    ctx.fillRect(px, py, cellSize, 2);
-    ctx.fillRect(px, py + cellSize - 2, cellSize, 2);
-    ctx.fillRect(px, py, 2, cellSize);
-    ctx.fillRect(px + cellSize - 2, py, 2, cellSize);
+    // Gold edge trim — sides facing rooms
+    drawFacingWallEdges(ctx, px, py, cellSize, th, orient, 2);
     ctx.fillStyle = th.baseboard;
     ctx.fillRect(px, py + cellSize - baseH, cellSize, baseH);
     ctx.fillStyle = gold;
@@ -536,23 +604,27 @@ function drawWallTile(ctx, px, py, cellSize, floor = 0, skinId = 'basic') {
   }
 
   if (id === 'castle_keep') {
-    // Stone / dark wood keep — mortar grid + thick edges
-    const rows = 3;
-    const cols = 2;
+    // Stone / dark wood keep — mortar grid follows wall axis
+    const vertRun = axis === 'v';
+    const rows = vertRun ? 2 : 3;
+    const cols = vertRun ? 3 : 2;
     const bh = cellSize / rows;
     const bw = cellSize / cols;
     ctx.strokeStyle = 'rgba(0,0,0,0.35)';
     ctx.lineWidth = 1;
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
-        const ox = (r % 2) * (bw * 0.5);
+        // Offset along the short axis of the brick run
+        const ox = vertRun ? 0 : (r % 2) * (bw * 0.5);
+        const oy = vertRun ? (c % 2) * (bh * 0.5) : 0;
         const bx = px + c * bw + ox;
-        const by = py + r * bh;
-        if (bx >= px + cellSize) continue;
+        const by = py + r * bh + oy;
+        if (bx >= px + cellSize || by >= py + cellSize) continue;
         const ww = Math.min(bw - 1, px + cellSize - bx - 1);
+        const hh = Math.min(bh - 1, py + cellSize - by - 1);
         ctx.fillStyle = (r + c + floor) % 2 === 0 ? th.wall : shadeColor(th.wall, 12);
-        ctx.fillRect(bx, by, ww, bh - 1);
-        ctx.strokeRect(bx, by, ww, bh - 1);
+        ctx.fillRect(bx, by, ww, hh);
+        ctx.strokeRect(bx, by, ww, hh);
       }
     }
     // Dark timber top beam
@@ -562,48 +634,72 @@ function drawWallTile(ctx, px, py, cellSize, floor = 0, skinId = 'basic') {
     ctx.fillRect(px, py, cellSize, 2);
     ctx.fillStyle = th.baseboard;
     ctx.fillRect(px, py + cellSize - baseH, cellSize, baseH);
-    // Thick keep edges
+    // Thick keep edges only where facing a room
     const ew = Math.max(3, cellSize * 0.1);
-    ctx.fillStyle = th.wallEdge;
-    ctx.fillRect(px, py, cellSize, 2);
-    ctx.fillRect(px, py, ew, cellSize);
-    ctx.fillRect(px + cellSize - ew, py, ew, cellSize);
+    drawFacingWallEdges(ctx, px, py, cellSize, th, orient, ew);
     return;
   }
 
   if (id === 'osaka') {
-    // White castle plaster — richest: gold rails + dark roof-edge accents
+    // White castle plaster — richest: gold rails + dark posts along facing sides
     ctx.fillStyle = th.wallTop;
     ctx.fillRect(px, py, cellSize, topH);
     // Fine plaster grain
     ctx.fillStyle = 'rgba(255,255,255,0.35)';
     ctx.fillRect(px + 2, py + topH * 0.5, cellSize - 4, cellSize * 0.12);
-    // Horizontal gold rails
-    ctx.fillStyle = gold;
-    ctx.fillRect(px + 1, py + cellSize * 0.32, cellSize - 2, 2);
-    ctx.fillRect(px + 1, py + cellSize * 0.58, cellSize - 2, 2);
-    // Dark timber posts (roof-edge / pillar hint)
     const postW = Math.max(2, cellSize * 0.1);
+    if (drawH) {
+      // Horizontal run: horizontal gold rails
+      ctx.fillStyle = gold;
+      ctx.fillRect(px + 1, py + cellSize * 0.32, cellSize - 2, 2);
+      ctx.fillRect(px + 1, py + cellSize * 0.58, cellSize - 2, 2);
+    }
+    if (drawV) {
+      // Vertical run: vertical gold rails
+      ctx.fillStyle = gold;
+      ctx.fillRect(px + cellSize * 0.32, py + 1, 2, cellSize - 2);
+      ctx.fillRect(px + cellSize * 0.58, py + 1, 2, cellSize - 2);
+    }
+    // Dark timber posts on room-facing sides
     ctx.fillStyle = th.baseboard;
-    ctx.fillRect(px, py, postW, cellSize);
-    ctx.fillRect(px + cellSize - postW, py, postW, cellSize);
+    if (orient.faceW) ctx.fillRect(px, py, postW, cellSize);
+    if (orient.faceE) ctx.fillRect(px + cellSize - postW, py, postW, cellSize);
+    if (orient.faceN) ctx.fillRect(px, py, cellSize, postW);
+    if (orient.faceS) ctx.fillRect(px, py + cellSize - postW, cellSize, postW);
     // Gold studs on posts
     ctx.fillStyle = gold;
-    for (const yy of [0.22, 0.45, 0.68]) {
-      ctx.fillRect(px + 1, py + cellSize * yy, postW - 1, 2);
-      ctx.fillRect(px + cellSize - postW + 1, py + cellSize * yy, postW - 1, 2);
+    if (orient.faceW || orient.faceE) {
+      for (const yy of [0.22, 0.45, 0.68]) {
+        if (orient.faceW) ctx.fillRect(px + 1, py + cellSize * yy, postW - 1, 2);
+        if (orient.faceE) ctx.fillRect(px + cellSize - postW + 1, py + cellSize * yy, postW - 1, 2);
+      }
+    }
+    if (orient.faceN || orient.faceS) {
+      for (const xx of [0.22, 0.45, 0.68]) {
+        if (orient.faceN) ctx.fillRect(px + cellSize * xx, py + 1, 2, postW - 1);
+        if (orient.faceS) ctx.fillRect(px + cellSize * xx, py + cellSize - postW + 1, 2, postW - 1);
+      }
     }
     // Inner white panel
+    const insetL = orient.faceW ? postW + 2 : 2;
+    const insetR = orient.faceE ? postW + 2 : 2;
+    const insetT = Math.max(topH + 2, orient.faceN ? postW + 2 : topH + 2);
+    const insetB = Math.max(baseH + 2, orient.faceS ? postW + 2 : baseH + 2);
     ctx.strokeStyle = 'rgba(200,160,40,0.35)';
     ctx.lineWidth = 1;
-    ctx.strokeRect(px + postW + 2, py + topH + 2, cellSize - postW * 2 - 4, cellSize - topH - baseH - 4);
+    ctx.strokeRect(
+      px + insetL,
+      py + insetT,
+      cellSize - insetL - insetR,
+      cellSize - insetT - insetB
+    );
     // Floor-tint hint stripe (richer on 3F)
     if (floor === 2) {
       ctx.fillStyle = 'rgba(212,175,55,0.18)';
-      ctx.fillRect(px + postW + 3, py + cellSize * 0.4, cellSize - postW * 2 - 6, cellSize * 0.12);
+      ctx.fillRect(px + insetL + 1, py + cellSize * 0.4, cellSize - insetL - insetR - 2, cellSize * 0.12);
     } else if (floor === 1) {
       ctx.fillStyle = 'rgba(180,150,60,0.10)';
-      ctx.fillRect(px + postW + 3, py + cellSize * 0.4, cellSize - postW * 2 - 6, cellSize * 0.1);
+      ctx.fillRect(px + insetL + 1, py + cellSize * 0.4, cellSize - insetL - insetR - 2, cellSize * 0.1);
     }
     ctx.fillStyle = th.baseboard;
     ctx.fillRect(px, py + cellSize - baseH, cellSize, baseH);
@@ -613,14 +709,12 @@ function drawWallTile(ctx, px, py, cellSize, floor = 0, skinId = 'basic') {
     return;
   }
 
-  // basic — plain plaster
+  // basic — plain plaster; edge highlights face rooms (L and R walls)
   ctx.fillStyle = th.wallTop;
   ctx.fillRect(px, py, cellSize, topH);
   ctx.fillStyle = th.baseboard;
   ctx.fillRect(px, py + cellSize - baseH, cellSize, baseH);
-  ctx.fillStyle = th.wallEdge;
-  ctx.fillRect(px, py, cellSize, 2);
-  ctx.fillRect(px, py, 2, cellSize);
+  drawFacingWallEdges(ctx, px, py, cellSize, th, orient, 2);
   ctx.strokeStyle = 'rgba(255,255,255,0.08)';
   ctx.lineWidth = 1;
   ctx.strokeRect(px + 3, py + cellSize * 0.22, cellSize - 6, cellSize * 0.5);
@@ -2113,7 +2207,7 @@ export function drawHouse(ctx, blueprint, houseData, floor, opts = {}) {
       const py = oy + y * cellSize;
 
       if (t === T.WALL) {
-        drawWallTile(ctx, px, py, cellSize, floor, skinId);
+        drawWallTile(ctx, px, py, cellSize, floor, skinId, blueprint, x, y);
       } else if (t === T.DOOR) {
         drawDoorTile(ctx, px, py, cellSize, floor, skinId);
       } else if (t === T.STAIRS_UP) {
