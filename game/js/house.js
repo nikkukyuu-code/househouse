@@ -692,39 +692,187 @@ export function drawChestSprite(ctx, px, py, cellSize) {
  * Deterministic decorative furniture per room (same every match).
  * Drawn inset on FLOOR cells only — does not affect walkability or placement.
  * Skips spawn (6,7) and never draws on doors/stairs/walls.
+ * Layout + sprite kinds grade up with house skin theme.
  */
-const FURNITURE_LAYOUT = [
-  // 1F–3F shared layout; colors tint via floor theme
-  // Top-left (bedroom)
-  { x: 1, y: 1, kind: 'bed' },
-  { x: 3, y: 1, kind: 'plant' },
-  { x: 1, y: 3, kind: 'shelf' },
-  // Top-mid (living)
-  { x: 6, y: 1, kind: 'sofa' },
-  { x: 5, y: 3, kind: 'table' },
-  { x: 7, y: 3, kind: 'plant' },
-  // Top-right (study; avoid stairs-up at 11,1)
-  { x: 9, y: 1, kind: 'shelf' },
-  { x: 10, y: 3, kind: 'table' },
-  { x: 11, y: 3, kind: 'plant' },
-  // Bottom-left (avoid stairs-down at 1,7)
-  { x: 3, y: 5, kind: 'shelf' },
-  { x: 2, y: 6, kind: 'table' },
-  { x: 1, y: 5, kind: 'plant' },
-  // Bottom-mid hall (avoid spawn 6,7)
-  { x: 5, y: 5, kind: 'plant' },
-  { x: 7, y: 5, kind: 'shelf' },
-  // Bottom-right (bedroom)
-  { x: 11, y: 5, kind: 'shelf' },
-  { x: 9, y: 6, kind: 'bed' },
-  { x: 11, y: 7, kind: 'plant' },
-];
+const FURNITURE_BY_SKIN = {
+  // ふつうの家 — sparse, simple everyday pieces
+  basic: [
+    { x: 1, y: 1, kind: 'bed' },
+    { x: 3, y: 1, kind: 'plant' },
+    { x: 1, y: 3, kind: 'shelf' },
+    { x: 5, y: 3, kind: 'table' },
+    { x: 9, y: 1, kind: 'shelf' },
+    { x: 3, y: 5, kind: 'shelf' },
+    { x: 2, y: 6, kind: 'table' },
+    { x: 9, y: 6, kind: 'bed' },
+    { x: 11, y: 7, kind: 'plant' },
+  ],
+  // こざっぱり — warmer wood, curtains, cozy rug, dresser
+  cottage: [
+    { x: 1, y: 1, kind: 'bed_nice' },
+    { x: 3, y: 1, kind: 'curtain' },
+    { x: 1, y: 3, kind: 'dresser' },
+    { x: 2, y: 2, kind: 'rug_cozy' },
+    { x: 6, y: 1, kind: 'sofa' },
+    { x: 5, y: 3, kind: 'table_wood' },
+    { x: 7, y: 3, kind: 'plant' },
+    { x: 6, y: 2, kind: 'rug_cozy' },
+    { x: 9, y: 1, kind: 'shelf_wood' },
+    { x: 10, y: 3, kind: 'table_wood' },
+    { x: 11, y: 3, kind: 'curtain' },
+    { x: 3, y: 5, kind: 'dresser' },
+    { x: 1, y: 5, kind: 'plant' },
+    { x: 2, y: 6, kind: 'table_wood' },
+    { x: 7, y: 5, kind: 'shelf_wood' },
+    { x: 9, y: 6, kind: 'bed_nice' },
+    { x: 11, y: 5, kind: 'dresser' },
+    { x: 11, y: 7, kind: 'plant' },
+    { x: 10, y: 6, kind: 'rug_cozy' },
+  ],
+  // 洋館 — sofa, chandelier hint, bookshelf, fireplace, elegant table
+  mansion: [
+    { x: 1, y: 1, kind: 'bed_nice' },
+    { x: 3, y: 1, kind: 'plant' },
+    { x: 1, y: 3, kind: 'bookshelf' },
+    { x: 2, y: 2, kind: 'chandelier' },
+    { x: 6, y: 1, kind: 'sofa' },
+    { x: 5, y: 3, kind: 'table_elegant' },
+    { x: 7, y: 3, kind: 'plant' },
+    { x: 6, y: 2, kind: 'chandelier' },
+    { x: 7, y: 1, kind: 'fireplace' },
+    { x: 9, y: 1, kind: 'bookshelf' },
+    { x: 10, y: 3, kind: 'table_elegant' },
+    { x: 11, y: 3, kind: 'plant' },
+    { x: 10, y: 2, kind: 'chandelier' },
+    { x: 1, y: 5, kind: 'fireplace' },
+    { x: 3, y: 5, kind: 'bookshelf' },
+    { x: 2, y: 6, kind: 'table_elegant' },
+    { x: 2, y: 5, kind: 'chandelier' },
+    { x: 5, y: 5, kind: 'plant' },
+    { x: 7, y: 5, kind: 'bookshelf' },
+    { x: 11, y: 5, kind: 'bookshelf' },
+    { x: 9, y: 6, kind: 'bed_nice' },
+    { x: 11, y: 7, kind: 'plant' },
+    { x: 10, y: 6, kind: 'chandelier' },
+    { x: 9, y: 5, kind: 'fireplace' },
+  ],
+  // 大邸宅 — luxury bed, grand table, art, tall plant, ornate cabinet
+  villa: [
+    { x: 1, y: 1, kind: 'bed_luxury' },
+    { x: 3, y: 1, kind: 'art_frame' },
+    { x: 1, y: 3, kind: 'cabinet_ornate' },
+    { x: 2, y: 2, kind: 'chandelier' },
+    { x: 3, y: 3, kind: 'plant_tall' },
+    { x: 6, y: 1, kind: 'sofa' },
+    { x: 5, y: 3, kind: 'table_grand' },
+    { x: 7, y: 3, kind: 'plant_tall' },
+    { x: 6, y: 2, kind: 'chandelier' },
+    { x: 7, y: 1, kind: 'art_frame' },
+    { x: 9, y: 1, kind: 'cabinet_ornate' },
+    { x: 10, y: 3, kind: 'table_grand' },
+    { x: 11, y: 3, kind: 'art_frame' },
+    { x: 10, y: 2, kind: 'chandelier' },
+    { x: 9, y: 3, kind: 'plant_tall' },
+    { x: 1, y: 5, kind: 'art_frame' },
+    { x: 3, y: 5, kind: 'cabinet_ornate' },
+    { x: 2, y: 6, kind: 'table_grand' },
+    { x: 1, y: 6, kind: 'plant_tall' },
+    { x: 2, y: 5, kind: 'chandelier' },
+    { x: 5, y: 5, kind: 'plant_tall' },
+    { x: 7, y: 5, kind: 'cabinet_ornate' },
+    { x: 5, y: 6, kind: 'art_frame' },
+    { x: 11, y: 5, kind: 'cabinet_ornate' },
+    { x: 9, y: 6, kind: 'bed_luxury' },
+    { x: 11, y: 7, kind: 'plant_tall' },
+    { x: 10, y: 5, kind: 'art_frame' },
+    { x: 10, y: 6, kind: 'chandelier' },
+  ],
+  // 天守風 — armor, banner, deco chest, tatami, lantern
+  castle_keep: [
+    { x: 1, y: 1, kind: 'armor' },
+    { x: 3, y: 1, kind: 'banner' },
+    { x: 1, y: 3, kind: 'chest_deco' },
+    { x: 2, y: 2, kind: 'tatami' },
+    { x: 3, y: 3, kind: 'lantern' },
+    { x: 6, y: 1, kind: 'banner' },
+    { x: 5, y: 3, kind: 'chest_deco' },
+    { x: 7, y: 3, kind: 'lantern' },
+    { x: 6, y: 2, kind: 'tatami' },
+    { x: 7, y: 1, kind: 'armor' },
+    { x: 9, y: 1, kind: 'banner' },
+    { x: 10, y: 3, kind: 'chest_deco' },
+    { x: 11, y: 3, kind: 'lantern' },
+    { x: 10, y: 2, kind: 'tatami' },
+    { x: 9, y: 3, kind: 'armor' },
+    { x: 3, y: 5, kind: 'chest_deco' },
+    { x: 1, y: 5, kind: 'banner' },
+    { x: 2, y: 6, kind: 'tatami' },
+    { x: 3, y: 6, kind: 'lantern' },
+    { x: 2, y: 5, kind: 'armor' },
+    { x: 5, y: 5, kind: 'lantern' },
+    { x: 7, y: 5, kind: 'banner' },
+    { x: 5, y: 6, kind: 'tatami' },
+    { x: 11, y: 5, kind: 'armor' },
+    { x: 9, y: 6, kind: 'chest_deco' },
+    { x: 11, y: 7, kind: 'lantern' },
+    { x: 10, y: 5, kind: 'banner' },
+    { x: 10, y: 6, kind: 'tatami' },
+    { x: 9, y: 5, kind: 'armor' },
+  ],
+  // 大阪城風 — gold screens, castle lanterns, ornate chests, byobu, rich rugs, pillars
+  osaka: [
+    { x: 1, y: 1, kind: 'byobu' },
+    { x: 3, y: 1, kind: 'gold_screen' },
+    { x: 1, y: 3, kind: 'ornate_chest' },
+    { x: 2, y: 2, kind: 'rug_rich' },
+    { x: 3, y: 3, kind: 'castle_lantern' },
+    { x: 2, y: 1, kind: 'pillar' },
+    { x: 6, y: 1, kind: 'gold_screen' },
+    { x: 5, y: 3, kind: 'ornate_chest' },
+    { x: 7, y: 3, kind: 'castle_lantern' },
+    { x: 6, y: 2, kind: 'rug_rich' },
+    { x: 7, y: 1, kind: 'byobu' },
+    { x: 5, y: 1, kind: 'pillar' },
+    { x: 9, y: 1, kind: 'gold_screen' },
+    { x: 10, y: 3, kind: 'ornate_chest' },
+    { x: 11, y: 3, kind: 'castle_lantern' },
+    { x: 10, y: 2, kind: 'rug_rich' },
+    { x: 9, y: 3, kind: 'byobu' },
+    { x: 11, y: 2, kind: 'pillar' },
+    { x: 1, y: 5, kind: 'gold_screen' },
+    { x: 3, y: 5, kind: 'ornate_chest' },
+    { x: 2, y: 6, kind: 'rug_rich' },
+    { x: 1, y: 6, kind: 'castle_lantern' },
+    { x: 3, y: 6, kind: 'pillar' },
+    { x: 2, y: 5, kind: 'byobu' },
+    { x: 5, y: 5, kind: 'castle_lantern' },
+    { x: 7, y: 5, kind: 'gold_screen' },
+    { x: 5, y: 6, kind: 'rug_rich' },
+    { x: 7, y: 6, kind: 'pillar' },
+    { x: 11, y: 5, kind: 'ornate_chest' },
+    { x: 9, y: 6, kind: 'byobu' },
+    { x: 11, y: 7, kind: 'castle_lantern' },
+    { x: 10, y: 5, kind: 'gold_screen' },
+    { x: 10, y: 6, kind: 'rug_rich' },
+    { x: 9, y: 5, kind: 'pillar' },
+    { x: 11, y: 6, kind: 'ornate_chest' },
+  ],
+};
+
+function furnitureLayoutForSkin(skinId) {
+  return FURNITURE_BY_SKIN[skinId] || FURNITURE_BY_SKIN.basic;
+}
 
 function drawRoomFurniture(ctx, blueprint, floor, ox, oy, cellSize, skinId = 'basic') {
-  for (const item of FURNITURE_LAYOUT) {
+  const layout = furnitureLayoutForSkin(skinId);
+  // Draw floor-ish mats/rugs first so upright props sit on top
+  const order = (k) => (
+    k === 'tatami' || k === 'rug_cozy' || k === 'rug_rich' ? 0 : 1
+  );
+  const sorted = layout.slice().sort((a, b) => order(a.kind) - order(b.kind));
+  for (const item of sorted) {
     const { x, y, kind } = item;
     if (blueprint[floor][y][x] !== T.FLOOR) continue;
-    // Keep spawn cell clean
     if (x === 6 && y === 7) continue;
     const px = ox + x * cellSize;
     const py = oy + y * cellSize;
@@ -736,90 +884,455 @@ function drawFurnitureSprite(ctx, kind, px, py, cellSize, floor, skinId = 'basic
   const th = themeForFloor(floor, skinId);
   const s = cellSize;
   const m = s * 0.14;
-  if (kind === 'bed') {
-    // Frame
-    ctx.fillStyle = shadeColor(th.wallEdge, 20);
+  const gold = th.badge || '#d4af37';
+  const wood = shadeColor(th.wallEdge, 25);
+  const woodHi = shadeColor(th.doorLight, -20);
+  const woodDk = th.wallEdge;
+
+  // --- beds ---
+  if (kind === 'bed' || kind === 'bed_nice' || kind === 'bed_luxury') {
+    const frame = kind === 'bed_luxury' ? gold : kind === 'bed_nice' ? wood : shadeColor(th.wallEdge, 20);
+    ctx.fillStyle = frame;
     ctx.fillRect(px + m, py + m * 1.2, s - m * 2, s - m * 2.2);
-    // Mattress
-    ctx.fillStyle = floor === 1 ? '#c8d4e8' : floor === 2 ? '#f0c8d0' : '#f0e0c0';
+    const mattress = kind === 'bed_luxury'
+      ? (floor === 1 ? '#e8e0f0' : floor === 2 ? '#f8d8e0' : '#fff4d8')
+      : kind === 'bed_nice'
+        ? (floor === 1 ? '#d0dcc8' : floor === 2 ? '#f0d0c0' : '#f5e8c8')
+        : (floor === 1 ? '#c8d4e8' : floor === 2 ? '#f0c8d0' : '#f0e0c0');
+    ctx.fillStyle = mattress;
     ctx.fillRect(px + m + 2, py + m * 1.2 + 2, s - m * 2 - 4, s - m * 2.2 - 4);
-    // Pillow
     ctx.fillStyle = '#fff8ee';
     ctx.fillRect(px + m + 3, py + m * 1.2 + 3, s * 0.28, s * 0.18);
-    // Blanket stripe
-    ctx.fillStyle = th.rug.replace('0.22', '0.45').replace('0.2', '0.45');
-    ctx.fillRect(px + m + 2, py + s * 0.52, s - m * 2 - 4, s * 0.12);
-  } else if (kind === 'table') {
-    // Top
-    ctx.fillStyle = shadeColor(th.wall, 30);
-    ctx.fillRect(px + m, py + m * 1.4, s - m * 2, s * 0.42);
-    ctx.fillStyle = shadeColor(th.doorLight, -40);
-    ctx.fillRect(px + m + 2, py + m * 1.4 + 2, s - m * 2 - 4, s * 0.32);
-    // Legs
-    ctx.fillStyle = th.wallEdge;
+    if (kind === 'bed_luxury') {
+      ctx.fillStyle = gold;
+      ctx.fillRect(px + m, py + m * 1.2, s - m * 2, 2);
+      ctx.fillRect(px + m + 2, py + s * 0.50, s - m * 2 - 4, s * 0.14);
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.fillRect(px + m + 4, py + s * 0.52, s - m * 2 - 8, 2);
+    } else {
+      ctx.fillStyle = th.rug.replace(/0\.\d+/g, '0.45');
+      ctx.fillRect(px + m + 2, py + s * 0.52, s - m * 2 - 4, s * 0.12);
+      if (kind === 'bed_nice') {
+        ctx.fillStyle = woodHi;
+        ctx.fillRect(px + m, py + m * 1.2, s - m * 2, 2);
+      }
+    }
+    return;
+  }
+
+  // --- tables ---
+  if (kind === 'table' || kind === 'table_wood' || kind === 'table_elegant' || kind === 'table_grand') {
+    const topH = kind === 'table' ? s * 0.36 : s * 0.42;
+    const topY = py + m * (kind === 'table' ? 1.6 : 1.3);
+    ctx.fillStyle = kind === 'table_grand' || kind === 'table_elegant' ? woodDk : wood;
+    ctx.fillRect(px + m, topY, s - m * 2, topH);
+    ctx.fillStyle = kind === 'table_grand' ? gold : kind === 'table_elegant' ? woodHi : shadeColor(th.doorLight, -40);
+    ctx.fillRect(px + m + 2, topY + 2, s - m * 2 - 4, topH - 6);
+    if (kind === 'table_elegant' || kind === 'table_grand') {
+      ctx.strokeStyle = gold;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(px + m + 3, topY + 3, s - m * 2 - 6, topH - 8);
+    }
+    if (kind === 'table_grand') {
+      // Center runner
+      ctx.fillStyle = th.rug.replace(/0\.\d+/g, '0.5');
+      ctx.fillRect(px + s * 0.38, topY + 4, s * 0.24, topH - 10);
+    }
+    ctx.fillStyle = woodDk;
     const legW = Math.max(2, s * 0.06);
-    ctx.fillRect(px + m + 2, py + m * 1.4 + s * 0.42, legW, s * 0.22);
-    ctx.fillRect(px + s - m - 2 - legW, py + m * 1.4 + s * 0.42, legW, s * 0.22);
-  } else if (kind === 'sofa') {
-    // Back
+    const legY = topY + topH;
+    const legH = s * (kind === 'table' ? 0.18 : 0.22);
+    ctx.fillRect(px + m + 2, legY, legW, legH);
+    ctx.fillRect(px + s - m - 2 - legW, legY, legW, legH);
+    if (kind === 'table_grand') {
+      ctx.fillRect(px + m + 2 + legW * 3, legY, legW, legH);
+      ctx.fillRect(px + s - m - 2 - legW * 4, legY, legW, legH);
+    }
+    return;
+  }
+
+  // --- sofa ---
+  if (kind === 'sofa') {
     ctx.fillStyle = shadeColor(th.wall, 10);
     ctx.fillRect(px + m * 0.8, py + m, s - m * 1.6, s * 0.28);
-    // Seat
-    const seat = floor === 1 ? '#5a7aaa' : floor === 2 ? '#b06070' : '#a05040';
+    const seat = skinId === 'villa'
+      ? (floor === 1 ? '#6a7088' : floor === 2 ? '#a88840' : '#8a7860')
+      : skinId === 'mansion'
+        ? (floor === 1 ? '#5a4060' : floor === 2 ? '#8a3040' : '#704030')
+        : skinId === 'cottage'
+          ? (floor === 1 ? '#6a8860' : floor === 2 ? '#a87060' : '#a07040')
+          : (floor === 1 ? '#5a7aaa' : floor === 2 ? '#b06070' : '#a05040');
     ctx.fillStyle = seat;
     ctx.fillRect(px + m * 0.8, py + m + s * 0.22, s - m * 1.6, s * 0.38);
-    // Armrests
     ctx.fillStyle = shadeColor(seat, -25);
     ctx.fillRect(px + m * 0.8, py + m + s * 0.18, s * 0.12, s * 0.42);
     ctx.fillRect(px + s - m * 0.8 - s * 0.12, py + m + s * 0.18, s * 0.12, s * 0.42);
-    // Cushion highlight
     ctx.fillStyle = 'rgba(255,255,255,0.18)';
     ctx.fillRect(px + m + s * 0.14, py + m + s * 0.28, s * 0.5, s * 0.1);
-  } else if (kind === 'shelf') {
-    // Cabinet body
-    ctx.fillStyle = th.wallEdge;
-    ctx.fillRect(px + m * 1.2, py + m * 0.8, s - m * 2.4, s - m * 1.6);
-    ctx.fillStyle = shadeColor(th.wall, 15);
-    ctx.fillRect(px + m * 1.2 + 1, py + m * 0.8 + 1, s - m * 2.4 - 2, s - m * 1.6 - 2);
-    // Shelves + books
-    const books = ['#c04040', '#4060b0', '#d0a020', '#408060', '#8040a0'];
-    const rows = 3;
-    const innerX = px + m * 1.2 + 3;
-    const innerW = s - m * 2.4 - 6;
+    if (skinId === 'mansion' || skinId === 'villa') {
+      ctx.fillStyle = gold;
+      ctx.fillRect(px + m * 0.8, py + m, s - m * 1.6, 2);
+    }
+    return;
+  }
+
+  // --- shelves / cabinets / bookshelf / dresser ---
+  if (kind === 'shelf' || kind === 'shelf_wood' || kind === 'bookshelf' || kind === 'dresser' || kind === 'cabinet_ornate') {
+    const bodyX = px + m * 1.2;
+    const bodyY = py + m * 0.8;
+    const bodyW = s - m * 2.4;
+    const bodyH = s - m * 1.6;
+    ctx.fillStyle = kind === 'cabinet_ornate' ? gold : woodDk;
+    ctx.fillRect(bodyX, bodyY, bodyW, bodyH);
+    ctx.fillStyle = kind === 'cabinet_ornate'
+      ? shadeColor(th.wall, 25)
+      : kind === 'dresser' || kind === 'shelf_wood'
+        ? woodHi
+        : shadeColor(th.wall, 15);
+    ctx.fillRect(bodyX + 1, bodyY + 1, bodyW - 2, bodyH - 2);
+    if (kind === 'dresser') {
+      // Drawers
+      for (let d = 0; d < 2; d++) {
+        const dy = bodyY + 4 + d * (bodyH * 0.42);
+        ctx.fillStyle = wood;
+        ctx.fillRect(bodyX + 3, dy, bodyW - 6, bodyH * 0.36);
+        ctx.fillStyle = gold;
+        ctx.fillRect(bodyX + bodyW * 0.5 - 2, dy + bodyH * 0.14, 4, 3);
+      }
+      return;
+    }
+    if (kind === 'cabinet_ornate') {
+      ctx.strokeStyle = gold;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(bodyX + 3, bodyY + 3, bodyW - 6, bodyH - 6);
+      ctx.fillStyle = gold;
+      ctx.fillRect(bodyX + bodyW * 0.5 - 1, bodyY + 4, 2, bodyH - 8);
+      ctx.fillStyle = '#c04040';
+      ctx.beginPath();
+      ctx.arc(bodyX + bodyW * 0.28, bodyY + bodyH * 0.5, 2, 0, Math.PI * 2);
+      ctx.arc(bodyX + bodyW * 0.72, bodyY + bodyH * 0.5, 2, 0, Math.PI * 2);
+      ctx.fill();
+      return;
+    }
+    const books = kind === 'bookshelf'
+      ? ['#6a2030', '#2a4060', '#8a7020', '#2a5840', '#503070', '#a05030']
+      : ['#c04040', '#4060b0', '#d0a020', '#408060', '#8040a0'];
+    const rows = kind === 'bookshelf' ? 4 : 3;
+    const innerX = bodyX + 3;
+    const innerW = bodyW - 6;
     for (let r = 0; r < rows; r++) {
-      const by = py + m * 0.8 + 4 + r * ((s - m * 1.6 - 8) / rows);
-      ctx.fillStyle = th.wallEdge;
-      ctx.fillRect(innerX - 1, by + s * 0.16, innerW + 2, 2);
+      const by = bodyY + 4 + r * ((bodyH - 8) / rows);
+      ctx.fillStyle = woodDk;
+      ctx.fillRect(innerX - 1, by + s * 0.14, innerW + 2, 2);
       let bx = innerX;
-      for (let b = 0; b < 4; b++) {
-        const bw = innerW / 4 - 1;
+      const n = kind === 'bookshelf' ? 5 : 4;
+      for (let b = 0; b < n; b++) {
+        const bw = innerW / n - 1;
         ctx.fillStyle = books[(r * 3 + b + floor) % books.length];
-        ctx.fillRect(bx, by, bw, s * 0.15);
+        ctx.fillRect(bx, by, bw, s * 0.13);
         bx += bw + 1;
       }
     }
-  } else if (kind === 'plant') {
-    // Pot
-    ctx.fillStyle = '#8a5a3c';
+    return;
+  }
+
+  // --- plants ---
+  if (kind === 'plant' || kind === 'plant_tall') {
+    const potY = kind === 'plant_tall' ? s * 0.62 : s * 0.58;
+    ctx.fillStyle = skinId === 'villa' ? '#6a5a48' : '#8a5a3c';
     ctx.beginPath();
-    ctx.moveTo(px + s * 0.32, py + s * 0.58);
-    ctx.lineTo(px + s * 0.68, py + s * 0.58);
+    ctx.moveTo(px + s * 0.32, py + potY);
+    ctx.lineTo(px + s * 0.68, py + potY);
     ctx.lineTo(px + s * 0.62, py + s * 0.82);
     ctx.lineTo(px + s * 0.38, py + s * 0.82);
     ctx.closePath();
     ctx.fill();
     ctx.fillStyle = '#6a4028';
-    ctx.fillRect(px + s * 0.30, py + s * 0.54, s * 0.40, s * 0.06);
-    // Leaves
-    ctx.fillStyle = '#3d8b4a';
+    ctx.fillRect(px + s * 0.30, py + potY - s * 0.04, s * 0.40, s * 0.06);
+    if (kind === 'plant_tall') {
+      ctx.fillStyle = '#2d6b3a';
+      ctx.fillRect(px + s * 0.47, py + s * 0.18, s * 0.06, s * 0.44);
+      ctx.fillStyle = '#3d8b4a';
+      ctx.beginPath();
+      ctx.ellipse(px + s * 0.38, py + s * 0.28, s * 0.14, s * 0.22, -0.4, 0, Math.PI * 2);
+      ctx.ellipse(px + s * 0.62, py + s * 0.26, s * 0.14, s * 0.24, 0.4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#5cb86a';
+      ctx.beginPath();
+      ctx.ellipse(px + s * 0.5, py + s * 0.18, s * 0.12, s * 0.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.fillStyle = '#3d8b4a';
+      ctx.beginPath();
+      ctx.arc(px + s * 0.5, py + s * 0.38, s * 0.18, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#5cb86a';
+      ctx.beginPath();
+      ctx.arc(px + s * 0.38, py + s * 0.42, s * 0.12, 0, Math.PI * 2);
+      ctx.arc(px + s * 0.62, py + s * 0.40, s * 0.13, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    return;
+  }
+
+  // --- cottage curtain hint ---
+  if (kind === 'curtain') {
+    ctx.fillStyle = 'rgba(0,0,0,0.12)';
+    ctx.fillRect(px + m, py + m * 0.5, s - m * 2, 3);
+    const cloth = floor === 1 ? '#88a878' : floor === 2 ? '#d09080' : '#d0b050';
+    ctx.fillStyle = cloth;
+    ctx.fillRect(px + m, py + m * 0.5 + 3, s * 0.28, s * 0.55);
+    ctx.fillRect(px + s - m - s * 0.28, py + m * 0.5 + 3, s * 0.28, s * 0.55);
+    ctx.fillStyle = shadeColor(cloth, 30);
+    ctx.fillRect(px + m + 2, py + m * 0.5 + 5, s * 0.1, s * 0.5);
+    ctx.fillRect(px + s - m - s * 0.18, py + m * 0.5 + 5, s * 0.1, s * 0.5);
+    return;
+  }
+
+  // --- rugs / tatami ---
+  if (kind === 'rug_cozy' || kind === 'rug_rich' || kind === 'tatami') {
+    const pad = s * 0.12;
+    if (kind === 'tatami') {
+      ctx.fillStyle = '#c8b86a';
+      ctx.fillRect(px + pad, py + pad, s - pad * 2, s - pad * 2);
+      ctx.fillStyle = '#a89848';
+      ctx.fillRect(px + pad, py + pad, s - pad * 2, 2);
+      ctx.fillRect(px + pad, py + s - pad - 2, s - pad * 2, 2);
+      ctx.strokeStyle = 'rgba(80,60,20,0.25)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(px + s * 0.5, py + pad + 2);
+      ctx.lineTo(px + s * 0.5, py + s - pad - 2);
+      ctx.stroke();
+      ctx.fillStyle = '#8a7830';
+      ctx.fillRect(px + pad, py + pad, 3, s - pad * 2);
+      ctx.fillRect(px + s - pad - 3, py + pad, 3, s - pad * 2);
+    } else if (kind === 'rug_rich') {
+      ctx.fillStyle = 'rgba(160,30,30,0.55)';
+      ctx.fillRect(px + pad, py + pad, s - pad * 2, s - pad * 2);
+      ctx.strokeStyle = gold;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(px + pad + 2, py + pad + 2, s - pad * 2 - 4, s - pad * 2 - 4);
+      ctx.fillStyle = gold;
+      ctx.fillRect(px + s * 0.42, py + s * 0.42, s * 0.16, s * 0.16);
+    } else {
+      ctx.fillStyle = th.rug.replace(/0\.\d+/g, '0.4');
+      ctx.fillRect(px + pad, py + pad, s - pad * 2, s - pad * 2);
+      ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(px + pad + 2, py + pad + 2, s - pad * 2 - 4, s - pad * 2 - 4);
+    }
+    return;
+  }
+
+  // --- chandelier mark ---
+  if (kind === 'chandelier') {
+    ctx.strokeStyle = gold;
+    ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.arc(px + s * 0.5, py + s * 0.38, s * 0.18, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#5cb86a';
+    ctx.moveTo(px + s * 0.5, py + s * 0.12);
+    ctx.lineTo(px + s * 0.5, py + s * 0.32);
+    ctx.stroke();
+    ctx.fillStyle = gold;
     ctx.beginPath();
-    ctx.arc(px + s * 0.38, py + s * 0.42, s * 0.12, 0, Math.PI * 2);
-    ctx.arc(px + s * 0.62, py + s * 0.40, s * 0.13, 0, Math.PI * 2);
+    ctx.moveTo(px + s * 0.5, py + s * 0.28);
+    ctx.lineTo(px + s * 0.22, py + s * 0.42);
+    ctx.lineTo(px + s * 0.78, py + s * 0.42);
+    ctx.closePath();
     ctx.fill();
+    ctx.fillStyle = '#fff0a0';
+    ctx.beginPath();
+    ctx.arc(px + s * 0.5, py + s * 0.48, s * 0.08, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,220,100,0.35)';
+    ctx.beginPath();
+    ctx.arc(px + s * 0.5, py + s * 0.5, s * 0.2, 0, Math.PI * 2);
+    ctx.fill();
+    return;
+  }
+
+  // --- fireplace silhouette ---
+  if (kind === 'fireplace') {
+    ctx.fillStyle = '#3a3030';
+    ctx.fillRect(px + m, py + m * 0.8, s - m * 2, s - m * 1.4);
+    ctx.fillStyle = shadeColor(th.wall, 5);
+    ctx.fillRect(px + m + 2, py + m * 0.8 + 2, s - m * 2 - 4, s * 0.18);
+    ctx.fillStyle = '#1a1010';
+    ctx.fillRect(px + m + 4, py + m * 0.8 + s * 0.22, s - m * 2 - 8, s * 0.38);
+    // Embers
+    ctx.fillStyle = '#e07030';
+    ctx.fillRect(px + s * 0.32, py + s * 0.62, s * 0.12, s * 0.08);
+    ctx.fillStyle = '#f0c040';
+    ctx.fillRect(px + s * 0.48, py + s * 0.60, s * 0.14, s * 0.1);
+    ctx.fillStyle = gold;
+    ctx.fillRect(px + m, py + m * 0.8, s - m * 2, 2);
+    return;
+  }
+
+  // --- art frame ---
+  if (kind === 'art_frame') {
+    ctx.fillStyle = gold;
+    ctx.fillRect(px + m * 1.1, py + m * 0.9, s - m * 2.2, s - m * 1.8);
+    ctx.fillStyle = floor === 1 ? '#405878' : floor === 2 ? '#785040' : '#587048';
+    ctx.fillRect(px + m * 1.1 + 3, py + m * 0.9 + 3, s - m * 2.2 - 6, s - m * 1.8 - 6);
+    ctx.fillStyle = 'rgba(255,255,255,0.2)';
+    ctx.fillRect(px + m * 1.1 + 5, py + m * 0.9 + 5, s * 0.2, s * 0.15);
+    // Simple motif
+    ctx.fillStyle = 'rgba(255,240,200,0.45)';
+    ctx.beginPath();
+    ctx.arc(px + s * 0.5, py + s * 0.48, s * 0.12, 0, Math.PI * 2);
+    ctx.fill();
+    return;
+  }
+
+  // --- armor stand ---
+  if (kind === 'armor') {
+    ctx.fillStyle = '#6a6870';
+    // Helmet
+    ctx.beginPath();
+    ctx.arc(px + s * 0.5, py + s * 0.28, s * 0.14, Math.PI, 0);
+    ctx.fill();
+    ctx.fillRect(px + s * 0.36, py + s * 0.26, s * 0.28, s * 0.1);
+    // Body
+    ctx.fillStyle = '#585860';
+    ctx.fillRect(px + s * 0.34, py + s * 0.36, s * 0.32, s * 0.32);
+    // Arms
+    ctx.fillRect(px + s * 0.2, py + s * 0.38, s * 0.14, s * 0.1);
+    ctx.fillRect(px + s * 0.66, py + s * 0.38, s * 0.14, s * 0.1);
+    // Gold trim
+    ctx.fillStyle = gold;
+    ctx.fillRect(px + s * 0.46, py + s * 0.4, s * 0.08, s * 0.22);
+    // Stand base
+    ctx.fillStyle = woodDk;
+    ctx.fillRect(px + s * 0.28, py + s * 0.72, s * 0.44, s * 0.08);
+    return;
+  }
+
+  // --- banner ---
+  if (kind === 'banner') {
+    ctx.fillStyle = woodDk;
+    ctx.fillRect(px + s * 0.46, py + m * 0.5, s * 0.08, s * 0.7);
+    ctx.fillStyle = floor === 1 ? '#3a4060' : floor === 2 ? '#8a3020' : '#6a4020';
+    ctx.beginPath();
+    ctx.moveTo(px + s * 0.28, py + m * 0.6);
+    ctx.lineTo(px + s * 0.72, py + m * 0.6);
+    ctx.lineTo(px + s * 0.72, py + s * 0.55);
+    ctx.lineTo(px + s * 0.5, py + s * 0.68);
+    ctx.lineTo(px + s * 0.28, py + s * 0.55);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = gold;
+    ctx.fillRect(px + s * 0.28, py + m * 0.6, s * 0.44, 3);
+    ctx.beginPath();
+    ctx.arc(px + s * 0.5, py + s * 0.38, s * 0.08, 0, Math.PI * 2);
+    ctx.fill();
+    return;
+  }
+
+  // --- deco wooden chest ---
+  if (kind === 'chest_deco') {
+    ctx.fillStyle = '#6a4828';
+    ctx.fillRect(px + m, py + s * 0.38, s - m * 2, s * 0.4);
+    ctx.fillStyle = '#8a6438';
+    ctx.fillRect(px + m + 2, py + s * 0.3, s - m * 2 - 4, s * 0.16);
+    ctx.fillStyle = gold;
+    ctx.fillRect(px + m, py + s * 0.44, s - m * 2, 2);
+    ctx.fillRect(px + s * 0.45, py + s * 0.48, s * 0.1, s * 0.12);
+    return;
+  }
+
+  // --- lantern (keep) ---
+  if (kind === 'lantern') {
+    ctx.fillStyle = woodDk;
+    ctx.fillRect(px + s * 0.46, py + s * 0.12, s * 0.08, s * 0.18);
+    ctx.fillStyle = '#3a3020';
+    ctx.fillRect(px + s * 0.32, py + s * 0.28, s * 0.36, s * 0.4);
+    ctx.fillStyle = '#f0c860';
+    ctx.fillRect(px + s * 0.38, py + s * 0.34, s * 0.24, s * 0.28);
+    ctx.fillStyle = 'rgba(255,200,80,0.3)';
+    ctx.beginPath();
+    ctx.arc(px + s * 0.5, py + s * 0.48, s * 0.22, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = gold;
+    ctx.fillRect(px + s * 0.32, py + s * 0.28, s * 0.36, 2);
+    ctx.fillRect(px + s * 0.32, py + s * 0.66, s * 0.36, 2);
+    return;
+  }
+
+  // --- Osaka: castle lantern ---
+  if (kind === 'castle_lantern') {
+    ctx.fillStyle = '#1a1612';
+    ctx.fillRect(px + s * 0.3, py + s * 0.22, s * 0.4, s * 0.5);
+    ctx.fillStyle = '#ffe08a';
+    ctx.fillRect(px + s * 0.36, py + s * 0.3, s * 0.28, s * 0.34);
+    ctx.fillStyle = gold;
+    ctx.fillRect(px + s * 0.28, py + s * 0.18, s * 0.44, 4);
+    ctx.fillRect(px + s * 0.28, py + s * 0.7, s * 0.44, 4);
+    // Roof tip
+    ctx.beginPath();
+    ctx.moveTo(px + s * 0.5, py + s * 0.06);
+    ctx.lineTo(px + s * 0.22, py + s * 0.2);
+    ctx.lineTo(px + s * 0.78, py + s * 0.2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,220,100,0.35)';
+    ctx.beginPath();
+    ctx.arc(px + s * 0.5, py + s * 0.48, s * 0.24, 0, Math.PI * 2);
+    ctx.fill();
+    return;
+  }
+
+  // --- Osaka: gold screen / byobu ---
+  if (kind === 'gold_screen' || kind === 'byobu') {
+    const panels = kind === 'byobu' ? 3 : 2;
+    const padX = m * 0.8;
+    const pw = (s - padX * 2) / panels;
+    for (let i = 0; i < panels; i++) {
+      const sx0 = px + padX + i * pw;
+      ctx.fillStyle = i % 2 === 0 ? '#e8d060' : '#d4af37';
+      ctx.fillRect(sx0, py + m * 0.7, pw - 1, s - m * 1.5);
+      ctx.fillStyle = '#fff0a0';
+      ctx.fillRect(sx0 + 2, py + m * 0.7 + 2, pw - 5, 3);
+      ctx.fillStyle = '#2a2420';
+      ctx.fillRect(sx0, py + m * 0.7, 1, s - m * 1.5);
+      // Cloud / wave motif
+      ctx.fillStyle = 'rgba(180,40,40,0.35)';
+      ctx.beginPath();
+      ctx.arc(sx0 + pw * 0.5, py + s * 0.45, pw * 0.22, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#2a2420';
+    ctx.fillRect(px + padX, py + m * 0.7, s - padX * 2, 2);
+    ctx.fillRect(px + padX, py + s - m * 0.8 - 2, s - padX * 2, 2);
+    return;
+  }
+
+  // --- Osaka: ornate chest ---
+  if (kind === 'ornate_chest') {
+    ctx.fillStyle = '#5a3020';
+    ctx.fillRect(px + m, py + s * 0.36, s - m * 2, s * 0.42);
+    ctx.fillStyle = '#8a4830';
+    ctx.fillRect(px + m + 2, py + s * 0.28, s - m * 2 - 4, s * 0.16);
+    ctx.fillStyle = gold;
+    ctx.fillRect(px + m, py + s * 0.42, s - m * 2, 3);
+    ctx.strokeStyle = gold;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(px + m + 3, py + s * 0.5, s - m * 2 - 6, s * 0.22);
+    ctx.fillStyle = '#ffe08a';
+    ctx.fillRect(px + s * 0.44, py + s * 0.55, s * 0.12, s * 0.1);
+    return;
+  }
+
+  // --- decorative pillar / corner post ---
+  if (kind === 'pillar') {
+    ctx.fillStyle = '#2a2420';
+    ctx.fillRect(px + s * 0.38, py + m * 0.5, s * 0.24, s - m);
+    ctx.fillStyle = gold;
+    ctx.fillRect(px + s * 0.34, py + m * 0.5, s * 0.32, 4);
+    ctx.fillRect(px + s * 0.34, py + s - m * 0.7, s * 0.32, 4);
+    ctx.fillStyle = '#fff0a0';
+    ctx.fillRect(px + s * 0.44, py + m * 0.5 + 6, s * 0.12, s - m * 1.4);
+    return;
   }
 }
 
@@ -948,22 +1461,28 @@ export function drawHouse(ctx, blueprint, houseData, floor, opts = {}) {
     }
   }
 
-  // Soft rugs in room centers (house feel)
+  // Soft rugs in room centers (house feel; richer borders at higher skins)
   const th = themeForFloor(floor, skinId);
   const rugCells = [
     [2, 2], [6, 2], [10, 2],
     [2, 6], [6, 6], [10, 6],
   ];
+  const rugTier = ({ basic: 0, cottage: 1, mansion: 2, villa: 3, castle_keep: 4, osaka: 5 })[skinId] || 0;
   for (const [rx, ry] of rugCells) {
     if (blueprint[floor][ry][rx] !== T.FLOOR) continue;
     const rpx = ox + rx * cellSize;
     const rpy = oy + ry * cellSize;
-    ctx.fillStyle = th.rug;
-    const rr = cellSize * 0.08;
-    const rx0 = rpx + cellSize * 0.15;
-    const ry0 = rpy + cellSize * 0.15;
-    const rw = cellSize * 0.7;
-    const rh = cellSize * 0.7;
+    ctx.fillStyle = rugTier >= 5
+      ? th.rug.replace(/0\.\d+/g, '0.38')
+      : rugTier >= 3
+        ? th.rug.replace(/0\.\d+/g, '0.32')
+        : th.rug;
+    const rr = cellSize * (rugTier >= 4 ? 0.06 : 0.08);
+    const inset = rugTier >= 5 ? 0.1 : 0.15;
+    const rx0 = rpx + cellSize * inset;
+    const ry0 = rpy + cellSize * inset;
+    const rw = cellSize * (1 - inset * 2);
+    const rh = cellSize * (1 - inset * 2);
     ctx.beginPath();
     ctx.moveTo(rx0 + rr, ry0);
     ctx.arcTo(rx0 + rw, ry0, rx0 + rw, ry0 + rh, rr);
@@ -972,6 +1491,11 @@ export function drawHouse(ctx, blueprint, houseData, floor, opts = {}) {
     ctx.arcTo(rx0, ry0, rx0 + rw, ry0, rr);
     ctx.closePath();
     ctx.fill();
+    if (rugTier >= 2) {
+      ctx.strokeStyle = rugTier >= 5 ? (th.badge || '#d4af37') : 'rgba(255,255,255,0.22)';
+      ctx.lineWidth = rugTier >= 5 ? 1.5 : 1;
+      ctx.strokeRect(rx0 + 2, ry0 + 2, rw - 4, rh - 4);
+    }
   }
 
   // Decorative furniture (visual only — walk/place unchanged)
