@@ -9,7 +9,7 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta name="theme-color" content="#120e18" />
   <title>ハウスと罠</title>
-  <link rel="stylesheet" href="css/style.css?v=20260920t" />
+  <link rel="stylesheet" href="css/style.css?v=20260920u" />
 </head>
 <body>
   <div id="app">
@@ -20,6 +20,7 @@
       <p class="title-sub">家に罠を仕掛けて<br />相手の宝箱を探せ！</p>
       <div class="btn-col">
         <button type="button" class="btn btn-com" id="btn-com">COM対戦</button>
+        <button type="button" class="btn btn-ghost" id="btn-tutorial">チュートリアル</button>
         <button type="button" class="btn btn-secondary" id="btn-create">ルームを作成</button>
         <button type="button" class="btn btn-secondary" id="btn-join">ルームに参加</button>
         <div class="title-footer-row">
@@ -28,7 +29,27 @@
         </div>
       </div>
       <p class="peer-note" id="peer-note">通信準備中…</p>
-      <p class="build-stamp" id="build-stamp">build 20260920q</p>
+      <p class="build-stamp" id="build-stamp">build 20260920u</p>
+    </section>
+
+
+    <!-- チュートリアル -->
+    <section id="screen-tutorial" class="screen">
+      <h2 class="tutorial-heading-main">チュートリアル</h2>
+      <p class="tutorial-step-ind" id="tutorial-step-ind" aria-live="polite">1/8</p>
+      <div class="tutorial-card allow-scroll" id="tutorial-card">
+        <h3 class="tutorial-step-title" id="tutorial-step-title"></h3>
+        <p class="tutorial-body" id="tutorial-body"></p>
+        <p class="tutorial-tip hidden" id="tutorial-tip"></p>
+      </div>
+      <div class="tutorial-nav">
+        <button type="button" class="btn btn-ghost btn-compact" id="btn-tutorial-home">戻る</button>
+        <button type="button" class="btn btn-ghost btn-compact" id="btn-tutorial-prev">前へ</button>
+        <button type="button" class="btn btn-primary btn-compact" id="btn-tutorial-next">次へ</button>
+      </div>
+      <div class="tutorial-extra hidden" id="tutorial-extra">
+        <button type="button" class="btn btn-com" id="btn-tutorial-com">COMで遊ぶ</button>
+      </div>
     </section>
 
     <!-- ロビー -->
@@ -158,13 +179,13 @@
   </div>
 
   <footer id="game-meta" aria-label="バージョンとアクセス数">
-    <span id="meta-version">ver 20260920t</span>
+    <span id="meta-version">ver 20260920u</span>
     <span class="meta-sep" aria-hidden="true">｜</span>
     <span id="meta-visits" class="meta-visits"><span class="meta-visits-label">アクセス</span> <img id="meta-visits-badge" alt="access" width="70" height="20" /></span>
   </footer>
 
   <script type="module">
-    import { init } from './js/game.js?v=20260920t';
+    import { init } from './js/game.js?v=20260920u';
     init().catch((e) => {
       console.error(e);
       const n = document.getElementById('peer-note');

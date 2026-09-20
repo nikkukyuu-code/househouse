@@ -8,12 +8,12 @@ import {
   createBlueprint, createEmptyHouseData, isWalkable, isPlaceable,
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
-} from './house.js?v=20260920t';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920t';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920t';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920t';
+} from './house.js?v=20260920u';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920u';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920u';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920u';
 
-export const GAME_VERSION = '20260920t';
+export const GAME_VERSION = '20260920u';
 
 const blueprint = createBlueprint();
 
@@ -1771,6 +1771,108 @@ function maybeStartOnlineMatch() {
   }
 }
 
+
+/* ---------- Tutorial ---------- */
+const TUTORIAL_STEPS = [
+  {
+    title: 'ゲームの概要',
+    body: '自分の家に宝箱を1つと罠を10個置きます。\nお互いの家を探索し、相手が隠した宝箱を見つけましょう。',
+    tip: '守りと攻めが同時進行する対戦ゲームです。',
+  },
+  {
+    title: '勝ち方',
+    body: '次のどちらかで勝利です。\n・先に相手の宝箱を見つける\n・相手の体力を0にする',
+    tip: '宝箱ハントと罠の両方が勝ち筋になります。',
+  },
+  {
+    title: '家の設計',
+    body: '宝箱1個・罠10個は必須です。\n罠は「爆弾」と「落とし穴」の2種類。\n1Fの落とし穴は下に落ちないので、爆弾向きです。',
+    tip: '宝箱は見つかりにくい場所に隠そう。',
+  },
+  {
+    title: '対戦画面',
+    body: '上画面：相手があなたの家を探索中\n下画面：あなたが相手の家を探索中\n上下を見比べながら立ち回りましょう。',
+    tip: null,
+  },
+  {
+    title: '罠のルール',
+    body: '罠は1回だけ発動します。\n一度踏まれたあとは安全な床になります。',
+    tip: '発動済みの場所は通っても大丈夫。',
+  },
+  {
+    title: '操作方法',
+    body: '十字キー（画面下の▲▼◀▶）で移動します。\n階段マスに乗ると階を移動できます。',
+    tip: 'キーボードの矢印／WASDでも操作できます。',
+  },
+  {
+    title: 'アラーム',
+    body: '相手があなたの宝箱がある部屋に入ると、上画面が赤く点滅します。\nこの警報はあなた側にだけ出ます（相手には見えません）。',
+    tip: '点滅したら相手が近い合図！',
+  },
+  {
+    title: 'はじめ方',
+    body: 'まずは「COM対戦」がおすすめです。\n一人で設計と探索の流れを練習しましょう。\n準備ができたらタイトルへ戻るか、そのままCOMへ進めます。',
+    tip: 'オンラインはルームコードで友だちと対戦。',
+  },
+];
+
+let tutorialStep = 0;
+
+function openTutorial() {
+  tutorialStep = 0;
+  S.phase = 'tutorial';
+  renderTutorial();
+  showScreen('screen-tutorial');
+}
+
+function renderTutorial() {
+  const total = TUTORIAL_STEPS.length;
+  const step = Math.max(0, Math.min(tutorialStep, total - 1));
+  tutorialStep = step;
+  const data = TUTORIAL_STEPS[step];
+  const ind = $('tutorial-step-ind');
+  const title = $('tutorial-step-title');
+  const body = $('tutorial-body');
+  const tip = $('tutorial-tip');
+  const prev = $('btn-tutorial-prev');
+  const next = $('btn-tutorial-next');
+  const extra = $('tutorial-extra');
+  const card = $('tutorial-card');
+
+  if (ind) ind.textContent = `${step + 1}/${total}`;
+  if (title) title.textContent = data.title;
+  if (body) body.textContent = data.body;
+  if (tip) {
+    if (data.tip) {
+      tip.textContent = data.tip;
+      tip.classList.remove('hidden');
+    } else {
+      tip.textContent = '';
+      tip.classList.add('hidden');
+    }
+  }
+  if (prev) prev.disabled = step <= 0;
+  const last = step >= total - 1;
+  if (next) next.textContent = last ? 'タイトルへ' : '次へ';
+  if (extra) extra.classList.toggle('hidden', !last);
+  if (card) card.scrollTop = 0;
+}
+
+function tutorialNext() {
+  if (tutorialStep >= TUTORIAL_STEPS.length - 1) {
+    goTitle();
+    return;
+  }
+  tutorialStep += 1;
+  renderTutorial();
+}
+
+function tutorialPrev() {
+  if (tutorialStep <= 0) return;
+  tutorialStep -= 1;
+  renderTutorial();
+}
+
 /* ---------- Flow ---------- */
 function goTitle() {
   S.phase = 'title';
@@ -2049,6 +2151,29 @@ function bindControls() {
   bindTap($('btn-create'), () => { unlockAudio(); sfx('tap'); createRoom(); });
   bindTap($('btn-join'), () => { unlockAudio(); sfx('tap'); showJoinLobby(); });
   bindTap($('btn-com'), () => {
+    unlockAudio();
+    sfx('tap');
+    S.mode = 'com';
+    startSetup();
+  });
+  bindTap($('btn-tutorial'), () => {
+    unlockAudio();
+    sfx('tap');
+    openTutorial();
+  });
+  bindTap($('btn-tutorial-home'), () => {
+    sfx('tap');
+    goTitle();
+  });
+  bindTap($('btn-tutorial-prev'), () => {
+    sfx('tap');
+    tutorialPrev();
+  });
+  bindTap($('btn-tutorial-next'), () => {
+    sfx('tap');
+    tutorialNext();
+  });
+  bindTap($('btn-tutorial-com'), () => {
     unlockAudio();
     sfx('tap');
     S.mode = 'com';

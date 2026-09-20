@@ -70,9 +70,10 @@ export function bindTap(el, fn) {
 export function lockTouch(root) {
   if (!root) return;
   const blockMove = (e) => {
-    // Allow text fields; allow title menu scroll on short phones
+    // Allow text fields; allow title/tutorial scroll on short phones
     if (e.target.closest('input, textarea')) return;
     if (e.target.closest('#screen-title')) return;
+    if (e.target.closest('#screen-tutorial .allow-scroll, .allow-scroll')) return;
     e.preventDefault();
   };
   const blockGesture = (e) => e.preventDefault();
@@ -80,8 +81,11 @@ export function lockTouch(root) {
   document.addEventListener('touchmove', blockMove, { passive: false });
   document.addEventListener('gesturestart', blockGesture, { passive: false });
   document.addEventListener('gesturechange', blockGesture, { passive: false });
-  // Kill wheel / trackpad scroll on desktop embeds
-  document.addEventListener('wheel', (e) => e.preventDefault(), { passive: false });
+  // Kill wheel / trackpad scroll on desktop embeds (except tutorial card)
+  document.addEventListener('wheel', (e) => {
+    if (e.target.closest('#screen-tutorial .allow-scroll, .allow-scroll, input, textarea')) return;
+    e.preventDefault();
+  }, { passive: false });
 }
 
 export function flashOverlay(el, text, ms = 900) {
