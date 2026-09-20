@@ -9,12 +9,12 @@ import {
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
   HOUSE_SKINS, getHouseSkin,
-} from './house.js?v=20260920z';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920z';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920z';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920z';
+} from './house.js?v=20260921a';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260921a';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260921a';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260921a';
 
-export const GAME_VERSION = '20260920z';
+export const GAME_VERSION = '20260921a';
 
 const blueprint = createBlueprint();
 
@@ -481,13 +481,33 @@ function refreshComMemoryUi() {
 
 /* ---------- Points wallet (remaining life → points after match) ---------- */
 const POINTS_KEY = 'househouse-points-v1';
+/** Link not public yet — start testers with 1000 pt. Flip false before public launch. */
+const POINTS_TEST_MODE = true;
+const POINTS_TEST_START = 1000;
+const POINTS_TEST_GRANT_KEY = 'househouse-points-test-grant-v1';
 
 function loadPoints() {
   try {
+    if (POINTS_TEST_MODE) {
+      const granted = localStorage.getItem(POINTS_TEST_GRANT_KEY);
+      if (!granted) {
+        const existing = parseInt(localStorage.getItem(POINTS_KEY), 10);
+        const base = Number.isFinite(existing) && existing >= 0 ? existing : 0;
+        const start = Math.max(base, POINTS_TEST_START);
+        localStorage.setItem(POINTS_KEY, String(start));
+        localStorage.setItem(POINTS_TEST_GRANT_KEY, '1');
+        return start;
+      }
+    }
     const n = parseInt(localStorage.getItem(POINTS_KEY), 10);
-    return Number.isFinite(n) && n >= 0 ? n : 0;
-  } catch {
+    if (Number.isFinite(n) && n >= 0) return n;
+    if (POINTS_TEST_MODE) {
+      localStorage.setItem(POINTS_KEY, String(POINTS_TEST_START));
+      return POINTS_TEST_START;
+    }
     return 0;
+  } catch {
+    return POINTS_TEST_MODE ? POINTS_TEST_START : 0;
   }
 }
 
@@ -513,7 +533,11 @@ function awardMatchPointsFromHp(iWon) {
 function refreshPointsUi(gained) {
   const total = loadPoints();
   const titleEl = $('title-points');
-  if (titleEl) titleEl.textContent = 'ポイント ' + total;
+  if (titleEl) {
+    titleEl.textContent = POINTS_TEST_MODE
+      ? ('ポイント ' + total + '（テスト）')
+      : ('ポイント ' + total);
+  }
   const resEl = $('result-points');
   if (resEl) resEl.textContent = 'ポイント ' + total;
   const shopEl = $('shop-points');
