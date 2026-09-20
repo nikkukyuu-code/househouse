@@ -268,7 +268,7 @@ export const HOUSE_SKINS = [
     id: 'villa',
     name: '大邸宅',
     price: 80,
-    swatch: ['#e8e4d8', '#6a6870', '#d4af37'],
+    swatch: ['#e8e4d8', '#f2eee4', '#d4af37'],
     ornaments: 'trim',
     desc: '絵画・観葉・金縁キャビネットの大邸',
   },
@@ -336,20 +336,20 @@ const SKIN_FLOOR_OVERRIDES = {
   villa: [
     {
       floor: '#e8e4d8', floorAlt: '#d8d4c8', floorGrain: 'rgba(80,70,50,0.12)',
-      wall: '#9a9890', wallTop: '#b0aea8', wallEdge: '#4a4840',
-      baseboard: '#3a3830', door: '#8a7840', doorDark: '#504820', doorLight: '#e8d080',
+      wall: '#f2eee4', wallTop: '#faf6ec', wallEdge: '#d4af37',
+      baseboard: '#6a5a38', door: '#8a7840', doorDark: '#504820', doorLight: '#e8d080',
       rug: 'rgba(180,150,60,0.22)', glow: 'rgba(255,250,230,0.12)', badge: '#d4af37',
     },
     {
       floor: '#d8e0e8', floorAlt: '#c8d0d8', floorGrain: 'rgba(40,50,70,0.12)',
-      wall: '#7a8088', wallTop: '#949aa0', wallEdge: '#3a4048',
-      baseboard: '#2a3038', door: '#607088', doorDark: '#384858', doorLight: '#c0d0e0',
+      wall: '#e8ecf2', wallTop: '#f4f7fb', wallEdge: '#c9a227',
+      baseboard: '#585868', door: '#607088', doorDark: '#384858', doorLight: '#c0d0e0',
       rug: 'rgba(60,100,160,0.22)', glow: 'rgba(200,220,255,0.10)', badge: '#88a8d0',
     },
     {
       floor: '#ece4d0', floorAlt: '#dcd4c0', floorGrain: 'rgba(90,70,40,0.12)',
-      wall: '#a09888', wallTop: '#b8b0a0', wallEdge: '#504840',
-      baseboard: '#383028', door: '#a08840', doorDark: '#605020', doorLight: '#f0e0a0',
+      wall: '#f6edd8', wallTop: '#fff8ec', wallEdge: '#e0c040',
+      baseboard: '#6a5840', door: '#a08840', doorDark: '#605020', doorLight: '#f0e0a0',
       rug: 'rgba(160,100,40,0.22)', glow: 'rgba(255,240,200,0.10)', badge: '#e0c060',
     },
   ],
@@ -433,19 +433,194 @@ function drawWoodFloor(ctx, px, py, cellSize, x, y, floor = 0, skinId = 'basic')
 
 function drawWallTile(ctx, px, py, cellSize, floor = 0, skinId = 'basic') {
   const th = themeForFloor(floor, skinId);
+  const id = skinId || 'basic';
+  const topH = Math.max(3, cellSize * 0.2);
+  const baseH = Math.max(4, cellSize * 0.16);
+  const gold = th.badge || '#d4af37';
+
+  // Base fill (per-skin / per-floor tint via theme)
   ctx.fillStyle = th.wall;
   ctx.fillRect(px, py, cellSize, cellSize);
-  // Plaster / panel top
+
+  if (id === 'cottage') {
+    // Warm wood — grain + plank seams
+    ctx.fillStyle = th.wallTop;
+    ctx.fillRect(px, py, cellSize, topH * 0.55);
+    ctx.strokeStyle = 'rgba(60,35,15,0.22)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let i = 1; i <= 4; i++) {
+      const gy = py + cellSize * (0.18 + i * 0.16);
+      const wobble = ((floor + i) % 3) - 1;
+      ctx.moveTo(px + 1, gy);
+      ctx.lineTo(px + cellSize - 1, gy + wobble);
+    }
+    ctx.stroke();
+    // Vertical plank seams
+    ctx.strokeStyle = 'rgba(40,25,10,0.28)';
+    ctx.beginPath();
+    ctx.moveTo(px + cellSize * 0.33, py + 2);
+    ctx.lineTo(px + cellSize * 0.33, py + cellSize - 2);
+    ctx.moveTo(px + cellSize * 0.66, py + 2);
+    ctx.lineTo(px + cellSize * 0.66, py + cellSize - 2);
+    ctx.stroke();
+    // Soft wood highlight
+    ctx.fillStyle = 'rgba(255,220,160,0.10)';
+    ctx.fillRect(px + 2, py + 2, cellSize - 4, cellSize * 0.18);
+    ctx.fillStyle = th.baseboard;
+    ctx.fillRect(px, py + cellSize - baseH, cellSize, baseH);
+    ctx.fillStyle = th.wallEdge;
+    ctx.fillRect(px, py, cellSize, 2);
+    ctx.fillRect(px, py, 2, cellSize);
+    return;
+  }
+
+  if (id === 'mansion') {
+    // Elegant wallpaper stripes + dark trim / wainscot
+    const stripe = floor === 1 ? 'rgba(90,70,110,0.14)' : floor === 2 ? 'rgba(140,60,70,0.14)' : 'rgba(100,70,40,0.12)';
+    ctx.fillStyle = stripe;
+    const sw = Math.max(2, cellSize * 0.12);
+    for (let sx = px + 3; sx < px + cellSize - 2; sx += sw * 2) {
+      ctx.fillRect(sx, py + topH * 0.4, sw, cellSize - baseH - topH * 0.5);
+    }
+    // Upper molding
+    ctx.fillStyle = th.wallTop;
+    ctx.fillRect(px, py, cellSize, Math.max(2, cellSize * 0.1));
+    ctx.fillStyle = th.wallEdge;
+    ctx.fillRect(px, py + Math.max(2, cellSize * 0.1), cellSize, 2);
+    // Dark wainscot panel
+    const wainH = cellSize * 0.38;
+    ctx.fillStyle = shadeColor(th.baseboard, 18);
+    ctx.fillRect(px + 1, py + cellSize - baseH - wainH, cellSize - 2, wainH);
+    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(px + 4, py + cellSize - baseH - wainH + 3, cellSize - 8, wainH - 6);
+    ctx.fillStyle = th.baseboard;
+    ctx.fillRect(px, py + cellSize - baseH, cellSize, baseH);
+    // Dark trim edges
+    ctx.fillStyle = th.wallEdge;
+    ctx.fillRect(px, py, cellSize, 2);
+    ctx.fillRect(px, py, Math.max(2, cellSize * 0.08), cellSize);
+    ctx.fillRect(px + cellSize - Math.max(2, cellSize * 0.08), py, Math.max(2, cellSize * 0.08), cellSize);
+    return;
+  }
+
+  if (id === 'villa') {
+    // Luxury light plaster + gold accents
+    ctx.fillStyle = th.wallTop;
+    ctx.fillRect(px, py, cellSize, topH);
+    // Soft panel inset
+    ctx.fillStyle = 'rgba(255,255,255,0.22)';
+    ctx.fillRect(px + 4, py + topH + 2, cellSize - 8, cellSize - topH - baseH - 4);
+    ctx.strokeStyle = 'rgba(180,150,80,0.35)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(px + 5, py + topH + 3, cellSize - 10, cellSize - topH - baseH - 6);
+    // Gold corner studs
+    const g = Math.max(2, cellSize * 0.08);
+    ctx.fillStyle = gold;
+    ctx.fillRect(px + 3, py + topH + 1, g, g);
+    ctx.fillRect(px + cellSize - 3 - g, py + topH + 1, g, g);
+    ctx.fillRect(px + 3, py + cellSize - baseH - g - 1, g, g);
+    ctx.fillRect(px + cellSize - 3 - g, py + cellSize - baseH - g - 1, g, g);
+    // Gold edge trim
+    ctx.fillStyle = th.wallEdge;
+    ctx.fillRect(px, py, cellSize, 2);
+    ctx.fillRect(px, py + cellSize - 2, cellSize, 2);
+    ctx.fillRect(px, py, 2, cellSize);
+    ctx.fillRect(px + cellSize - 2, py, 2, cellSize);
+    ctx.fillStyle = th.baseboard;
+    ctx.fillRect(px, py + cellSize - baseH, cellSize, baseH);
+    ctx.fillStyle = gold;
+    ctx.fillRect(px, py + cellSize - baseH, cellSize, 2);
+    return;
+  }
+
+  if (id === 'castle_keep') {
+    // Stone / dark wood keep — mortar grid + thick edges
+    const rows = 3;
+    const cols = 2;
+    const bh = cellSize / rows;
+    const bw = cellSize / cols;
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+    ctx.lineWidth = 1;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const ox = (r % 2) * (bw * 0.5);
+        const bx = px + c * bw + ox;
+        const by = py + r * bh;
+        if (bx >= px + cellSize) continue;
+        const ww = Math.min(bw - 1, px + cellSize - bx - 1);
+        ctx.fillStyle = (r + c + floor) % 2 === 0 ? th.wall : shadeColor(th.wall, 12);
+        ctx.fillRect(bx, by, ww, bh - 1);
+        ctx.strokeRect(bx, by, ww, bh - 1);
+      }
+    }
+    // Dark timber top beam
+    ctx.fillStyle = shadeColor(th.baseboard, -10);
+    ctx.fillRect(px, py, cellSize, Math.max(3, cellSize * 0.14));
+    ctx.fillStyle = th.wallTop;
+    ctx.fillRect(px, py, cellSize, 2);
+    ctx.fillStyle = th.baseboard;
+    ctx.fillRect(px, py + cellSize - baseH, cellSize, baseH);
+    // Thick keep edges
+    const ew = Math.max(3, cellSize * 0.1);
+    ctx.fillStyle = th.wallEdge;
+    ctx.fillRect(px, py, cellSize, 2);
+    ctx.fillRect(px, py, ew, cellSize);
+    ctx.fillRect(px + cellSize - ew, py, ew, cellSize);
+    return;
+  }
+
+  if (id === 'osaka') {
+    // White castle plaster — richest: gold rails + dark roof-edge accents
+    ctx.fillStyle = th.wallTop;
+    ctx.fillRect(px, py, cellSize, topH);
+    // Fine plaster grain
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.fillRect(px + 2, py + topH * 0.5, cellSize - 4, cellSize * 0.12);
+    // Horizontal gold rails
+    ctx.fillStyle = gold;
+    ctx.fillRect(px + 1, py + cellSize * 0.32, cellSize - 2, 2);
+    ctx.fillRect(px + 1, py + cellSize * 0.58, cellSize - 2, 2);
+    // Dark timber posts (roof-edge / pillar hint)
+    const postW = Math.max(2, cellSize * 0.1);
+    ctx.fillStyle = th.baseboard;
+    ctx.fillRect(px, py, postW, cellSize);
+    ctx.fillRect(px + cellSize - postW, py, postW, cellSize);
+    // Gold studs on posts
+    ctx.fillStyle = gold;
+    for (const yy of [0.22, 0.45, 0.68]) {
+      ctx.fillRect(px + 1, py + cellSize * yy, postW - 1, 2);
+      ctx.fillRect(px + cellSize - postW + 1, py + cellSize * yy, postW - 1, 2);
+    }
+    // Inner white panel
+    ctx.strokeStyle = 'rgba(200,160,40,0.35)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(px + postW + 2, py + topH + 2, cellSize - postW * 2 - 4, cellSize - topH - baseH - 4);
+    // Floor-tint hint stripe (richer on 3F)
+    if (floor === 2) {
+      ctx.fillStyle = 'rgba(212,175,55,0.18)';
+      ctx.fillRect(px + postW + 3, py + cellSize * 0.4, cellSize - postW * 2 - 6, cellSize * 0.12);
+    } else if (floor === 1) {
+      ctx.fillStyle = 'rgba(180,150,60,0.10)';
+      ctx.fillRect(px + postW + 3, py + cellSize * 0.4, cellSize - postW * 2 - 6, cellSize * 0.1);
+    }
+    ctx.fillStyle = th.baseboard;
+    ctx.fillRect(px, py + cellSize - baseH, cellSize, baseH);
+    ctx.fillStyle = gold;
+    ctx.fillRect(px, py + cellSize - baseH, cellSize, 2);
+    ctx.fillRect(px, py, cellSize, 2);
+    return;
+  }
+
+  // basic — plain plaster
   ctx.fillStyle = th.wallTop;
-  ctx.fillRect(px, py, cellSize, Math.max(3, cellSize * 0.2));
-  // Baseboard
+  ctx.fillRect(px, py, cellSize, topH);
   ctx.fillStyle = th.baseboard;
-  ctx.fillRect(px, py + cellSize - Math.max(4, cellSize * 0.16), cellSize, Math.max(4, cellSize * 0.16));
-  // Edge
+  ctx.fillRect(px, py + cellSize - baseH, cellSize, baseH);
   ctx.fillStyle = th.wallEdge;
   ctx.fillRect(px, py, cellSize, 2);
   ctx.fillRect(px, py, 2, cellSize);
-  // Tiny wall panel line
   ctx.strokeStyle = 'rgba(255,255,255,0.08)';
   ctx.lineWidth = 1;
   ctx.strokeRect(px + 3, py + cellSize * 0.22, cellSize - 6, cellSize * 0.5);
