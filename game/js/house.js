@@ -408,27 +408,220 @@ export function themeForFloor(floor, skinId = 'basic') {
   return { ...base, ...overrides[fi] };
 }
 
+
+/** Asset base (relative to game/index.html) */
+const ASSET_BASE = 'assets/';
+
+/** Shared Image cache + ready flag */
+const _texImages = new Map(); // key -> HTMLImageElement
+const _texReady = new Map();  // key -> boolean
+const _patternCache = new WeakMap(); // ctx -> Map(key -> CanvasPattern)
+
+const TEXTURE_MANIFEST = {
+  floor_wood: 'textures/floor_wood.png',
+  floor_wood_cool: 'textures/floor_wood_cool.png',
+  floor_wood_warm: 'textures/floor_wood_warm.png',
+  floor_tatami: 'textures/floor_tatami.png',
+  wall_basic: 'textures/wall_basic.png',
+  wall_cottage: 'textures/wall_cottage.png',
+  wall_mansion: 'textures/wall_mansion.png',
+  wall_villa: 'textures/wall_villa.png',
+  wall_castle: 'textures/wall_castle.png',
+  wall_osaka: 'textures/wall_osaka.png',
+  rug: 'textures/rug.png',
+  door_wood: 'textures/door_wood.png',
+  furn_bed: 'furniture/bed.png',
+  furn_bed_nice: 'furniture/bed_nice.png',
+  furn_bed_luxury: 'furniture/bed_luxury.png',
+  furn_sofa: 'furniture/sofa.png',
+  furn_table: 'furniture/table.png',
+  furn_table_grand: 'furniture/table_grand.png',
+  furn_plant: 'furniture/plant.png',
+  furn_plant_tall: 'furniture/plant_tall.png',
+  furn_bookshelf: 'furniture/bookshelf.png',
+  furn_dresser: 'furniture/dresser.png',
+  furn_fireplace: 'furniture/fireplace.png',
+  furn_rug_cozy: 'furniture/rug_cozy.png',
+  furn_rug_rich: 'furniture/rug_rich.png',
+  furn_tatami: 'furniture/tatami.png',
+  furn_chair: 'furniture/chair.png',
+  furn_throne: 'furniture/throne.png',
+  furn_armor: 'furniture/armor.png',
+  furn_lantern: 'furniture/lantern.png',
+  furn_pillar: 'furniture/pillar.png',
+  furn_byobu: 'furniture/byobu.png',
+};
+
+const WALL_TEX_BY_SKIN = {
+  basic: 'wall_basic',
+  cottage: 'wall_cottage',
+  mansion: 'wall_mansion',
+  villa: 'wall_villa',
+  castle_keep: 'wall_castle',
+  osaka: 'wall_osaka',
+};
+
+const FURN_TEX_BY_KIND = {
+  bed: 'furn_bed',
+  bed_nice: 'furn_bed_nice',
+  bed_luxury: 'furn_bed_luxury',
+  sofa: 'furn_sofa',
+  table: 'furn_table',
+  table_wood: 'furn_table',
+  table_elegant: 'furn_table',
+  table_grand: 'furn_table_grand',
+  plant: 'furn_plant',
+  plant_tall: 'furn_plant_tall',
+  shelf: 'furn_bookshelf',
+  shelf_wood: 'furn_bookshelf',
+  bookshelf: 'furn_bookshelf',
+  dresser: 'furn_dresser',
+  wardrobe: 'furn_dresser',
+  cabinet_ornate: 'furn_dresser',
+  fireplace: 'furn_fireplace',
+  rug_cozy: 'furn_rug_cozy',
+  rug_rich: 'furn_rug_rich',
+  tatami: 'furn_tatami',
+  chair: 'furn_chair',
+  desk: 'furn_chair',
+  throne: 'furn_throne',
+  armor: 'furn_armor',
+  lantern: 'furn_lantern',
+  castle_lantern: 'furn_lantern',
+  pillar: 'furn_pillar',
+  byobu: 'furn_byobu',
+  gold_screen: 'furn_byobu',
+};
+
+function floorTexKey(floor, skinId) {
+  const id = skinId || 'basic';
+  if (id === 'castle_keep' || id === 'osaka') {
+    return floor === 2 ? 'floor_tatami' : 'floor_wood';
+  }
+  if (floor === 1) return 'floor_wood_cool';
+  if (floor === 2) return 'floor_wood_warm';
+  return 'floor_wood';
+}
+
+function getTex(key) {
+  if (!_texReady.get(key)) return null;
+  return _texImages.get(key) || null;
+}
+
+function getPattern(ctx, key) {
+  const img = getTex(key);
+  if (!img || !ctx) return null;
+  let map = _patternCache.get(ctx);
+  if (!map) {
+    map = new Map();
+    _patternCache.set(ctx, map);
+  }
+  if (map.has(key)) return map.get(key);
+  try {
+    const pat = ctx.createPattern(img, 'repeat');
+    map.set(key, pat);
+    return pat;
+  } catch (_) {
+    return null;
+  }
+}
+
+/**
+ * Preload all house textures. Safe to call multiple times.
+ * Resolves when every image has settled (load or error); missing files fall back to procedural draw.
+ */
+export function preloadTextures() {
+  const entries = Object.entries(TEXTURE_MANIFEST);
+  return Promise.all(
+    entries.map(
+      ([key, rel]) =>
+        new Promise((resolve) => {
+          if (_texImages.has(key)) {
+            resolve();
+            return;
+          }
+          const img = new Image();
+          img.decoding = 'async';
+          img.onload = () => {
+            _texReady.set(key, true);
+            resolve();
+          };
+          img.onerror = () => {
+            _texReady.set(key, false);
+            resolve();
+          };
+          _texImages.set(key, img);
+          img.src = ASSET_BASE + rel;
+        })
+    )
+  );
+}
+
+function fillTexRect(ctx, key, px, py, w, h, rotate90 = false) {
+  const img = getTex(key);
+  if (!img) return false;
+  if (rotate90) {
+    ctx.save();
+    ctx.translate(px + w / 2, py + h / 2);
+    ctx.rotate(Math.PI / 2);
+    ctx.drawImage(img, -h / 2, -w / 2, h, w);
+    ctx.restore();
+    return true;
+  }
+  const pat = getPattern(ctx, key);
+  if (pat) {
+    ctx.fillStyle = pat;
+    ctx.fillRect(px, py, w, h);
+    return true;
+  }
+  ctx.drawImage(img, px, py, w, h);
+  return true;
+}
+
+
 function drawWoodFloor(ctx, px, py, cellSize, x, y, floor = 0, skinId = 'basic') {
   const th = themeForFloor(floor, skinId);
-  const alt = (x + y) % 2 === 0;
-  ctx.fillStyle = alt ? th.floor : th.floorAlt;
-  ctx.fillRect(px, py, cellSize, cellSize);
-  // Plank lines (more house-like)
-  ctx.strokeStyle = th.floorGrain;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(px + 1, py + cellSize * 0.33);
-  ctx.lineTo(px + cellSize - 1, py + cellSize * 0.33 + ((x + y) % 2));
-  ctx.moveTo(px + 1, py + cellSize * 0.66);
-  ctx.lineTo(px + cellSize - 1, py + cellSize * 0.66 - ((x * 3 + y) % 2));
-  // Vertical seam every other tile
-  if (x % 2 === 0) {
-    ctx.moveTo(px + cellSize * 0.5, py + 1);
-    ctx.lineTo(px + cellSize * 0.5, py + cellSize - 1);
+  const texKey = floorTexKey(floor, skinId);
+  const used = fillTexRect(ctx, texKey, px, py, cellSize, cellSize);
+  if (!used) {
+    const alt = (x + y) % 2 === 0;
+    ctx.fillStyle = alt ? th.floor : th.floorAlt;
+    ctx.fillRect(px, py, cellSize, cellSize);
+    ctx.strokeStyle = th.floorGrain;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(px + 1, py + cellSize * 0.33);
+    ctx.lineTo(px + cellSize - 1, py + cellSize * 0.33 + ((x + y) % 2));
+    ctx.moveTo(px + 1, py + cellSize * 0.66);
+    ctx.lineTo(px + cellSize - 1, py + cellSize * 0.66 - ((x * 3 + y) % 2));
+    if (x % 2 === 0) {
+      ctx.moveTo(px + cellSize * 0.5, py + 1);
+      ctx.lineTo(px + cellSize * 0.5, py + cellSize - 1);
+    }
+    ctx.stroke();
+  } else {
+    // Theme tint so 1F/2F/3F stay distinct over shared wood photos
+    ctx.fillStyle = th.floor.length === 7
+      ? th.floor + '55'
+      : th.glow;
+    // Prefer translucent theme wash
+    const wash = th.rug && th.rug.includes('rgba') ? th.glow : 'rgba(255,240,200,0.12)';
+    ctx.fillStyle = wash;
+    ctx.fillRect(px, py, cellSize, cellSize);
+    // Soft plank seam for readability at small cell sizes
+    ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(px + 0.5, py + cellSize * 0.5);
+    ctx.lineTo(px + cellSize - 0.5, py + cellSize * 0.5);
+    if (x % 2 === 0) {
+      ctx.moveTo(px + cellSize * 0.5, py + 0.5);
+      ctx.lineTo(px + cellSize * 0.5, py + cellSize - 0.5);
+    }
+    ctx.stroke();
   }
-  ctx.stroke();
   ctx.fillStyle = th.glow;
-  ctx.fillRect(px + 1, py + 1, cellSize - 2, cellSize * 0.28);
+  ctx.fillRect(px + 1, py + 1, cellSize - 2, cellSize * 0.22);
 }
 
 /** Door sits in wall runs — treat as wall for continuity / facing checks. */
@@ -485,7 +678,58 @@ function drawWallTile(ctx, px, py, cellSize, floor = 0, skinId = 'basic', bluepr
   const drawV = axis === 'v' || axis === 'both';
   const cornerSoft = axis === 'both';
 
-  // Base fill (per-skin / per-floor tint via theme)
+  // Realistic wall texture (rotated for vertical runs); fallback to solid + procedural
+  const wallKey = WALL_TEX_BY_SKIN[id] || 'wall_basic';
+  const rotate90 = axis === 'v';
+  const texOk = fillTexRect(ctx, wallKey, px, py, cellSize, cellSize, rotate90);
+  if (texOk) {
+    // Theme wash so floors stay readable
+    ctx.fillStyle = th.wall.length === 7 ? th.wall + '40' : 'rgba(0,0,0,0.08)';
+    ctx.fillRect(px, py, cellSize, cellSize);
+    // Top lip + baseboard
+    ctx.fillStyle = th.wallTop;
+    ctx.globalAlpha = 0.55;
+    ctx.fillRect(px, py, cellSize, topH * 0.7);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = th.baseboard;
+    ctx.fillRect(px, py + cellSize - baseH, cellSize, baseH);
+    if (id === 'villa' || id === 'osaka') {
+      ctx.fillStyle = gold;
+      ctx.fillRect(px, py + cellSize - baseH, cellSize, 2);
+      ctx.fillRect(px, py, cellSize, 2);
+      if (id === 'osaka') {
+        const postW = Math.max(2, cellSize * 0.1);
+        ctx.fillStyle = th.baseboard;
+        if (orient.faceW) ctx.fillRect(px, py, postW, cellSize);
+        if (orient.faceE) ctx.fillRect(px + cellSize - postW, py, postW, cellSize);
+        if (orient.faceN) ctx.fillRect(px, py, cellSize, postW);
+        if (orient.faceS) ctx.fillRect(px, py + cellSize - postW, cellSize, postW);
+        ctx.fillStyle = gold;
+        if (drawH) {
+          ctx.fillRect(px + 1, py + cellSize * 0.32, cellSize - 2, 1.5);
+          ctx.fillRect(px + 1, py + cellSize * 0.58, cellSize - 2, 1.5);
+        }
+        if (drawV) {
+          ctx.fillRect(px + cellSize * 0.32, py + 1, 1.5, cellSize - 2);
+          ctx.fillRect(px + cellSize * 0.58, py + 1, 1.5, cellSize - 2);
+        }
+      }
+    } else if (id === 'castle_keep') {
+      const ew = Math.max(3, cellSize * 0.1);
+      drawFacingWallEdges(ctx, px, py, cellSize, th, orient, ew);
+      return;
+    } else if (id === 'mansion') {
+      const mold = Math.max(2, cellSize * 0.1);
+      ctx.fillStyle = th.wallTop;
+      ctx.globalAlpha = 0.7;
+      ctx.fillRect(px, py, cellSize, mold);
+      ctx.globalAlpha = 1;
+    }
+    drawFacingWallEdges(ctx, px, py, cellSize, th, orient, id === 'villa' ? 2 : 2);
+    return;
+  }
+
+  // Base fill (per-skin / per-floor tint via theme) — procedural fallback
   ctx.fillStyle = th.wall;
   ctx.fillRect(px, py, cellSize, cellSize);
 
@@ -760,14 +1004,23 @@ function drawDoorTile(ctx, px, py, cellSize, floor = 0, skinId = 'basic') {
   const th = themeForFloor(floor, skinId);
   drawWoodFloor(ctx, px, py, cellSize, 0, 0, floor, skinId);
   const m = Math.max(3, cellSize * 0.1);
-  // Door frame (house trim)
+  const doorImg = getTex('door_wood');
+  if (doorImg) {
+    ctx.fillStyle = th.baseboard;
+    ctx.fillRect(px + m - 2, py + m - 2, cellSize - (m - 2) * 2, cellSize - (m - 2) * 2);
+    ctx.drawImage(doorImg, px + m, py + m, cellSize - m * 2, cellSize - m * 2);
+    // Theme tint on door
+    ctx.fillStyle = th.door.length === 7 ? th.door + '33' : 'rgba(0,0,0,0.1)';
+    ctx.fillRect(px + m, py + m, cellSize - m * 2, cellSize - m * 2);
+    return;
+  }
+  // Door frame (house trim) — procedural fallback
   ctx.fillStyle = th.baseboard;
   ctx.fillRect(px + m - 2, py + m - 2, cellSize - (m - 2) * 2, cellSize - (m - 2) * 2);
   ctx.fillStyle = th.doorDark;
   ctx.fillRect(px + m, py + m, cellSize - m * 2, cellSize - m * 2);
   ctx.fillStyle = th.door;
   ctx.fillRect(px + m + 2, py + m + 2, cellSize - m * 2 - 4, cellSize - m * 2 - 4);
-  // Panels
   const pw = (cellSize - m * 2 - 8) / 2 - 1;
   const ph = (cellSize - m * 2 - 10) / 2 - 1;
   ctx.fillStyle = 'rgba(255,255,255,0.12)';
@@ -778,7 +1031,6 @@ function drawDoorTile(ctx, px, py, cellSize, floor = 0, skinId = 'basic') {
   ctx.strokeStyle = th.doorLight;
   ctx.lineWidth = 1.5;
   ctx.strokeRect(px + m + 1, py + m + 1, cellSize - m * 2 - 2, cellSize - m * 2 - 2);
-  // Knob
   ctx.fillStyle = th.doorLight;
   ctx.beginPath();
   ctx.arc(px + cellSize * 0.74, py + cellSize * 0.52, cellSize * 0.07, 0, Math.PI * 2);
@@ -963,31 +1215,44 @@ export function drawTrapSprite(ctx, tr, triggered, px, py, cellSize) {
 
 export function drawChestSprite(ctx, px, py, cellSize) {
   const m = Math.max(3, cellSize * 0.12);
-  // Shadow
-  ctx.fillStyle = 'rgba(0,0,0,0.25)';
-  ctx.fillRect(px + m + 2, py + cellSize - m, cellSize - m * 2, 3);
-  // Body
+  const rr = Math.max(2, cellSize * 0.08);
+  // Soft oval shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.28)';
+  ctx.beginPath();
+  ctx.ellipse(px + cellSize / 2, py + cellSize - m + 1, cellSize * 0.34, cellSize * 0.08, 0, 0, Math.PI * 2);
+  ctx.fill();
   const bodyY = py + cellSize * 0.38;
   const bodyH = cellSize * 0.48;
+  // Body with rounded corners
   ctx.fillStyle = COLORS.chestEdge;
-  ctx.fillRect(px + m, bodyY, cellSize - m * 2, bodyH);
+  ctx.beginPath();
+  ctx.roundRect(px + m, bodyY, cellSize - m * 2, bodyH, rr);
+  ctx.fill();
   ctx.fillStyle = COLORS.chest;
-  ctx.fillRect(px + m + 2, bodyY + 2, cellSize - m * 2 - 4, bodyH - 4);
-  // Gold highlight stripe
-  ctx.fillStyle = 'rgba(255,240,160,0.45)';
-  ctx.fillRect(px + m + 3, bodyY + 3, cellSize - m * 2 - 6, 3);
+  ctx.beginPath();
+  ctx.roundRect(px + m + 2, bodyY + 2, cellSize - m * 2 - 4, bodyH - 4, rr * 0.7);
+  ctx.fill();
+  // Specular
+  ctx.fillStyle = 'rgba(255,245,180,0.4)';
+  ctx.fillRect(px + m + 3, bodyY + 3, cellSize - m * 2 - 6, Math.max(2, cellSize * 0.06));
   // Lid
   ctx.fillStyle = COLORS.chestEdge;
-  ctx.fillRect(px + m - 1, py + cellSize * 0.22, cellSize - m * 2 + 2, cellSize * 0.22);
+  ctx.beginPath();
+  ctx.roundRect(px + m - 1, py + cellSize * 0.22, cellSize - m * 2 + 2, cellSize * 0.22, rr);
+  ctx.fill();
   ctx.fillStyle = COLORS.chestLid;
-  ctx.fillRect(px + m + 1, py + cellSize * 0.24, cellSize - m * 2 - 2, cellSize * 0.16);
-  ctx.fillStyle = 'rgba(255,255,220,0.5)';
+  ctx.beginPath();
+  ctx.roundRect(px + m + 1, py + cellSize * 0.24, cellSize - m * 2 - 2, cellSize * 0.16, rr * 0.6);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,220,0.55)';
   ctx.fillRect(px + m + 2, py + cellSize * 0.25, cellSize - m * 2 - 4, 3);
   // Lock
   ctx.fillStyle = COLORS.chestLock;
   const lx = px + cellSize / 2 - 3;
   const ly = py + cellSize * 0.42;
-  ctx.fillRect(lx, ly, 6, 7);
+  ctx.beginPath();
+  ctx.roundRect(lx, ly, 6, 7, 1);
+  ctx.fill();
   ctx.fillStyle = '#e8c547';
   ctx.fillRect(lx + 1, ly + 1, 4, 3);
 }
@@ -1521,6 +1786,17 @@ function drawFurnitureSprite(ctx, kind, px, py, cellSize, floor, skinId = 'basic
   const wood = shadeColor(th.wallEdge, 25);
   const woodHi = shadeColor(th.doorLight, -20);
   const woodDk = th.wallEdge;
+
+  // Realistic furniture sprite when available
+  const furnKey = FURN_TEX_BY_KIND[kind];
+  if (furnKey) {
+    const img = getTex(furnKey);
+    if (img) {
+      const pad = s * 0.06;
+      ctx.drawImage(img, px + pad, py + pad, s - pad * 2, s - pad * 2);
+      return;
+    }
+  }
 
   // --- beds ---
   if (kind === 'bed' || kind === 'bed_nice' || kind === 'bed_luxury') {
@@ -2267,29 +2543,51 @@ export function drawHouse(ctx, blueprint, houseData, floor, opts = {}) {
     if (blueprint[floor][ry][rx] !== T.FLOOR) continue;
     const rpx = ox + rx * cellSize;
     const rpy = oy + ry * cellSize;
-    ctx.fillStyle = rugTier >= 5
-      ? th.rug.replace(/0\.\d+/g, '0.38')
-      : rugTier >= 3
-        ? th.rug.replace(/0\.\d+/g, '0.32')
-        : th.rug;
-    const rr = cellSize * (rugTier >= 4 ? 0.06 : 0.08);
     const inset = rugTier >= 5 ? 0.1 : 0.15;
     const rx0 = rpx + cellSize * inset;
     const ry0 = rpy + cellSize * inset;
     const rw = cellSize * (1 - inset * 2);
     const rh = cellSize * (1 - inset * 2);
-    ctx.beginPath();
-    ctx.moveTo(rx0 + rr, ry0);
-    ctx.arcTo(rx0 + rw, ry0, rx0 + rw, ry0 + rh, rr);
-    ctx.arcTo(rx0 + rw, ry0 + rh, rx0, ry0 + rh, rr);
-    ctx.arcTo(rx0, ry0 + rh, rx0, ry0, rr);
-    ctx.arcTo(rx0, ry0, rx0 + rw, ry0, rr);
-    ctx.closePath();
-    ctx.fill();
-    if (rugTier >= 2) {
-      ctx.strokeStyle = rugTier >= 5 ? (th.badge || '#d4af37') : 'rgba(255,255,255,0.22)';
-      ctx.lineWidth = rugTier >= 5 ? 1.5 : 1;
-      ctx.strokeRect(rx0 + 2, ry0 + 2, rw - 4, rh - 4);
+    const rugImg = getTex(rugTier >= 3 ? 'rug' : 'furn_rug_cozy') || getTex('rug');
+    if (rugImg) {
+      ctx.save();
+      const rr = cellSize * (rugTier >= 4 ? 0.06 : 0.08);
+      ctx.beginPath();
+      ctx.moveTo(rx0 + rr, ry0);
+      ctx.arcTo(rx0 + rw, ry0, rx0 + rw, ry0 + rh, rr);
+      ctx.arcTo(rx0 + rw, ry0 + rh, rx0, ry0 + rh, rr);
+      ctx.arcTo(rx0, ry0 + rh, rx0, ry0, rr);
+      ctx.arcTo(rx0, ry0, rx0 + rw, ry0, rr);
+      ctx.closePath();
+      ctx.clip();
+      ctx.globalAlpha = rugTier >= 5 ? 0.92 : rugTier >= 2 ? 0.8 : 0.65;
+      ctx.drawImage(rugImg, rx0, ry0, rw, rh);
+      ctx.restore();
+      if (rugTier >= 2) {
+        ctx.strokeStyle = rugTier >= 5 ? (th.badge || '#d4af37') : 'rgba(255,255,255,0.22)';
+        ctx.lineWidth = rugTier >= 5 ? 1.5 : 1;
+        ctx.strokeRect(rx0 + 2, ry0 + 2, rw - 4, rh - 4);
+      }
+    } else {
+      ctx.fillStyle = rugTier >= 5
+        ? th.rug.replace(/0\.\d+/g, '0.38')
+        : rugTier >= 3
+          ? th.rug.replace(/0\.\d+/g, '0.32')
+          : th.rug;
+      const rr = cellSize * (rugTier >= 4 ? 0.06 : 0.08);
+      ctx.beginPath();
+      ctx.moveTo(rx0 + rr, ry0);
+      ctx.arcTo(rx0 + rw, ry0, rx0 + rw, ry0 + rh, rr);
+      ctx.arcTo(rx0 + rw, ry0 + rh, rx0, ry0 + rh, rr);
+      ctx.arcTo(rx0, ry0 + rh, rx0, ry0, rr);
+      ctx.arcTo(rx0, ry0, rx0 + rw, ry0, rr);
+      ctx.closePath();
+      ctx.fill();
+      if (rugTier >= 2) {
+        ctx.strokeStyle = rugTier >= 5 ? (th.badge || '#d4af37') : 'rgba(255,255,255,0.22)';
+        ctx.lineWidth = rugTier >= 5 ? 1.5 : 1;
+        ctx.strokeRect(rx0 + 2, ry0 + 2, rw - 4, rh - 4);
+      }
     }
   }
 
