@@ -246,7 +246,7 @@ export const HOUSE_SKINS = [
     price: 0,
     swatch: ['#e8c98a', '#6b4430', '#d9b56e'],
     ornaments: 'none',
-    desc: 'いまの見た目（無料）',
+    desc: '簡素な家具・リビング／寝室／屋根裏',
   },
   {
     id: 'cottage',
@@ -254,7 +254,7 @@ export const HOUSE_SKINS = [
     price: 15,
     swatch: ['#f2e0b0', '#8a6548', '#c8d8a8'],
     ornaments: 'none',
-    desc: '少し立派な住まい',
+    desc: 'カーテン・コンロ・木家具のあたたかさ',
   },
   {
     id: 'mansion',
@@ -262,7 +262,7 @@ export const HOUSE_SKINS = [
     price: 40,
     swatch: ['#d8c8a8', '#5a4a3a', '#8a3040'],
     ornaments: 'trim',
-    desc: '西洋風の館',
+    desc: '暖炉・シャンデリア・書棚の西洋館',
   },
   {
     id: 'villa',
@@ -270,7 +270,7 @@ export const HOUSE_SKINS = [
     price: 80,
     swatch: ['#e8e4d8', '#6a6870', '#d4af37'],
     ornaments: 'trim',
-    desc: '広々とした邸宅',
+    desc: '絵画・観葉・金縁キャビネットの大邸',
   },
   {
     id: 'castle_keep',
@@ -278,7 +278,7 @@ export const HOUSE_SKINS = [
     price: 150,
     swatch: ['#c8b090', '#4a4540', '#d4af37'],
     ornaments: 'keep',
-    desc: '天守を思わせる佇まい',
+    desc: '甲冑・旗・畳・3F玉座の天守',
   },
   {
     id: 'osaka',
@@ -286,7 +286,7 @@ export const HOUSE_SKINS = [
     price: 250,
     swatch: ['#fff8e0', '#2a2420', '#d4af37'],
     ornaments: 'castle',
-    desc: '金白壁・黒屋根の城郭風',
+    desc: '金屏風・柱・朱絨毯・天守玉座',
   },
 ];
 
@@ -692,179 +692,522 @@ export function drawChestSprite(ctx, px, py, cellSize) {
  * Deterministic decorative furniture per room (same every match).
  * Drawn inset on FLOOR cells only — does not affect walkability or placement.
  * Skips spawn (6,7) and never draws on doors/stairs/walls.
- * Layout + sprite kinds grade up with house skin theme.
+ * Each skin has 3 floor layouts: 1F living/entrance, 2F bedrooms/study,
+ * 3F attic / keep / throne (skin-dependent). Density + signature props
+ * make skins visually obvious at a glance.
  */
 const FURNITURE_BY_SKIN = {
-  // ふつうの家 — sparse, simple everyday pieces
+  // ふつうの家 — sparse everyday; clear 1F living / 2F sleep-study / 3F attic
   basic: [
-    { x: 1, y: 1, kind: 'bed' },
-    { x: 3, y: 1, kind: 'plant' },
-    { x: 1, y: 3, kind: 'shelf' },
-    { x: 5, y: 3, kind: 'table' },
-    { x: 9, y: 1, kind: 'shelf' },
-    { x: 3, y: 5, kind: 'shelf' },
-    { x: 2, y: 6, kind: 'table' },
-    { x: 9, y: 6, kind: 'bed' },
-    { x: 11, y: 7, kind: 'plant' },
+    // 1F living + entrance
+    [
+      { x: 5, y: 5, kind: 'coat_rack' },
+      { x: 6, y: 1, kind: 'sofa' },
+      { x: 7, y: 1, kind: 'tv_stand' },
+      { x: 5, y: 3, kind: 'table' },
+      { x: 3, y: 1, kind: 'plant' },
+      { x: 1, y: 3, kind: 'shelf' },
+      { x: 9, y: 3, kind: 'shelf' },
+      { x: 11, y: 7, kind: 'plant' },
+    ],
+    // 2F bedrooms + study
+    [
+      { x: 1, y: 1, kind: 'bed' },
+      { x: 1, y: 3, kind: 'shelf' },
+      { x: 3, y: 1, kind: 'plant' },
+      { x: 5, y: 1, kind: 'desk' },
+      { x: 6, y: 1, kind: 'chair' },
+      { x: 7, y: 3, kind: 'shelf' },
+      { x: 9, y: 6, kind: 'bed' },
+      { x: 11, y: 5, kind: 'shelf' },
+      { x: 10, y: 3, kind: 'table' },
+      { x: 3, y: 5, kind: 'plant' },
+    ],
+    // 3F attic storage
+    [
+      { x: 1, y: 1, kind: 'crate' },
+      { x: 3, y: 1, kind: 'trunk' },
+      { x: 2, y: 3, kind: 'crate' },
+      { x: 5, y: 3, kind: 'shelf' },
+      { x: 7, y: 1, kind: 'trunk' },
+      { x: 9, y: 1, kind: 'crate' },
+      { x: 11, y: 3, kind: 'trunk' },
+      { x: 1, y: 5, kind: 'crate' },
+      { x: 3, y: 6, kind: 'plant' },
+      { x: 9, y: 6, kind: 'trunk' },
+      { x: 11, y: 5, kind: 'crate' },
+    ],
   ],
-  // こざっぱり — warmer wood, curtains, cozy rug, dresser
+  // こざっぱり — warm wood, curtains, cozy rugs; kitchen-ish 1F
   cottage: [
-    { x: 1, y: 1, kind: 'bed_nice' },
-    { x: 3, y: 1, kind: 'curtain' },
-    { x: 1, y: 3, kind: 'dresser' },
-    { x: 2, y: 2, kind: 'rug_cozy' },
-    { x: 6, y: 1, kind: 'sofa' },
-    { x: 5, y: 3, kind: 'table_wood' },
-    { x: 7, y: 3, kind: 'plant' },
-    { x: 6, y: 2, kind: 'rug_cozy' },
-    { x: 9, y: 1, kind: 'shelf_wood' },
-    { x: 10, y: 3, kind: 'table_wood' },
-    { x: 11, y: 3, kind: 'curtain' },
-    { x: 3, y: 5, kind: 'dresser' },
-    { x: 1, y: 5, kind: 'plant' },
-    { x: 2, y: 6, kind: 'table_wood' },
-    { x: 7, y: 5, kind: 'shelf_wood' },
-    { x: 9, y: 6, kind: 'bed_nice' },
-    { x: 11, y: 5, kind: 'dresser' },
-    { x: 11, y: 7, kind: 'plant' },
-    { x: 10, y: 6, kind: 'rug_cozy' },
+    // 1F living + kitchen nook
+    [
+      { x: 1, y: 1, kind: 'curtain' },
+      { x: 3, y: 1, kind: 'stove' },
+      { x: 1, y: 3, kind: 'dresser' },
+      { x: 2, y: 2, kind: 'rug_cozy' },
+      { x: 6, y: 1, kind: 'sofa' },
+      { x: 5, y: 3, kind: 'table_wood' },
+      { x: 7, y: 3, kind: 'plant' },
+      { x: 6, y: 2, kind: 'rug_cozy' },
+      { x: 9, y: 1, kind: 'curtain' },
+      { x: 11, y: 3, kind: 'shelf_wood' },
+      { x: 10, y: 2, kind: 'rug_cozy' },
+      { x: 5, y: 5, kind: 'coat_rack' },
+      { x: 3, y: 5, kind: 'dresser' },
+      { x: 1, y: 5, kind: 'plant' },
+      { x: 2, y: 6, kind: 'table_wood' },
+      { x: 9, y: 6, kind: 'shelf_wood' },
+      { x: 11, y: 7, kind: 'plant' },
+      { x: 10, y: 6, kind: 'rug_cozy' },
+    ],
+    // 2F bedrooms
+    [
+      { x: 1, y: 1, kind: 'bed_nice' },
+      { x: 3, y: 1, kind: 'curtain' },
+      { x: 1, y: 3, kind: 'dresser' },
+      { x: 2, y: 2, kind: 'rug_cozy' },
+      { x: 5, y: 1, kind: 'desk' },
+      { x: 6, y: 1, kind: 'chair' },
+      { x: 7, y: 3, kind: 'plant' },
+      { x: 6, y: 2, kind: 'rug_cozy' },
+      { x: 9, y: 1, kind: 'bed_nice' },
+      { x: 11, y: 3, kind: 'dresser' },
+      { x: 10, y: 2, kind: 'curtain' },
+      { x: 3, y: 5, kind: 'wardrobe' },
+      { x: 1, y: 5, kind: 'plant' },
+      { x: 2, y: 6, kind: 'rug_cozy' },
+      { x: 7, y: 5, kind: 'shelf_wood' },
+      { x: 9, y: 6, kind: 'bed_nice' },
+      { x: 11, y: 5, kind: 'dresser' },
+      { x: 11, y: 7, kind: 'curtain' },
+      { x: 10, y: 6, kind: 'rug_cozy' },
+    ],
+    // 3F cozy attic loft
+    [
+      { x: 1, y: 1, kind: 'trunk' },
+      { x: 3, y: 1, kind: 'curtain' },
+      { x: 2, y: 2, kind: 'rug_cozy' },
+      { x: 1, y: 3, kind: 'crate' },
+      { x: 5, y: 1, kind: 'bed_nice' },
+      { x: 7, y: 1, kind: 'curtain' },
+      { x: 6, y: 2, kind: 'rug_cozy' },
+      { x: 5, y: 3, kind: 'table_wood' },
+      { x: 9, y: 1, kind: 'trunk' },
+      { x: 11, y: 3, kind: 'plant' },
+      { x: 10, y: 2, kind: 'rug_cozy' },
+      { x: 3, y: 5, kind: 'dresser' },
+      { x: 1, y: 5, kind: 'crate' },
+      { x: 2, y: 6, kind: 'rug_cozy' },
+      { x: 7, y: 5, kind: 'shelf_wood' },
+      { x: 9, y: 6, kind: 'trunk' },
+      { x: 11, y: 5, kind: 'curtain' },
+      { x: 11, y: 7, kind: 'plant' },
+      { x: 5, y: 6, kind: 'plant' },
+    ],
   ],
-  // 洋館 — sofa, chandelier hint, bookshelf, fireplace, elegant table
+  // 洋館 — parlor / library-bedrooms / gallery; fireplace + chandelier signature
   mansion: [
-    { x: 1, y: 1, kind: 'bed_nice' },
-    { x: 3, y: 1, kind: 'plant' },
-    { x: 1, y: 3, kind: 'bookshelf' },
-    { x: 2, y: 2, kind: 'chandelier' },
-    { x: 6, y: 1, kind: 'sofa' },
-    { x: 5, y: 3, kind: 'table_elegant' },
-    { x: 7, y: 3, kind: 'plant' },
-    { x: 6, y: 2, kind: 'chandelier' },
-    { x: 7, y: 1, kind: 'fireplace' },
-    { x: 9, y: 1, kind: 'bookshelf' },
-    { x: 10, y: 3, kind: 'table_elegant' },
-    { x: 11, y: 3, kind: 'plant' },
-    { x: 10, y: 2, kind: 'chandelier' },
-    { x: 1, y: 5, kind: 'fireplace' },
-    { x: 3, y: 5, kind: 'bookshelf' },
-    { x: 2, y: 6, kind: 'table_elegant' },
-    { x: 2, y: 5, kind: 'chandelier' },
-    { x: 5, y: 5, kind: 'plant' },
-    { x: 7, y: 5, kind: 'bookshelf' },
-    { x: 11, y: 5, kind: 'bookshelf' },
-    { x: 9, y: 6, kind: 'bed_nice' },
-    { x: 11, y: 7, kind: 'plant' },
-    { x: 10, y: 6, kind: 'chandelier' },
-    { x: 9, y: 5, kind: 'fireplace' },
+    // 1F parlor + entrance hall
+    [
+      { x: 1, y: 1, kind: 'bookshelf' },
+      { x: 3, y: 1, kind: 'plant' },
+      { x: 1, y: 3, kind: 'fireplace' },
+      { x: 2, y: 2, kind: 'chandelier' },
+      { x: 6, y: 1, kind: 'sofa' },
+      { x: 5, y: 3, kind: 'table_elegant' },
+      { x: 7, y: 1, kind: 'fireplace' },
+      { x: 6, y: 2, kind: 'chandelier' },
+      { x: 7, y: 3, kind: 'plant' },
+      { x: 9, y: 1, kind: 'bookshelf' },
+      { x: 10, y: 3, kind: 'table_elegant' },
+      { x: 11, y: 3, kind: 'plant' },
+      { x: 10, y: 2, kind: 'chandelier' },
+      { x: 5, y: 5, kind: 'coat_rack' },
+      { x: 3, y: 5, kind: 'bookshelf' },
+      { x: 1, y: 5, kind: 'fireplace' },
+      { x: 2, y: 6, kind: 'table_elegant' },
+      { x: 2, y: 5, kind: 'chandelier' },
+      { x: 9, y: 5, kind: 'sofa' },
+      { x: 11, y: 7, kind: 'plant' },
+      { x: 10, y: 6, kind: 'chandelier' },
+    ],
+    // 2F bedrooms + study library
+    [
+      { x: 1, y: 1, kind: 'bed_nice' },
+      { x: 3, y: 1, kind: 'plant' },
+      { x: 1, y: 3, kind: 'bookshelf' },
+      { x: 2, y: 2, kind: 'chandelier' },
+      { x: 5, y: 1, kind: 'desk' },
+      { x: 6, y: 1, kind: 'chair' },
+      { x: 7, y: 3, kind: 'bookshelf' },
+      { x: 6, y: 2, kind: 'chandelier' },
+      { x: 5, y: 3, kind: 'table_elegant' },
+      { x: 9, y: 1, kind: 'bed_nice' },
+      { x: 11, y: 3, kind: 'bookshelf' },
+      { x: 10, y: 2, kind: 'chandelier' },
+      { x: 9, y: 3, kind: 'fireplace' },
+      { x: 1, y: 5, kind: 'fireplace' },
+      { x: 3, y: 5, kind: 'bookshelf' },
+      { x: 2, y: 6, kind: 'wardrobe' },
+      { x: 2, y: 5, kind: 'chandelier' },
+      { x: 7, y: 5, kind: 'bookshelf' },
+      { x: 5, y: 5, kind: 'plant' },
+      { x: 9, y: 6, kind: 'bed_nice' },
+      { x: 11, y: 5, kind: 'bookshelf' },
+      { x: 11, y: 7, kind: 'plant' },
+      { x: 10, y: 6, kind: 'chandelier' },
+    ],
+    // 3F gallery attic
+    [
+      { x: 1, y: 1, kind: 'art_frame' },
+      { x: 3, y: 1, kind: 'bookshelf' },
+      { x: 2, y: 2, kind: 'chandelier' },
+      { x: 1, y: 3, kind: 'fireplace' },
+      { x: 5, y: 1, kind: 'sofa' },
+      { x: 7, y: 1, kind: 'art_frame' },
+      { x: 6, y: 2, kind: 'chandelier' },
+      { x: 5, y: 3, kind: 'table_elegant' },
+      { x: 9, y: 1, kind: 'art_frame' },
+      { x: 11, y: 3, kind: 'bookshelf' },
+      { x: 10, y: 2, kind: 'chandelier' },
+      { x: 9, y: 3, kind: 'plant' },
+      { x: 1, y: 5, kind: 'art_frame' },
+      { x: 3, y: 5, kind: 'bookshelf' },
+      { x: 2, y: 5, kind: 'chandelier' },
+      { x: 2, y: 6, kind: 'table_elegant' },
+      { x: 5, y: 5, kind: 'plant' },
+      { x: 7, y: 5, kind: 'art_frame' },
+      { x: 9, y: 5, kind: 'fireplace' },
+      { x: 11, y: 5, kind: 'bookshelf' },
+      { x: 10, y: 6, kind: 'chandelier' },
+      { x: 11, y: 7, kind: 'plant' },
+      { x: 9, y: 6, kind: 'sofa' },
+    ],
   ],
-  // 大邸宅 — luxury bed, grand table, art, tall plant, ornate cabinet
+  // 大邸宅 — dense luxury; tall plants, art, ornate cabinets, grand tables
   villa: [
-    { x: 1, y: 1, kind: 'bed_luxury' },
-    { x: 3, y: 1, kind: 'art_frame' },
-    { x: 1, y: 3, kind: 'cabinet_ornate' },
-    { x: 2, y: 2, kind: 'chandelier' },
-    { x: 3, y: 3, kind: 'plant_tall' },
-    { x: 6, y: 1, kind: 'sofa' },
-    { x: 5, y: 3, kind: 'table_grand' },
-    { x: 7, y: 3, kind: 'plant_tall' },
-    { x: 6, y: 2, kind: 'chandelier' },
-    { x: 7, y: 1, kind: 'art_frame' },
-    { x: 9, y: 1, kind: 'cabinet_ornate' },
-    { x: 10, y: 3, kind: 'table_grand' },
-    { x: 11, y: 3, kind: 'art_frame' },
-    { x: 10, y: 2, kind: 'chandelier' },
-    { x: 9, y: 3, kind: 'plant_tall' },
-    { x: 1, y: 5, kind: 'art_frame' },
-    { x: 3, y: 5, kind: 'cabinet_ornate' },
-    { x: 2, y: 6, kind: 'table_grand' },
-    { x: 1, y: 6, kind: 'plant_tall' },
-    { x: 2, y: 5, kind: 'chandelier' },
-    { x: 5, y: 5, kind: 'plant_tall' },
-    { x: 7, y: 5, kind: 'cabinet_ornate' },
-    { x: 5, y: 6, kind: 'art_frame' },
-    { x: 11, y: 5, kind: 'cabinet_ornate' },
-    { x: 9, y: 6, kind: 'bed_luxury' },
-    { x: 11, y: 7, kind: 'plant_tall' },
-    { x: 10, y: 5, kind: 'art_frame' },
-    { x: 10, y: 6, kind: 'chandelier' },
+    // 1F grand foyer / salon
+    [
+      { x: 1, y: 1, kind: 'cabinet_ornate' },
+      { x: 3, y: 1, kind: 'art_frame' },
+      { x: 1, y: 3, kind: 'plant_tall' },
+      { x: 2, y: 2, kind: 'chandelier' },
+      { x: 3, y: 3, kind: 'plant_tall' },
+      { x: 6, y: 1, kind: 'sofa' },
+      { x: 5, y: 3, kind: 'table_grand' },
+      { x: 7, y: 3, kind: 'plant_tall' },
+      { x: 6, y: 2, kind: 'chandelier' },
+      { x: 7, y: 1, kind: 'art_frame' },
+      { x: 9, y: 1, kind: 'cabinet_ornate' },
+      { x: 10, y: 3, kind: 'table_grand' },
+      { x: 11, y: 3, kind: 'art_frame' },
+      { x: 10, y: 2, kind: 'chandelier' },
+      { x: 9, y: 3, kind: 'plant_tall' },
+      { x: 5, y: 5, kind: 'coat_rack' },
+      { x: 1, y: 5, kind: 'art_frame' },
+      { x: 3, y: 5, kind: 'cabinet_ornate' },
+      { x: 2, y: 6, kind: 'table_grand' },
+      { x: 1, y: 6, kind: 'plant_tall' },
+      { x: 2, y: 5, kind: 'chandelier' },
+      { x: 7, y: 5, kind: 'plant_tall' },
+      { x: 9, y: 5, kind: 'sofa' },
+      { x: 11, y: 5, kind: 'cabinet_ornate' },
+      { x: 10, y: 6, kind: 'chandelier' },
+      { x: 11, y: 7, kind: 'plant_tall' },
+      { x: 10, y: 5, kind: 'art_frame' },
+    ],
+    // 2F luxury suites + study
+    [
+      { x: 1, y: 1, kind: 'bed_luxury' },
+      { x: 3, y: 1, kind: 'art_frame' },
+      { x: 1, y: 3, kind: 'wardrobe' },
+      { x: 2, y: 2, kind: 'chandelier' },
+      { x: 3, y: 3, kind: 'plant_tall' },
+      { x: 5, y: 1, kind: 'desk' },
+      { x: 6, y: 1, kind: 'chair' },
+      { x: 7, y: 3, kind: 'cabinet_ornate' },
+      { x: 6, y: 2, kind: 'chandelier' },
+      { x: 5, y: 3, kind: 'table_grand' },
+      { x: 7, y: 1, kind: 'art_frame' },
+      { x: 9, y: 1, kind: 'bed_luxury' },
+      { x: 11, y: 3, kind: 'wardrobe' },
+      { x: 10, y: 2, kind: 'chandelier' },
+      { x: 9, y: 3, kind: 'plant_tall' },
+      { x: 10, y: 3, kind: 'cabinet_ornate' },
+      { x: 1, y: 5, kind: 'art_frame' },
+      { x: 3, y: 5, kind: 'cabinet_ornate' },
+      { x: 2, y: 6, kind: 'wardrobe' },
+      { x: 1, y: 6, kind: 'plant_tall' },
+      { x: 2, y: 5, kind: 'chandelier' },
+      { x: 5, y: 5, kind: 'plant_tall' },
+      { x: 7, y: 5, kind: 'art_frame' },
+      { x: 5, y: 6, kind: 'table_grand' },
+      { x: 9, y: 6, kind: 'bed_luxury' },
+      { x: 11, y: 5, kind: 'cabinet_ornate' },
+      { x: 11, y: 7, kind: 'plant_tall' },
+      { x: 10, y: 5, kind: 'art_frame' },
+      { x: 10, y: 6, kind: 'chandelier' },
+    ],
+    // 3F upper lounge / gallery
+    [
+      { x: 1, y: 1, kind: 'art_frame' },
+      { x: 3, y: 1, kind: 'cabinet_ornate' },
+      { x: 2, y: 2, kind: 'chandelier' },
+      { x: 1, y: 3, kind: 'plant_tall' },
+      { x: 3, y: 3, kind: 'sofa' },
+      { x: 5, y: 1, kind: 'table_grand' },
+      { x: 7, y: 1, kind: 'art_frame' },
+      { x: 6, y: 2, kind: 'chandelier' },
+      { x: 5, y: 3, kind: 'plant_tall' },
+      { x: 7, y: 3, kind: 'cabinet_ornate' },
+      { x: 9, y: 1, kind: 'art_frame' },
+      { x: 11, y: 3, kind: 'plant_tall' },
+      { x: 10, y: 2, kind: 'chandelier' },
+      { x: 9, y: 3, kind: 'sofa' },
+      { x: 10, y: 3, kind: 'table_grand' },
+      { x: 1, y: 5, kind: 'art_frame' },
+      { x: 3, y: 5, kind: 'cabinet_ornate' },
+      { x: 2, y: 5, kind: 'chandelier' },
+      { x: 2, y: 6, kind: 'plant_tall' },
+      { x: 5, y: 5, kind: 'sofa' },
+      { x: 7, y: 5, kind: 'art_frame' },
+      { x: 5, y: 6, kind: 'table_grand' },
+      { x: 6, y: 5, kind: 'chandelier' },
+      { x: 9, y: 5, kind: 'cabinet_ornate' },
+      { x: 11, y: 5, kind: 'art_frame' },
+      { x: 10, y: 6, kind: 'chandelier' },
+      { x: 11, y: 7, kind: 'plant_tall' },
+      { x: 9, y: 6, kind: 'plant_tall' },
+    ],
   ],
-  // 天守風 — armor, banner, deco chest, tatami, lantern
+  // 天守風 — armor/banner/lantern/tatami; 3F throne keep
   castle_keep: [
-    { x: 1, y: 1, kind: 'armor' },
-    { x: 3, y: 1, kind: 'banner' },
-    { x: 1, y: 3, kind: 'chest_deco' },
-    { x: 2, y: 2, kind: 'tatami' },
-    { x: 3, y: 3, kind: 'lantern' },
-    { x: 6, y: 1, kind: 'banner' },
-    { x: 5, y: 3, kind: 'chest_deco' },
-    { x: 7, y: 3, kind: 'lantern' },
-    { x: 6, y: 2, kind: 'tatami' },
-    { x: 7, y: 1, kind: 'armor' },
-    { x: 9, y: 1, kind: 'banner' },
-    { x: 10, y: 3, kind: 'chest_deco' },
-    { x: 11, y: 3, kind: 'lantern' },
-    { x: 10, y: 2, kind: 'tatami' },
-    { x: 9, y: 3, kind: 'armor' },
-    { x: 3, y: 5, kind: 'chest_deco' },
-    { x: 1, y: 5, kind: 'banner' },
-    { x: 2, y: 6, kind: 'tatami' },
-    { x: 3, y: 6, kind: 'lantern' },
-    { x: 2, y: 5, kind: 'armor' },
-    { x: 5, y: 5, kind: 'lantern' },
-    { x: 7, y: 5, kind: 'banner' },
-    { x: 5, y: 6, kind: 'tatami' },
-    { x: 11, y: 5, kind: 'armor' },
-    { x: 9, y: 6, kind: 'chest_deco' },
-    { x: 11, y: 7, kind: 'lantern' },
-    { x: 10, y: 5, kind: 'banner' },
-    { x: 10, y: 6, kind: 'tatami' },
-    { x: 9, y: 5, kind: 'armor' },
+    // 1F gate hall / barracks feel
+    [
+      { x: 1, y: 1, kind: 'armor' },
+      { x: 3, y: 1, kind: 'banner' },
+      { x: 1, y: 3, kind: 'chest_deco' },
+      { x: 2, y: 2, kind: 'tatami' },
+      { x: 3, y: 3, kind: 'lantern' },
+      { x: 6, y: 1, kind: 'banner' },
+      { x: 5, y: 3, kind: 'chest_deco' },
+      { x: 7, y: 3, kind: 'lantern' },
+      { x: 6, y: 2, kind: 'tatami' },
+      { x: 7, y: 1, kind: 'armor' },
+      { x: 9, y: 1, kind: 'banner' },
+      { x: 10, y: 3, kind: 'chest_deco' },
+      { x: 11, y: 3, kind: 'lantern' },
+      { x: 10, y: 2, kind: 'tatami' },
+      { x: 9, y: 3, kind: 'armor' },
+      { x: 5, y: 5, kind: 'banner' },
+      { x: 3, y: 5, kind: 'chest_deco' },
+      { x: 1, y: 5, kind: 'armor' },
+      { x: 2, y: 6, kind: 'tatami' },
+      { x: 3, y: 6, kind: 'lantern' },
+      { x: 7, y: 5, kind: 'lantern' },
+      { x: 5, y: 6, kind: 'tatami' },
+      { x: 11, y: 5, kind: 'armor' },
+      { x: 9, y: 6, kind: 'chest_deco' },
+      { x: 11, y: 7, kind: 'lantern' },
+      { x: 10, y: 5, kind: 'banner' },
+      { x: 10, y: 6, kind: 'tatami' },
+    ],
+    // 2F warrior quarters
+    [
+      { x: 1, y: 1, kind: 'armor' },
+      { x: 3, y: 1, kind: 'banner' },
+      { x: 1, y: 3, kind: 'chest_deco' },
+      { x: 2, y: 2, kind: 'tatami' },
+      { x: 3, y: 3, kind: 'lantern' },
+      { x: 5, y: 1, kind: 'banner' },
+      { x: 7, y: 1, kind: 'armor' },
+      { x: 6, y: 2, kind: 'tatami' },
+      { x: 5, y: 3, kind: 'chest_deco' },
+      { x: 7, y: 3, kind: 'lantern' },
+      { x: 9, y: 1, kind: 'armor' },
+      { x: 11, y: 3, kind: 'banner' },
+      { x: 10, y: 2, kind: 'tatami' },
+      { x: 9, y: 3, kind: 'lantern' },
+      { x: 10, y: 3, kind: 'chest_deco' },
+      { x: 1, y: 5, kind: 'banner' },
+      { x: 3, y: 5, kind: 'armor' },
+      { x: 2, y: 6, kind: 'tatami' },
+      { x: 2, y: 5, kind: 'lantern' },
+      { x: 3, y: 6, kind: 'chest_deco' },
+      { x: 5, y: 5, kind: 'lantern' },
+      { x: 7, y: 5, kind: 'banner' },
+      { x: 5, y: 6, kind: 'tatami' },
+      { x: 9, y: 5, kind: 'armor' },
+      { x: 11, y: 5, kind: 'banner' },
+      { x: 10, y: 6, kind: 'tatami' },
+      { x: 9, y: 6, kind: 'chest_deco' },
+      { x: 11, y: 7, kind: 'lantern' },
+    ],
+    // 3F keep throne hall
+    [
+      { x: 1, y: 1, kind: 'armor' },
+      { x: 3, y: 1, kind: 'banner' },
+      { x: 2, y: 2, kind: 'tatami' },
+      { x: 1, y: 3, kind: 'lantern' },
+      { x: 3, y: 3, kind: 'chest_deco' },
+      { x: 6, y: 1, kind: 'throne' },
+      { x: 5, y: 1, kind: 'banner' },
+      { x: 7, y: 1, kind: 'banner' },
+      { x: 5, y: 3, kind: 'armor' },
+      { x: 7, y: 3, kind: 'armor' },
+      { x: 6, y: 2, kind: 'tatami' },
+      { x: 6, y: 3, kind: 'lantern' },
+      { x: 9, y: 1, kind: 'banner' },
+      { x: 11, y: 3, kind: 'armor' },
+      { x: 10, y: 2, kind: 'tatami' },
+      { x: 9, y: 3, kind: 'lantern' },
+      { x: 10, y: 3, kind: 'chest_deco' },
+      { x: 1, y: 5, kind: 'banner' },
+      { x: 3, y: 5, kind: 'armor' },
+      { x: 2, y: 6, kind: 'tatami' },
+      { x: 2, y: 5, kind: 'lantern' },
+      { x: 5, y: 5, kind: 'chest_deco' },
+      { x: 7, y: 5, kind: 'banner' },
+      { x: 5, y: 6, kind: 'tatami' },
+      { x: 7, y: 6, kind: 'lantern' },
+      { x: 9, y: 5, kind: 'armor' },
+      { x: 11, y: 5, kind: 'banner' },
+      { x: 10, y: 6, kind: 'tatami' },
+      { x: 9, y: 6, kind: 'chest_deco' },
+      { x: 11, y: 7, kind: 'lantern' },
+    ],
   ],
-  // 大阪城風 — gold screens, castle lanterns, ornate chests, byobu, rich rugs, pillars
+  // 大阪城風 — densest; gold screens, pillars, byobu; 3F tenshu throne
   osaka: [
-    { x: 1, y: 1, kind: 'byobu' },
-    { x: 3, y: 1, kind: 'gold_screen' },
-    { x: 1, y: 3, kind: 'ornate_chest' },
-    { x: 2, y: 2, kind: 'rug_rich' },
-    { x: 3, y: 3, kind: 'castle_lantern' },
-    { x: 2, y: 1, kind: 'pillar' },
-    { x: 6, y: 1, kind: 'gold_screen' },
-    { x: 5, y: 3, kind: 'ornate_chest' },
-    { x: 7, y: 3, kind: 'castle_lantern' },
-    { x: 6, y: 2, kind: 'rug_rich' },
-    { x: 7, y: 1, kind: 'byobu' },
-    { x: 5, y: 1, kind: 'pillar' },
-    { x: 9, y: 1, kind: 'gold_screen' },
-    { x: 10, y: 3, kind: 'ornate_chest' },
-    { x: 11, y: 3, kind: 'castle_lantern' },
-    { x: 10, y: 2, kind: 'rug_rich' },
-    { x: 9, y: 3, kind: 'byobu' },
-    { x: 11, y: 2, kind: 'pillar' },
-    { x: 1, y: 5, kind: 'gold_screen' },
-    { x: 3, y: 5, kind: 'ornate_chest' },
-    { x: 2, y: 6, kind: 'rug_rich' },
-    { x: 1, y: 6, kind: 'castle_lantern' },
-    { x: 3, y: 6, kind: 'pillar' },
-    { x: 2, y: 5, kind: 'byobu' },
-    { x: 5, y: 5, kind: 'castle_lantern' },
-    { x: 7, y: 5, kind: 'gold_screen' },
-    { x: 5, y: 6, kind: 'rug_rich' },
-    { x: 7, y: 6, kind: 'pillar' },
-    { x: 11, y: 5, kind: 'ornate_chest' },
-    { x: 9, y: 6, kind: 'byobu' },
-    { x: 11, y: 7, kind: 'castle_lantern' },
-    { x: 10, y: 5, kind: 'gold_screen' },
-    { x: 10, y: 6, kind: 'rug_rich' },
-    { x: 9, y: 5, kind: 'pillar' },
-    { x: 11, y: 6, kind: 'ornate_chest' },
+    // 1F reception hall
+    [
+      { x: 1, y: 1, kind: 'byobu' },
+      { x: 3, y: 1, kind: 'gold_screen' },
+      { x: 2, y: 1, kind: 'pillar' },
+      { x: 1, y: 3, kind: 'ornate_chest' },
+      { x: 2, y: 2, kind: 'rug_rich' },
+      { x: 3, y: 3, kind: 'castle_lantern' },
+      { x: 6, y: 1, kind: 'gold_screen' },
+      { x: 5, y: 1, kind: 'pillar' },
+      { x: 7, y: 1, kind: 'byobu' },
+      { x: 5, y: 3, kind: 'ornate_chest' },
+      { x: 7, y: 3, kind: 'castle_lantern' },
+      { x: 6, y: 2, kind: 'rug_rich' },
+      { x: 9, y: 1, kind: 'gold_screen' },
+      { x: 11, y: 2, kind: 'pillar' },
+      { x: 10, y: 3, kind: 'ornate_chest' },
+      { x: 11, y: 3, kind: 'castle_lantern' },
+      { x: 10, y: 2, kind: 'rug_rich' },
+      { x: 9, y: 3, kind: 'byobu' },
+      { x: 5, y: 5, kind: 'pillar' },
+      { x: 1, y: 5, kind: 'gold_screen' },
+      { x: 3, y: 5, kind: 'ornate_chest' },
+      { x: 2, y: 6, kind: 'rug_rich' },
+      { x: 1, y: 6, kind: 'castle_lantern' },
+      { x: 3, y: 6, kind: 'pillar' },
+      { x: 2, y: 5, kind: 'byobu' },
+      { x: 7, y: 5, kind: 'gold_screen' },
+      { x: 5, y: 6, kind: 'rug_rich' },
+      { x: 7, y: 6, kind: 'castle_lantern' },
+      { x: 11, y: 5, kind: 'ornate_chest' },
+      { x: 9, y: 6, kind: 'byobu' },
+      { x: 11, y: 7, kind: 'castle_lantern' },
+      { x: 10, y: 5, kind: 'gold_screen' },
+      { x: 10, y: 6, kind: 'rug_rich' },
+      { x: 9, y: 5, kind: 'pillar' },
+    ],
+    // 2F chambers
+    [
+      { x: 1, y: 1, kind: 'byobu' },
+      { x: 3, y: 1, kind: 'gold_screen' },
+      { x: 2, y: 1, kind: 'pillar' },
+      { x: 1, y: 3, kind: 'ornate_chest' },
+      { x: 2, y: 2, kind: 'rug_rich' },
+      { x: 3, y: 3, kind: 'castle_lantern' },
+      { x: 5, y: 1, kind: 'gold_screen' },
+      { x: 7, y: 1, kind: 'byobu' },
+      { x: 6, y: 1, kind: 'pillar' },
+      { x: 5, y: 3, kind: 'ornate_chest' },
+      { x: 7, y: 3, kind: 'castle_lantern' },
+      { x: 6, y: 2, kind: 'rug_rich' },
+      { x: 9, y: 1, kind: 'byobu' },
+      { x: 11, y: 3, kind: 'gold_screen' },
+      { x: 11, y: 2, kind: 'pillar' },
+      { x: 10, y: 2, kind: 'rug_rich' },
+      { x: 9, y: 3, kind: 'ornate_chest' },
+      { x: 10, y: 3, kind: 'castle_lantern' },
+      { x: 1, y: 5, kind: 'gold_screen' },
+      { x: 3, y: 5, kind: 'byobu' },
+      { x: 2, y: 5, kind: 'pillar' },
+      { x: 2, y: 6, kind: 'rug_rich' },
+      { x: 1, y: 6, kind: 'castle_lantern' },
+      { x: 3, y: 6, kind: 'ornate_chest' },
+      { x: 5, y: 5, kind: 'castle_lantern' },
+      { x: 7, y: 5, kind: 'gold_screen' },
+      { x: 5, y: 6, kind: 'rug_rich' },
+      { x: 7, y: 6, kind: 'pillar' },
+      { x: 9, y: 5, kind: 'byobu' },
+      { x: 11, y: 5, kind: 'ornate_chest' },
+      { x: 10, y: 5, kind: 'pillar' },
+      { x: 10, y: 6, kind: 'rug_rich' },
+      { x: 9, y: 6, kind: 'gold_screen' },
+      { x: 11, y: 7, kind: 'castle_lantern' },
+      { x: 11, y: 6, kind: 'ornate_chest' },
+    ],
+    // 3F tenshu throne hall — densest gold
+    [
+      { x: 1, y: 1, kind: 'byobu' },
+      { x: 3, y: 1, kind: 'gold_screen' },
+      { x: 2, y: 1, kind: 'pillar' },
+      { x: 1, y: 3, kind: 'castle_lantern' },
+      { x: 2, y: 2, kind: 'rug_rich' },
+      { x: 3, y: 3, kind: 'ornate_chest' },
+      { x: 6, y: 1, kind: 'throne' },
+      { x: 5, y: 1, kind: 'pillar' },
+      { x: 7, y: 1, kind: 'pillar' },
+      { x: 5, y: 3, kind: 'gold_screen' },
+      { x: 7, y: 3, kind: 'byobu' },
+      { x: 6, y: 2, kind: 'rug_rich' },
+      { x: 6, y: 3, kind: 'castle_lantern' },
+      { x: 9, y: 1, kind: 'gold_screen' },
+      { x: 11, y: 2, kind: 'pillar' },
+      { x: 10, y: 2, kind: 'rug_rich' },
+      { x: 9, y: 3, kind: 'byobu' },
+      { x: 11, y: 3, kind: 'castle_lantern' },
+      { x: 10, y: 3, kind: 'ornate_chest' },
+      { x: 1, y: 5, kind: 'gold_screen' },
+      { x: 3, y: 5, kind: 'byobu' },
+      { x: 2, y: 5, kind: 'pillar' },
+      { x: 2, y: 6, kind: 'rug_rich' },
+      { x: 1, y: 6, kind: 'castle_lantern' },
+      { x: 3, y: 6, kind: 'ornate_chest' },
+      { x: 5, y: 5, kind: 'castle_lantern' },
+      { x: 7, y: 5, kind: 'gold_screen' },
+      { x: 5, y: 6, kind: 'rug_rich' },
+      { x: 7, y: 6, kind: 'pillar' },
+      { x: 6, y: 5, kind: 'ornate_chest' },
+      { x: 9, y: 5, kind: 'pillar' },
+      { x: 11, y: 5, kind: 'ornate_chest' },
+      { x: 10, y: 5, kind: 'gold_screen' },
+      { x: 10, y: 6, kind: 'rug_rich' },
+      { x: 9, y: 6, kind: 'byobu' },
+      { x: 11, y: 7, kind: 'castle_lantern' },
+      { x: 11, y: 6, kind: 'ornate_chest' },
+    ],
   ],
 };
 
-function furnitureLayoutForSkin(skinId) {
-  return FURNITURE_BY_SKIN[skinId] || FURNITURE_BY_SKIN.basic;
+function furnitureLayoutForSkin(skinId, floor = 0) {
+  const bySkin = FURNITURE_BY_SKIN[skinId] || FURNITURE_BY_SKIN.basic;
+  const fi = Math.max(0, Math.min(FLOORS - 1, floor | 0));
+  // Per-floor layouts: [f0, f1, f2]
+  if (Array.isArray(bySkin[0])) return bySkin[fi] || bySkin[0] || [];
+  return bySkin;
 }
 
 function drawRoomFurniture(ctx, blueprint, floor, ox, oy, cellSize, skinId = 'basic') {
-  const layout = furnitureLayoutForSkin(skinId);
+  const layout = furnitureLayoutForSkin(skinId, floor);
   // Draw floor-ish mats/rugs first so upright props sit on top
   const order = (k) => (
     k === 'tatami' || k === 'rug_cozy' || k === 'rug_rich' ? 0 : 1
@@ -976,8 +1319,8 @@ function drawFurnitureSprite(ctx, kind, px, py, cellSize, floor, skinId = 'basic
     return;
   }
 
-  // --- shelves / cabinets / bookshelf / dresser ---
-  if (kind === 'shelf' || kind === 'shelf_wood' || kind === 'bookshelf' || kind === 'dresser' || kind === 'cabinet_ornate') {
+  // --- shelves / cabinets / bookshelf / dresser / wardrobe ---
+  if (kind === 'shelf' || kind === 'shelf_wood' || kind === 'bookshelf' || kind === 'dresser' || kind === 'cabinet_ornate' || kind === 'wardrobe') {
     const bodyX = px + m * 1.2;
     const bodyY = py + m * 0.8;
     const bodyW = s - m * 2.4;
@@ -986,7 +1329,7 @@ function drawFurnitureSprite(ctx, kind, px, py, cellSize, floor, skinId = 'basic
     ctx.fillRect(bodyX, bodyY, bodyW, bodyH);
     ctx.fillStyle = kind === 'cabinet_ornate'
       ? shadeColor(th.wall, 25)
-      : kind === 'dresser' || kind === 'shelf_wood'
+      : kind === 'dresser' || kind === 'shelf_wood' || kind === 'wardrobe'
         ? woodHi
         : shadeColor(th.wall, 15);
     ctx.fillRect(bodyX + 1, bodyY + 1, bodyW - 2, bodyH - 2);
@@ -999,6 +1342,17 @@ function drawFurnitureSprite(ctx, kind, px, py, cellSize, floor, skinId = 'basic
         ctx.fillStyle = gold;
         ctx.fillRect(bodyX + bodyW * 0.5 - 2, dy + bodyH * 0.14, 4, 3);
       }
+      return;
+    }
+    if (kind === 'wardrobe') {
+      ctx.fillStyle = wood;
+      ctx.fillRect(bodyX + 3, bodyY + 3, bodyW * 0.42, bodyH - 6);
+      ctx.fillRect(bodyX + bodyW * 0.52, bodyY + 3, bodyW * 0.42, bodyH - 6);
+      ctx.fillStyle = gold;
+      ctx.fillRect(bodyX + bodyW * 0.38, bodyY + bodyH * 0.45, 3, 4);
+      ctx.fillRect(bodyX + bodyW * 0.58, bodyY + bodyH * 0.45, 3, 4);
+      ctx.fillStyle = woodDk;
+      ctx.fillRect(bodyX + 3, bodyY + bodyH * 0.72, bodyW - 6, 2);
       return;
     }
     if (kind === 'cabinet_ornate') {
@@ -1332,6 +1686,157 @@ function drawFurnitureSprite(ctx, kind, px, py, cellSize, floor, skinId = 'basic
     ctx.fillRect(px + s * 0.34, py + s - m * 0.7, s * 0.32, 4);
     ctx.fillStyle = '#fff0a0';
     ctx.fillRect(px + s * 0.44, py + m * 0.5 + 6, s * 0.12, s - m * 1.4);
+    return;
+  }
+
+  // --- desk (study) ---
+  if (kind === 'desk') {
+    ctx.fillStyle = woodDk;
+    ctx.fillRect(px + m * 0.8, py + s * 0.42, s - m * 1.6, s * 0.28);
+    ctx.fillStyle = woodHi;
+    ctx.fillRect(px + m * 0.8 + 2, py + s * 0.34, s - m * 1.6 - 4, s * 0.14);
+    ctx.fillStyle = woodDk;
+    const dw = Math.max(2, s * 0.06);
+    ctx.fillRect(px + m * 0.8 + 2, py + s * 0.7, dw, s * 0.12);
+    ctx.fillRect(px + s - m * 0.8 - 2 - dw, py + s * 0.7, dw, s * 0.12);
+    // Paper / blotter
+    ctx.fillStyle = '#f5f0e0';
+    ctx.fillRect(px + s * 0.28, py + s * 0.38, s * 0.36, s * 0.08);
+    ctx.fillStyle = '#4060a0';
+    ctx.fillRect(px + s * 0.58, py + s * 0.36, s * 0.08, s * 0.04);
+    return;
+  }
+
+  // --- chair ---
+  if (kind === 'chair') {
+    ctx.fillStyle = woodDk;
+    ctx.fillRect(px + s * 0.28, py + s * 0.22, s * 0.44, s * 0.12);
+    ctx.fillStyle = wood;
+    ctx.fillRect(px + s * 0.26, py + s * 0.42, s * 0.48, s * 0.22);
+    ctx.fillStyle = woodDk;
+    ctx.fillRect(px + s * 0.28, py + s * 0.64, s * 0.08, s * 0.14);
+    ctx.fillRect(px + s * 0.64, py + s * 0.64, s * 0.08, s * 0.14);
+    ctx.fillStyle = th.rug.replace(/0\.\d+/g, '0.45');
+    ctx.fillRect(px + s * 0.3, py + s * 0.46, s * 0.4, s * 0.12);
+    return;
+  }
+
+  // --- TV / console stand (living) ---
+  if (kind === 'tv_stand') {
+    ctx.fillStyle = woodDk;
+    ctx.fillRect(px + m, py + s * 0.58, s - m * 2, s * 0.22);
+    ctx.fillStyle = wood;
+    ctx.fillRect(px + m + 2, py + s * 0.6, s - m * 2 - 4, s * 0.1);
+    ctx.fillStyle = '#1a1e28';
+    ctx.fillRect(px + s * 0.22, py + s * 0.22, s * 0.56, s * 0.34);
+    ctx.fillStyle = '#3a6088';
+    ctx.fillRect(px + s * 0.26, py + s * 0.26, s * 0.48, s * 0.26);
+    ctx.fillStyle = 'rgba(200,230,255,0.25)';
+    ctx.fillRect(px + s * 0.3, py + s * 0.28, s * 0.16, s * 0.1);
+    return;
+  }
+
+  // --- coat rack (entrance) ---
+  if (kind === 'coat_rack') {
+    ctx.fillStyle = woodDk;
+    ctx.fillRect(px + s * 0.46, py + s * 0.18, s * 0.08, s * 0.58);
+    ctx.fillRect(px + s * 0.32, py + s * 0.72, s * 0.36, s * 0.08);
+    ctx.strokeStyle = wood;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(px + s * 0.5, py + s * 0.28);
+    ctx.lineTo(px + s * 0.28, py + s * 0.22);
+    ctx.moveTo(px + s * 0.5, py + s * 0.32);
+    ctx.lineTo(px + s * 0.72, py + s * 0.24);
+    ctx.moveTo(px + s * 0.5, py + s * 0.38);
+    ctx.lineTo(px + s * 0.26, py + s * 0.36);
+    ctx.stroke();
+    // Hanging coat hint
+    ctx.fillStyle = floor === 1 ? '#4a6080' : floor === 2 ? '#804040' : '#706040';
+    ctx.fillRect(px + s * 0.22, py + s * 0.3, s * 0.14, s * 0.28);
+    return;
+  }
+
+  // --- attic crate ---
+  if (kind === 'crate') {
+    ctx.fillStyle = '#8a6a38';
+    ctx.fillRect(px + m, py + s * 0.38, s - m * 2, s * 0.42);
+    ctx.fillStyle = '#a88848';
+    ctx.fillRect(px + m + 2, py + s * 0.4, s - m * 2 - 4, s * 0.12);
+    ctx.strokeStyle = '#5a4020';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(px + m + 1, py + s * 0.38, s - m * 2 - 2, s * 0.42);
+    ctx.beginPath();
+    ctx.moveTo(px + m + 1, py + s * 0.58);
+    ctx.lineTo(px + s - m - 1, py + s * 0.58);
+    ctx.stroke();
+    return;
+  }
+
+  // --- attic trunk ---
+  if (kind === 'trunk') {
+    ctx.fillStyle = '#5a3820';
+    ctx.fillRect(px + m, py + s * 0.42, s - m * 2, s * 0.36);
+    ctx.fillStyle = '#7a5030';
+    ctx.fillRect(px + m + 2, py + s * 0.32, s - m * 2 - 4, s * 0.16);
+    ctx.fillStyle = '#c9a227';
+    ctx.fillRect(px + m, py + s * 0.48, s - m * 2, 2);
+    ctx.fillRect(px + s * 0.44, py + s * 0.52, s * 0.12, s * 0.1);
+    ctx.fillStyle = '#3a2410';
+    ctx.fillRect(px + m + 4, py + s * 0.36, s - m * 2 - 8, 2);
+    return;
+  }
+
+  // --- cottage stove / kitchen ---
+  if (kind === 'stove') {
+    ctx.fillStyle = '#4a4848';
+    ctx.fillRect(px + m, py + s * 0.28, s - m * 2, s * 0.5);
+    ctx.fillStyle = '#2a2828';
+    ctx.fillRect(px + m + 3, py + s * 0.36, s - m * 2 - 6, s * 0.28);
+    ctx.fillStyle = '#e07030';
+    ctx.beginPath();
+    ctx.arc(px + s * 0.38, py + s * 0.5, s * 0.06, 0, Math.PI * 2);
+    ctx.arc(px + s * 0.58, py + s * 0.48, s * 0.05, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#6a6868';
+    ctx.fillRect(px + s * 0.42, py + s * 0.18, s * 0.16, s * 0.12);
+    ctx.fillStyle = woodDk;
+    ctx.fillRect(px + m, py + s * 0.74, s - m * 2, s * 0.08);
+    return;
+  }
+
+  // --- throne (keep / Osaka 3F) ---
+  if (kind === 'throne') {
+    const isOsaka = skinId === 'osaka';
+    const seat = isOsaka ? '#8a2018' : '#5a3038';
+    const trim = isOsaka ? '#ffe08a' : gold;
+    // Back
+    ctx.fillStyle = trim;
+    ctx.fillRect(px + s * 0.22, py + s * 0.12, s * 0.56, s * 0.48);
+    ctx.fillStyle = seat;
+    ctx.fillRect(px + s * 0.26, py + s * 0.16, s * 0.48, s * 0.4);
+    // Crest
+    ctx.fillStyle = trim;
+    ctx.beginPath();
+    ctx.moveTo(px + s * 0.5, py + s * 0.06);
+    ctx.lineTo(px + s * 0.28, py + s * 0.18);
+    ctx.lineTo(px + s * 0.72, py + s * 0.18);
+    ctx.closePath();
+    ctx.fill();
+    // Seat cushion
+    ctx.fillStyle = isOsaka ? '#c04040' : '#704050';
+    ctx.fillRect(px + s * 0.24, py + s * 0.52, s * 0.52, s * 0.18);
+    // Arms
+    ctx.fillStyle = trim;
+    ctx.fillRect(px + s * 0.16, py + s * 0.48, s * 0.1, s * 0.26);
+    ctx.fillRect(px + s * 0.74, py + s * 0.48, s * 0.1, s * 0.26);
+    // Base
+    ctx.fillStyle = woodDk;
+    ctx.fillRect(px + s * 0.22, py + s * 0.72, s * 0.56, s * 0.1);
+    if (isOsaka) {
+      ctx.fillStyle = '#ffe08a';
+      ctx.fillRect(px + s * 0.42, py + s * 0.28, s * 0.16, s * 0.16);
+    }
     return;
   }
 }
