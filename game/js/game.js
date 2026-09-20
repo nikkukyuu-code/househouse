@@ -8,12 +8,12 @@ import {
   createBlueprint, createEmptyHouseData, isWalkable, isPlaceable,
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
-} from './house.js?v=20260920v';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920v';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920v';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920v';
+} from './house.js?v=20260920w';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260920w';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260920w';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260920w';
 
-export const GAME_VERSION = '20260920v';
+export const GAME_VERSION = '20260920w';
 
 const blueprint = createBlueprint();
 
@@ -334,6 +334,60 @@ function trapHeatAt(floor, x, y) {
   const heat = S._trapHeat || {};
   return heat[`${floor},${x},${y}`] || 0;
 }
+
+
+/* ---------- Points wallet (remaining life → points after match) ---------- */
+const POINTS_KEY = 'househouse-points-v1';
+
+function loadPoints() {
+  try {
+    const n = parseInt(localStorage.getItem(POINTS_KEY), 10);
+    return Number.isFinite(n) && n >= 0 ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function savePoints(n) {
+  try {
+    localStorage.setItem(POINTS_KEY, String(Math.max(0, Math.floor(n))));
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+/** 1 heart = 1 point; half-hearts use Math.round (e.g. 7.5 → 8). */
+function awardMatchPointsFromHp() {
+  const gained = Math.max(0, Math.round(S.myHp));
+  S._pointsGained = gained;
+  if (gained > 0) {
+    const total = loadPoints() + gained;
+    savePoints(total);
+  }
+  return gained;
+}
+
+function refreshPointsUi(gained) {
+  const total = loadPoints();
+  const titleEl = $('title-points');
+  if (titleEl) titleEl.textContent = 'ポイント ' + total;
+  const resEl = $('result-points');
+  if (resEl) resEl.textContent = 'ポイント ' + total;
+  const gainEl = $('result-points-gain');
+  if (gainEl) {
+    if (typeof gained === 'number' && gained > 0) {
+      gainEl.textContent = 'ライフ残り → +' + gained + ' pt';
+      gainEl.classList.remove('hidden');
+    } else if (typeof gained === 'number' && gained === 0) {
+      gainEl.textContent = 'ライフ残り → +0 pt';
+      gainEl.classList.remove('hidden');
+    } else {
+      gainEl.textContent = '';
+      gainEl.classList.add('hidden');
+    }
+  }
+}
+
 
 /* ---------- COM / AI explorer (BFS floor-clearing) ---------- */
 const AI_DIRS = [[0, -1], [0, 1], [-1, 0], [1, 0]];
@@ -1266,6 +1320,9 @@ function endGame(winner, reason) {
   S.revealSecrets = true;
   S.holdDir = null;
 
+  // Remaining life (HP hearts) → points wallet (1 heart ≈ 1 pt, rounded)
+  awardMatchPointsFromHp();
+
   const iWon = winner === 'me';
   const reasonText = endReasonLabel(reason, iWon);
   const eventTitle = climaxEventTitle(reason);
@@ -1476,6 +1533,7 @@ function showResultScreen(iWon, reasonText) {
     }
   }
   if (reasonEl) reasonEl.textContent = '理由：' + reasonText;
+  refreshPointsUi(S._pointsGained);
 }
 
 /* ---------- Match loop ---------- */
@@ -2040,6 +2098,7 @@ function goTitle() {
   hideIngameTipUi();
   if (S.net) { S.net.destroy(); S.net = null; }
   showScreen('screen-title');
+  refreshPointsUi();
   cancelAnimationFrame(animId);
   const home = $('btn-tutorial-home');
   if (home) home.textContent = '戻る';
@@ -2512,6 +2571,7 @@ export async function init() {
 
   bindControls();
   showScreen('screen-title');
+  refreshPointsUi();
   loadMutePref();
   syncMuteButton();
 

@@ -521,6 +521,142 @@ export function drawChestSprite(ctx, px, py, cellSize) {
   ctx.fillRect(lx + 1, ly + 1, 4, 3);
 }
 
+
+/**
+ * Deterministic decorative furniture per room (same every match).
+ * Drawn inset on FLOOR cells only — does not affect walkability or placement.
+ * Skips spawn (6,7) and never draws on doors/stairs/walls.
+ */
+const FURNITURE_LAYOUT = [
+  // 1F–3F shared layout; colors tint via floor theme
+  // Top-left (bedroom)
+  { x: 1, y: 1, kind: 'bed' },
+  { x: 3, y: 1, kind: 'plant' },
+  { x: 1, y: 3, kind: 'shelf' },
+  // Top-mid (living)
+  { x: 6, y: 1, kind: 'sofa' },
+  { x: 5, y: 3, kind: 'table' },
+  { x: 7, y: 3, kind: 'plant' },
+  // Top-right (study; avoid stairs-up at 11,1)
+  { x: 9, y: 1, kind: 'shelf' },
+  { x: 10, y: 3, kind: 'table' },
+  { x: 11, y: 3, kind: 'plant' },
+  // Bottom-left (avoid stairs-down at 1,7)
+  { x: 3, y: 5, kind: 'shelf' },
+  { x: 2, y: 6, kind: 'table' },
+  { x: 1, y: 5, kind: 'plant' },
+  // Bottom-mid hall (avoid spawn 6,7)
+  { x: 5, y: 5, kind: 'plant' },
+  { x: 7, y: 5, kind: 'shelf' },
+  // Bottom-right (bedroom)
+  { x: 11, y: 5, kind: 'shelf' },
+  { x: 9, y: 6, kind: 'bed' },
+  { x: 11, y: 7, kind: 'plant' },
+];
+
+function drawRoomFurniture(ctx, blueprint, floor, ox, oy, cellSize) {
+  for (const item of FURNITURE_LAYOUT) {
+    const { x, y, kind } = item;
+    if (blueprint[floor][y][x] !== T.FLOOR) continue;
+    // Keep spawn cell clean
+    if (x === 6 && y === 7) continue;
+    const px = ox + x * cellSize;
+    const py = oy + y * cellSize;
+    drawFurnitureSprite(ctx, kind, px, py, cellSize, floor);
+  }
+}
+
+function drawFurnitureSprite(ctx, kind, px, py, cellSize, floor) {
+  const th = themeForFloor(floor);
+  const s = cellSize;
+  const m = s * 0.14;
+  if (kind === 'bed') {
+    // Frame
+    ctx.fillStyle = shadeColor(th.wallEdge, 20);
+    ctx.fillRect(px + m, py + m * 1.2, s - m * 2, s - m * 2.2);
+    // Mattress
+    ctx.fillStyle = floor === 1 ? '#c8d4e8' : floor === 2 ? '#f0c8d0' : '#f0e0c0';
+    ctx.fillRect(px + m + 2, py + m * 1.2 + 2, s - m * 2 - 4, s - m * 2.2 - 4);
+    // Pillow
+    ctx.fillStyle = '#fff8ee';
+    ctx.fillRect(px + m + 3, py + m * 1.2 + 3, s * 0.28, s * 0.18);
+    // Blanket stripe
+    ctx.fillStyle = th.rug.replace('0.22', '0.45').replace('0.2', '0.45');
+    ctx.fillRect(px + m + 2, py + s * 0.52, s - m * 2 - 4, s * 0.12);
+  } else if (kind === 'table') {
+    // Top
+    ctx.fillStyle = shadeColor(th.wall, 30);
+    ctx.fillRect(px + m, py + m * 1.4, s - m * 2, s * 0.42);
+    ctx.fillStyle = shadeColor(th.doorLight, -40);
+    ctx.fillRect(px + m + 2, py + m * 1.4 + 2, s - m * 2 - 4, s * 0.32);
+    // Legs
+    ctx.fillStyle = th.wallEdge;
+    const legW = Math.max(2, s * 0.06);
+    ctx.fillRect(px + m + 2, py + m * 1.4 + s * 0.42, legW, s * 0.22);
+    ctx.fillRect(px + s - m - 2 - legW, py + m * 1.4 + s * 0.42, legW, s * 0.22);
+  } else if (kind === 'sofa') {
+    // Back
+    ctx.fillStyle = shadeColor(th.wall, 10);
+    ctx.fillRect(px + m * 0.8, py + m, s - m * 1.6, s * 0.28);
+    // Seat
+    const seat = floor === 1 ? '#5a7aaa' : floor === 2 ? '#b06070' : '#a05040';
+    ctx.fillStyle = seat;
+    ctx.fillRect(px + m * 0.8, py + m + s * 0.22, s - m * 1.6, s * 0.38);
+    // Armrests
+    ctx.fillStyle = shadeColor(seat, -25);
+    ctx.fillRect(px + m * 0.8, py + m + s * 0.18, s * 0.12, s * 0.42);
+    ctx.fillRect(px + s - m * 0.8 - s * 0.12, py + m + s * 0.18, s * 0.12, s * 0.42);
+    // Cushion highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.18)';
+    ctx.fillRect(px + m + s * 0.14, py + m + s * 0.28, s * 0.5, s * 0.1);
+  } else if (kind === 'shelf') {
+    // Cabinet body
+    ctx.fillStyle = th.wallEdge;
+    ctx.fillRect(px + m * 1.2, py + m * 0.8, s - m * 2.4, s - m * 1.6);
+    ctx.fillStyle = shadeColor(th.wall, 15);
+    ctx.fillRect(px + m * 1.2 + 1, py + m * 0.8 + 1, s - m * 2.4 - 2, s - m * 1.6 - 2);
+    // Shelves + books
+    const books = ['#c04040', '#4060b0', '#d0a020', '#408060', '#8040a0'];
+    const rows = 3;
+    const innerX = px + m * 1.2 + 3;
+    const innerW = s - m * 2.4 - 6;
+    for (let r = 0; r < rows; r++) {
+      const by = py + m * 0.8 + 4 + r * ((s - m * 1.6 - 8) / rows);
+      ctx.fillStyle = th.wallEdge;
+      ctx.fillRect(innerX - 1, by + s * 0.16, innerW + 2, 2);
+      let bx = innerX;
+      for (let b = 0; b < 4; b++) {
+        const bw = innerW / 4 - 1;
+        ctx.fillStyle = books[(r * 3 + b + floor) % books.length];
+        ctx.fillRect(bx, by, bw, s * 0.15);
+        bx += bw + 1;
+      }
+    }
+  } else if (kind === 'plant') {
+    // Pot
+    ctx.fillStyle = '#8a5a3c';
+    ctx.beginPath();
+    ctx.moveTo(px + s * 0.32, py + s * 0.58);
+    ctx.lineTo(px + s * 0.68, py + s * 0.58);
+    ctx.lineTo(px + s * 0.62, py + s * 0.82);
+    ctx.lineTo(px + s * 0.38, py + s * 0.82);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#6a4028';
+    ctx.fillRect(px + s * 0.30, py + s * 0.54, s * 0.40, s * 0.06);
+    // Leaves
+    ctx.fillStyle = '#3d8b4a';
+    ctx.beginPath();
+    ctx.arc(px + s * 0.5, py + s * 0.38, s * 0.18, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#5cb86a';
+    ctx.beginPath();
+    ctx.arc(px + s * 0.38, py + s * 0.42, s * 0.12, 0, Math.PI * 2);
+    ctx.arc(px + s * 0.62, py + s * 0.40, s * 0.13, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
 export function drawHouse(ctx, blueprint, houseData, floor, opts = {}) {
   const {
     showChest = false,
@@ -555,6 +691,7 @@ export function drawHouse(ctx, blueprint, houseData, floor, opts = {}) {
     }
   }
 
+
   // Soft rugs in room centers (house feel)
   const th = themeForFloor(floor);
   const rugCells = [
@@ -580,6 +717,9 @@ export function drawHouse(ctx, blueprint, houseData, floor, opts = {}) {
     ctx.closePath();
     ctx.fill();
   }
+
+  // Decorative furniture (visual only — walk/place unchanged)
+  drawRoomFurniture(ctx, blueprint, floor, ox, oy, cellSize);
 
   // Soft floor ambient glow in center (tinted per floor)
   if (vignette) {

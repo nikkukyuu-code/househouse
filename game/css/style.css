@@ -215,6 +215,31 @@ a.btn.link-btn {
   color: #fff;
   box-shadow: 0 3px 0 #6a1818;
 }
+
+.title-points {
+  position: relative;
+  margin: 0 0 clamp(2px, 0.6vh, 6px);
+  font-size: clamp(0.85rem, 2.2vh, 1.05rem);
+  font-weight: 800;
+  color: #ffe08a;
+  letter-spacing: 0.06em;
+  text-shadow: 0 0 12px rgba(255, 200, 80, 0.35);
+}
+.result-points {
+  margin: 0;
+  font-size: clamp(0.95rem, 2.5vh, 1.15rem);
+  font-weight: 800;
+  color: #ffe08a;
+  letter-spacing: 0.04em;
+}
+.result-points-gain {
+  margin: 0;
+  font-size: clamp(0.75rem, 2vh, 0.9rem);
+  font-weight: 700;
+  color: #b8e0a0;
+}
+.result-points-gain.hidden { display: none; }
+
 .peer-note {
   margin-top: clamp(6px, 1.5vh, 14px);
   font-size: clamp(0.65rem, 1.8vh, 0.75rem);
