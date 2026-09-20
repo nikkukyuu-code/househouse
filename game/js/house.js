@@ -622,6 +622,8 @@ function drawWoodFloor(ctx, px, py, cellSize, x, y, floor = 0, skinId = 'basic')
   }
   ctx.fillStyle = th.glow;
   ctx.fillRect(px + 1, py + 1, cellSize - 2, cellSize * 0.22);
+  // Per-room perspective / vignette (rooms read as volumes, not flat grid)
+  drawFloorRoomDepth(ctx, px, py, cellSize, x, y);
 }
 
 /** Door sits in wall runs — treat as wall for continuity / facing checks. */
@@ -654,6 +656,94 @@ function wallOrientInfo(blueprint, floor, x, y) {
   };
 }
 
+/** Room cell ranges: walls at x=4,8 and y=4 split a 3×2 room grid. */
+function roomBoundsForCell(x, y) {
+  const x0 = x < 4 ? 1 : x < 8 ? 5 : 9;
+  const x1 = x < 4 ? 3 : x < 8 ? 7 : 11;
+  const y0 = y < 4 ? 1 : 5;
+  const y1 = y < 4 ? 3 : 7;
+  return { x0, x1, y0, y1, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2 };
+}
+
+/** Soft drop shadow under props / characters (oval under feet). */
+function drawGroundShadow(ctx, cx, cy, rx, ry, alpha = 0.32) {
+  ctx.fillStyle = `rgba(0,0,0,${alpha})`;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+/**
+ * Strong faux-3D wall depth: top face, side shade, thicker room-facing edges.
+ * Keeps H/V orientation via `face` from wallOrientInfo.
+ */
+function applyWallFaux3D(ctx, px, py, cellSize, th, face, axis = 'h') {
+  const s = cellSize;
+  const topH = Math.max(4, s * 0.22);
+  const sideW = Math.max(3, s * 0.14);
+  const edgeT = Math.max(3, s * 0.12);
+
+  // Top face (lighter lip) — reads as wall thickness from above
+  ctx.fillStyle = th.wallTop || 'rgba(255,255,255,0.35)';
+  ctx.globalAlpha = 0.72;
+  ctx.fillRect(px, py, s, topH);
+  ctx.globalAlpha = 1;
+  // Specular ridge on top face
+  ctx.fillStyle = 'rgba(255,255,255,0.28)';
+  ctx.fillRect(px + 1, py + 1, s - 2, Math.max(2, topH * 0.35));
+
+  // East side shade (right face of block)
+  ctx.fillStyle = 'rgba(0,0,0,0.28)';
+  ctx.fillRect(px + s - sideW, py + topH * 0.5, sideW, s - topH * 0.5);
+  // South underside shade
+  ctx.fillStyle = 'rgba(0,0,0,0.22)';
+  ctx.fillRect(px, py + s - Math.max(3, s * 0.12), s, Math.max(3, s * 0.12));
+
+  // Soft left highlight for volume
+  ctx.fillStyle = 'rgba(255,255,255,0.14)';
+  ctx.fillRect(px, py + topH * 0.4, Math.max(2, s * 0.08), s - topH * 0.4);
+
+  // Axis-aware bevel: H walls emphasize top/bottom; V walls emphasize left/right
+  if (axis === 'v') {
+    ctx.fillStyle = 'rgba(0,0,0,0.18)';
+    ctx.fillRect(px + s * 0.55, py, s * 0.45, s);
+    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+    ctx.fillRect(px, py, s * 0.22, s);
+  } else if (axis === 'h') {
+    ctx.fillStyle = 'rgba(255,255,255,0.10)';
+    ctx.fillRect(px, py, s, s * 0.28);
+    ctx.fillStyle = 'rgba(0,0,0,0.16)';
+    ctx.fillRect(px, py + s * 0.62, s, s * 0.38);
+  }
+
+  // Thick room-facing edges (wall vs floor contrast)
+  ctx.fillStyle = th.wallEdge;
+  if (face.faceN) {
+    ctx.fillRect(px, py, s, edgeT);
+    ctx.fillStyle = 'rgba(255,255,255,0.2)';
+    ctx.fillRect(px, py, s, 2);
+    ctx.fillStyle = th.wallEdge;
+  }
+  if (face.faceS) {
+    ctx.fillRect(px, py + s - edgeT, s, edgeT);
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.fillRect(px, py + s - 2, s, 2);
+    ctx.fillStyle = th.wallEdge;
+  }
+  if (face.faceW) {
+    ctx.fillRect(px, py, edgeT, s);
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.fillRect(px, py, 2, s);
+    ctx.fillStyle = th.wallEdge;
+  }
+  if (face.faceE) {
+    ctx.fillRect(px + s - edgeT, py, edgeT, s);
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.fillRect(px + s - 2, py, 2, s);
+    ctx.fillStyle = th.wallEdge;
+  }
+}
+
 /** Draw wall-edge highlights only on sides facing a room (non-wall). */
 function drawFacingWallEdges(ctx, px, py, cellSize, th, face, ew = 2) {
   const t = Math.max(2, ew | 0);
@@ -662,6 +752,39 @@ function drawFacingWallEdges(ctx, px, py, cellSize, th, face, ew = 2) {
   if (face.faceS) ctx.fillRect(px, py + cellSize - t, cellSize, t);
   if (face.faceW) ctx.fillRect(px, py, t, cellSize);
   if (face.faceE) ctx.fillRect(px + cellSize - t, py, t, cellSize);
+}
+
+/** Per-room perspective shade so floors read as rooms, not a flat grid. */
+function drawFloorRoomDepth(ctx, px, py, cellSize, x, y) {
+  if (x < 1 || y < 1 || x > 11 || y > 7) return;
+  // Skip corridor wall columns / row (walls themselves aren't floors)
+  if (x === 4 || x === 8 || y === 4) return;
+  const rb = roomBoundsForCell(x, y);
+  const nx = (x - rb.cx) / Math.max(1, (rb.x1 - rb.x0) * 0.5);
+  const ny = (y - rb.cy) / Math.max(1, (rb.y1 - rb.y0) * 0.5);
+  const dist = Math.min(1, Math.sqrt(nx * nx + ny * ny));
+
+  // Center soft light
+  const grd = ctx.createRadialGradient(
+    px + cellSize * 0.5, py + cellSize * 0.4, cellSize * 0.05,
+    px + cellSize * 0.5, py + cellSize * 0.5, cellSize * 0.85
+  );
+  grd.addColorStop(0, 'rgba(255,245,220,0.14)');
+  grd.addColorStop(0.55, 'rgba(255,245,220,0.02)');
+  grd.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = grd;
+  ctx.fillRect(px, py, cellSize, cellSize);
+
+  // Edge vignette toward walls (stronger near room perimeter)
+  const edgeDark = 0.04 + dist * 0.14;
+  ctx.fillStyle = `rgba(20,12,8,${edgeDark.toFixed(3)})`;
+  ctx.fillRect(px, py, cellSize, cellSize);
+
+  // North light / south shade — faux perspective
+  ctx.fillStyle = 'rgba(255,255,255,0.06)';
+  ctx.fillRect(px, py, cellSize, cellSize * 0.2);
+  ctx.fillStyle = 'rgba(0,0,0,0.08)';
+  ctx.fillRect(px, py + cellSize * 0.72, cellSize, cellSize * 0.28);
 }
 
 function drawWallTile(ctx, px, py, cellSize, floor = 0, skinId = 'basic', blueprint = null, x = 0, y = 0) {
@@ -716,7 +839,7 @@ function drawWallTile(ctx, px, py, cellSize, floor = 0, skinId = 'basic', bluepr
       }
     } else if (id === 'castle_keep') {
       const ew = Math.max(3, cellSize * 0.1);
-      drawFacingWallEdges(ctx, px, py, cellSize, th, orient, ew);
+      applyWallFaux3D(ctx, px, py, cellSize, th, orient, axis);
       return;
     } else if (id === 'mansion') {
       const mold = Math.max(2, cellSize * 0.1);
@@ -725,7 +848,7 @@ function drawWallTile(ctx, px, py, cellSize, floor = 0, skinId = 'basic', bluepr
       ctx.fillRect(px, py, cellSize, mold);
       ctx.globalAlpha = 1;
     }
-    drawFacingWallEdges(ctx, px, py, cellSize, th, orient, id === 'villa' ? 2 : 2);
+    applyWallFaux3D(ctx, px, py, cellSize, th, orient, axis);
     return;
   }
 
@@ -789,7 +912,7 @@ function drawWallTile(ctx, px, py, cellSize, floor = 0, skinId = 'basic', bluepr
     ctx.fillRect(px + 2, py + 2, cellSize - 4, cellSize * 0.18);
     ctx.fillStyle = th.baseboard;
     ctx.fillRect(px, py + cellSize - baseH, cellSize, baseH);
-    drawFacingWallEdges(ctx, px, py, cellSize, th, orient, 2);
+    applyWallFaux3D(ctx, px, py, cellSize, th, orient, axis);
     return;
   }
 
@@ -853,7 +976,7 @@ function drawWallTile(ctx, px, py, cellSize, floor = 0, skinId = 'basic', bluepr
     }
 
     const tw = Math.max(2, cellSize * 0.08);
-    drawFacingWallEdges(ctx, px, py, cellSize, th, orient, tw);
+    applyWallFaux3D(ctx, px, py, cellSize, th, orient, axis);
     return;
   }
 
@@ -875,7 +998,7 @@ function drawWallTile(ctx, px, py, cellSize, floor = 0, skinId = 'basic', bluepr
     ctx.fillRect(px + 3, py + cellSize - baseH - g - 1, g, g);
     ctx.fillRect(px + cellSize - 3 - g, py + cellSize - baseH - g - 1, g, g);
     // Gold edge trim — sides facing rooms
-    drawFacingWallEdges(ctx, px, py, cellSize, th, orient, 2);
+    applyWallFaux3D(ctx, px, py, cellSize, th, orient, axis);
     ctx.fillStyle = th.baseboard;
     ctx.fillRect(px, py + cellSize - baseH, cellSize, baseH);
     ctx.fillStyle = gold;
@@ -916,7 +1039,7 @@ function drawWallTile(ctx, px, py, cellSize, floor = 0, skinId = 'basic', bluepr
     ctx.fillRect(px, py + cellSize - baseH, cellSize, baseH);
     // Thick keep edges only where facing a room
     const ew = Math.max(3, cellSize * 0.1);
-    drawFacingWallEdges(ctx, px, py, cellSize, th, orient, ew);
+    applyWallFaux3D(ctx, px, py, cellSize, th, orient, axis);
     return;
   }
 
@@ -986,6 +1109,7 @@ function drawWallTile(ctx, px, py, cellSize, floor = 0, skinId = 'basic', bluepr
     ctx.fillStyle = gold;
     ctx.fillRect(px, py + cellSize - baseH, cellSize, 2);
     ctx.fillRect(px, py, cellSize, 2);
+    applyWallFaux3D(ctx, px, py, cellSize, th, orient, axis);
     return;
   }
 
@@ -994,7 +1118,7 @@ function drawWallTile(ctx, px, py, cellSize, floor = 0, skinId = 'basic', bluepr
   ctx.fillRect(px, py, cellSize, topH);
   ctx.fillStyle = th.baseboard;
   ctx.fillRect(px, py + cellSize - baseH, cellSize, baseH);
-  drawFacingWallEdges(ctx, px, py, cellSize, th, orient, 2);
+  applyWallFaux3D(ctx, px, py, cellSize, th, orient, axis);
   ctx.strokeStyle = 'rgba(255,255,255,0.08)';
   ctx.lineWidth = 1;
   ctx.strokeRect(px + 3, py + cellSize * 0.22, cellSize - 6, cellSize * 0.5);
@@ -1111,150 +1235,207 @@ export function drawTrapSprite(ctx, tr, triggered, px, py, cellSize) {
   const kind = tr.kind === TRAP_PIT ? TRAP_PIT : TRAP_BOMB;
   const cx = px + cellSize / 2;
   const cy = py + cellSize / 2;
+  const s = cellSize;
 
   if (kind === TRAP_PIT) {
+    // Soft ground shadow / rim volume
+    drawGroundShadow(ctx, cx, cy + s * 0.08, s * 0.4, s * 0.14, 0.35);
     if (triggered) {
-      // Spent / visible hole
+      // Spent hole with 3D rim
+      const grd = ctx.createRadialGradient(cx, cy - s * 0.05, s * 0.05, cx, cy, s * 0.38);
+      grd.addColorStop(0, '#0a0608');
+      grd.addColorStop(0.55, '#1a1210');
+      grd.addColorStop(1, COLORS.pitRim);
       ctx.fillStyle = COLORS.pitRim;
       ctx.beginPath();
-      ctx.ellipse(cx, cy + 1, cellSize * 0.38, cellSize * 0.28, 0, 0, Math.PI * 2);
+      ctx.ellipse(cx, cy + 2, s * 0.4, s * 0.3, 0, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = COLORS.pitDark;
+      ctx.fillStyle = grd;
       ctx.beginPath();
-      ctx.ellipse(cx, cy, cellSize * 0.32, cellSize * 0.22, 0, 0, Math.PI * 2);
+      ctx.ellipse(cx, cy, s * 0.34, s * 0.24, 0, 0, Math.PI * 2);
       ctx.fill();
-      // Crack lines
-      ctx.strokeStyle = 'rgba(20,15,10,0.7)';
+      // Inner abyss
+      ctx.fillStyle = '#050308';
+      ctx.beginPath();
+      ctx.ellipse(cx, cy + 1, s * 0.22, s * 0.15, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // Rim highlight
+      ctx.strokeStyle = 'rgba(180,150,120,0.45)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy - 1, s * 0.34, s * 0.22, 0, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(20,15,10,0.75)';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.moveTo(cx - cellSize * 0.35, cy);
-      ctx.lineTo(cx - cellSize * 0.15, cy - cellSize * 0.08);
-      ctx.lineTo(cx + cellSize * 0.05, cy + cellSize * 0.05);
-      ctx.moveTo(cx + cellSize * 0.1, cy - cellSize * 0.12);
-      ctx.lineTo(cx + cellSize * 0.32, cy + cellSize * 0.02);
+      ctx.moveTo(cx - s * 0.36, cy);
+      ctx.lineTo(cx - s * 0.12, cy - s * 0.1);
+      ctx.lineTo(cx + s * 0.08, cy + s * 0.06);
+      ctx.moveTo(cx + s * 0.1, cy - s * 0.14);
+      ctx.lineTo(cx + s * 0.34, cy + s * 0.02);
       ctx.stroke();
     } else {
-      // Armed pit — cracked floor hint (designer view)
-      ctx.fillStyle = 'rgba(30,20,15,0.55)';
+      // Armed pit — clear cracked floor icon
+      ctx.fillStyle = 'rgba(40,28,18,0.55)';
       ctx.beginPath();
-      ctx.ellipse(cx, cy + 1, cellSize * 0.36, cellSize * 0.26, 0, 0, Math.PI * 2);
+      ctx.ellipse(cx, cy + 2, s * 0.38, s * 0.28, 0, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = COLORS.pitDark;
+      const grd = ctx.createRadialGradient(cx - s * 0.05, cy - s * 0.06, 2, cx, cy, s * 0.3);
+      grd.addColorStop(0, '#2a2018');
+      grd.addColorStop(1, COLORS.pitDark);
+      ctx.fillStyle = grd;
       ctx.beginPath();
-      ctx.ellipse(cx, cy, cellSize * 0.28, cellSize * 0.2, 0, 0, Math.PI * 2);
+      ctx.ellipse(cx, cy, s * 0.3, s * 0.22, 0, 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = '#6a5040';
-      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = '#8a7058';
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(cx - cellSize * 0.3, cy - cellSize * 0.05);
-      ctx.lineTo(cx - cellSize * 0.05, cy + cellSize * 0.1);
-      ctx.lineTo(cx + cellSize * 0.28, cy - cellSize * 0.02);
+      ctx.ellipse(cx, cy, s * 0.3, s * 0.22, 0, 0, Math.PI * 2);
       ctx.stroke();
-      ctx.fillStyle = 'rgba(255,200,100,0.35)';
-      ctx.font = `bold ${Math.floor(cellSize * 0.28)}px sans-serif`;
+      ctx.strokeStyle = '#c9a070';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.moveTo(cx - s * 0.28, cy - s * 0.04);
+      ctx.lineTo(cx - s * 0.02, cy + s * 0.1);
+      ctx.lineTo(cx + s * 0.26, cy - s * 0.02);
+      ctx.moveTo(cx + s * 0.05, cy - s * 0.12);
+      ctx.lineTo(cx + s * 0.18, cy + s * 0.08);
+      ctx.stroke();
+      // Clear pit glyph
+      ctx.fillStyle = 'rgba(255,220,140,0.9)';
+      ctx.font = `bold ${Math.floor(s * 0.3)}px sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('穴', cx, cy);
+      ctx.fillText('穴', cx, cy + 1);
     }
     return;
   }
 
-  // Bomb (was normal trap)
+  // Bomb
   if (triggered) {
-    // Scorch mark after boom
-    ctx.fillStyle = 'rgba(40, 25, 15, 0.75)';
+    drawGroundShadow(ctx, cx, cy + s * 0.1, s * 0.34, s * 0.12, 0.4);
+    ctx.fillStyle = 'rgba(40, 25, 15, 0.8)';
     ctx.beginPath();
-    ctx.arc(cx, cy, cellSize * 0.32, 0, Math.PI * 2);
+    ctx.arc(cx, cy, s * 0.34, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = '#2a1810';
+    const scorch = ctx.createRadialGradient(cx, cy, 2, cx, cy, s * 0.28);
+    scorch.addColorStop(0, '#1a1008');
+    scorch.addColorStop(1, '#3a2818');
+    ctx.fillStyle = scorch;
     ctx.beginPath();
-    ctx.arc(cx, cy, cellSize * 0.2, 0, Math.PI * 2);
+    ctx.arc(cx, cy, s * 0.22, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = '#ff8844';
-    ctx.font = `bold ${Math.floor(cellSize * 0.28)}px sans-serif`;
+    ctx.font = `bold ${Math.floor(s * 0.3)}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('爆', cx, cy + 1);
   } else {
-    // Round bomb body
-    const r = cellSize * 0.28;
-    ctx.fillStyle = '#1a1a22';
+    drawGroundShadow(ctx, cx, cy + s * 0.28, s * 0.32, s * 0.11, 0.38);
+    const r = s * 0.32;
+    const by = cy + s * 0.06;
+    // Sphere shading
+    const body = ctx.createRadialGradient(cx - r * 0.35, by - r * 0.4, r * 0.1, cx, by, r);
+    body.addColorStop(0, '#4a4a58');
+    body.addColorStop(0.45, '#1e1e28');
+    body.addColorStop(1, '#0a0a10');
+    ctx.fillStyle = body;
     ctx.beginPath();
-    ctx.arc(cx, cy + cellSize * 0.04, r, 0, Math.PI * 2);
+    ctx.arc(cx, by, r, 0, Math.PI * 2);
     ctx.fill();
-    // Highlight
-    ctx.fillStyle = 'rgba(255,255,255,0.18)';
+    // Specular
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
     ctx.beginPath();
-    ctx.ellipse(cx - r * 0.28, cy - r * 0.15, r * 0.35, r * 0.22, -0.4, 0, Math.PI * 2);
+    ctx.ellipse(cx - r * 0.3, by - r * 0.32, r * 0.28, r * 0.18, -0.5, 0, Math.PI * 2);
     ctx.fill();
-    // Fuse
-    ctx.strokeStyle = '#c9a227';
-    ctx.lineWidth = Math.max(1.5, cellSize * 0.05);
+    // Cap / fuse mount
+    ctx.fillStyle = '#3a3020';
+    ctx.beginPath();
+    ctx.ellipse(cx, by - r * 0.72, r * 0.22, r * 0.12, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#e0b030';
+    ctx.lineWidth = Math.max(2, s * 0.06);
     ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.moveTo(cx, cy - r * 0.75);
-    ctx.quadraticCurveTo(cx + r * 0.45, cy - r * 1.15, cx + r * 0.15, cy - r * 1.35);
+    ctx.moveTo(cx, by - r * 0.8);
+    ctx.quadraticCurveTo(cx + r * 0.5, by - r * 1.25, cx + r * 0.18, by - r * 1.45);
     ctx.stroke();
-    // Spark
+    // Spark bloom
+    ctx.fillStyle = 'rgba(255,200,60,0.45)';
+    ctx.beginPath();
+    ctx.arc(cx + r * 0.18, by - r * 1.45, s * 0.1, 0, Math.PI * 2);
+    ctx.fill();
     ctx.fillStyle = '#ffcc44';
     ctx.beginPath();
-    ctx.arc(cx + r * 0.15, cy - r * 1.35, cellSize * 0.07, 0, Math.PI * 2);
+    ctx.arc(cx + r * 0.18, by - r * 1.45, s * 0.07, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = '#ff6622';
+    ctx.fillStyle = '#ff5522';
     ctx.beginPath();
-    ctx.arc(cx + r * 0.15, cy - r * 1.35, cellSize * 0.035, 0, Math.PI * 2);
+    ctx.arc(cx + r * 0.18, by - r * 1.45, s * 0.035, 0, Math.PI * 2);
     ctx.fill();
-    // Label
     ctx.fillStyle = '#ffe08a';
-    ctx.font = `bold ${Math.floor(cellSize * 0.22)}px sans-serif`;
+    ctx.font = `bold ${Math.floor(s * 0.22)}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('爆弾', cx, cy + cellSize * 0.06);
+    ctx.fillText('爆弾', cx, by + s * 0.02);
   }
 }
 
 export function drawChestSprite(ctx, px, py, cellSize) {
-  const m = Math.max(3, cellSize * 0.12);
-  const rr = Math.max(2, cellSize * 0.08);
-  // Soft oval shadow
-  ctx.fillStyle = 'rgba(0,0,0,0.28)';
-  ctx.beginPath();
-  ctx.ellipse(px + cellSize / 2, py + cellSize - m + 1, cellSize * 0.34, cellSize * 0.08, 0, 0, Math.PI * 2);
+  const s = cellSize;
+  const m = Math.max(2, s * 0.08);
+  const rr = Math.max(3, s * 0.1);
+  const cx = px + s / 2;
+  drawGroundShadow(ctx, cx, py + s - m + 2, s * 0.38, s * 0.1, 0.36);
+
+  const bodyY = py + s * 0.36;
+  const bodyH = s * 0.5;
+  const side = Math.max(3, s * 0.1);
+
+  // Side face (depth)
+  ctx.fillStyle = shadeColor(COLORS.chestEdge, -25);
+  roundRect(ctx, px + s - m - side, bodyY + side * 0.35, side, bodyH - side * 0.2, rr * 0.5);
   ctx.fill();
-  const bodyY = py + cellSize * 0.38;
-  const bodyH = cellSize * 0.48;
-  // Body with rounded corners
+
+  // Body
   ctx.fillStyle = COLORS.chestEdge;
-  ctx.beginPath();
-  ctx.roundRect(px + m, bodyY, cellSize - m * 2, bodyH, rr);
+  roundRect(ctx, px + m, bodyY, s - m * 2 - side * 0.35, bodyH, rr);
   ctx.fill();
-  ctx.fillStyle = COLORS.chest;
-  ctx.beginPath();
-  ctx.roundRect(px + m + 2, bodyY + 2, cellSize - m * 2 - 4, bodyH - 4, rr * 0.7);
+  const bodyGrd = ctx.createLinearGradient(px, bodyY, px, bodyY + bodyH);
+  bodyGrd.addColorStop(0, COLORS.chestLid);
+  bodyGrd.addColorStop(0.45, COLORS.chest);
+  bodyGrd.addColorStop(1, shadeColor(COLORS.chest, -30));
+  ctx.fillStyle = bodyGrd;
+  roundRect(ctx, px + m + 2, bodyY + 2, s - m * 2 - side * 0.35 - 4, bodyH - 4, rr * 0.7);
   ctx.fill();
-  // Specular
-  ctx.fillStyle = 'rgba(255,245,180,0.4)';
-  ctx.fillRect(px + m + 3, bodyY + 3, cellSize - m * 2 - 6, Math.max(2, cellSize * 0.06));
-  // Lid
-  ctx.fillStyle = COLORS.chestEdge;
-  ctx.beginPath();
-  ctx.roundRect(px + m - 1, py + cellSize * 0.22, cellSize - m * 2 + 2, cellSize * 0.22, rr);
+
+  // Lid block with top face
+  ctx.fillStyle = shadeColor(COLORS.chestEdge, -15);
+  roundRect(ctx, px + m - 1, py + s * 0.18, s - m * 2 + 2 - side * 0.2, s * 0.24, rr);
   ctx.fill();
-  ctx.fillStyle = COLORS.chestLid;
-  ctx.beginPath();
-  ctx.roundRect(px + m + 1, py + cellSize * 0.24, cellSize - m * 2 - 2, cellSize * 0.16, rr * 0.6);
+  const lidGrd = ctx.createLinearGradient(px, py + s * 0.18, px, py + s * 0.4);
+  lidGrd.addColorStop(0, '#ffe08a');
+  lidGrd.addColorStop(1, COLORS.chestLid);
+  ctx.fillStyle = lidGrd;
+  roundRect(ctx, px + m + 1, py + s * 0.2, s - m * 2 - 2 - side * 0.2, s * 0.18, rr * 0.6);
   ctx.fill();
-  ctx.fillStyle = 'rgba(255,255,220,0.55)';
-  ctx.fillRect(px + m + 2, py + cellSize * 0.25, cellSize - m * 2 - 4, 3);
-  // Lock
+  // Top specular
+  ctx.fillStyle = 'rgba(255,255,240,0.55)';
+  ctx.fillRect(px + m + 3, py + s * 0.22, s * 0.5, Math.max(2, s * 0.05));
+
+  // Band + lock
+  ctx.fillStyle = shadeColor(COLORS.chestEdge, 10);
+  ctx.fillRect(px + m + 2, bodyY + bodyH * 0.35, s - m * 2 - side * 0.35 - 4, Math.max(3, s * 0.08));
   ctx.fillStyle = COLORS.chestLock;
-  const lx = px + cellSize / 2 - 3;
-  const ly = py + cellSize * 0.42;
-  ctx.beginPath();
-  ctx.roundRect(lx, ly, 6, 7, 1);
+  const lx = cx - side * 0.55;
+  const ly = bodyY + bodyH * 0.28;
+  roundRect(ctx, lx, ly, 8, 10, 2);
   ctx.fill();
-  ctx.fillStyle = '#e8c547';
-  ctx.fillRect(lx + 1, ly + 1, 4, 3);
+  ctx.fillStyle = '#f0d060';
+  ctx.fillRect(lx + 1.5, ly + 1.5, 5, 4);
+  ctx.beginPath();
+  ctx.arc(lx + 4, ly + 7, 1.5, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 
@@ -1787,83 +1968,134 @@ function drawFurnitureSprite(ctx, kind, px, py, cellSize, floor, skinId = 'basic
   const woodHi = shadeColor(th.doorLight, -20);
   const woodDk = th.wallEdge;
 
-  // Realistic furniture sprite when available
+  // Realistic furniture sprite when available — larger, shadowed, simple 3D
   const furnKey = FURN_TEX_BY_KIND[kind];
   if (furnKey) {
     const img = getTex(furnKey);
     if (img) {
-      const pad = s * 0.06;
-      ctx.drawImage(img, px + pad, py + pad, s - pad * 2, s - pad * 2);
+      const flat = kind === 'tatami' || kind === 'rug_cozy' || kind === 'rug_rich';
+      // Bigger draw within/near cell so bed/sofa/table read at a glance
+      const scale = flat ? 0.92 : 1.12;
+      const dw = s * scale;
+      const dh = s * scale;
+      const dx = px + (s - dw) / 2;
+      const dy = flat ? py + (s - dh) / 2 : py + s - dh - s * 0.02;
+      // Drop shadow under feet
+      if (!flat) {
+        drawGroundShadow(ctx, px + s * 0.5, py + s * 0.88, s * 0.38, s * 0.12, 0.34);
+      }
+      // Side face (simple block depth) behind sprite
+      if (!flat) {
+        const side = Math.max(3, s * 0.1);
+        ctx.fillStyle = 'rgba(0,0,0,0.28)';
+        ctx.fillRect(dx + dw - side * 0.3, dy + side * 0.55, side, dh - side * 0.55);
+        ctx.fillStyle = 'rgba(40,28,18,0.35)';
+        ctx.fillRect(dx + 2, dy + dh - side * 0.55, dw - 4, side * 0.55);
+      }
+      ctx.drawImage(img, dx, dy, dw, dh);
+      // Top highlight lip for volume
+      if (!flat) {
+        ctx.fillStyle = 'rgba(255,255,255,0.18)';
+        ctx.fillRect(dx + dw * 0.12, dy + dh * 0.06, dw * 0.55, Math.max(2, s * 0.06));
+        ctx.fillStyle = 'rgba(0,0,0,0.12)';
+        ctx.fillRect(dx + dw * 0.08, dy + dh * 0.72, dw * 0.84, dh * 0.18);
+      }
       return;
     }
   }
 
-  // --- beds ---
+  // Procedural furniture: always cast a ground shadow first (except flat mats)
+  if (kind !== 'tatami' && kind !== 'rug_cozy' && kind !== 'rug_rich' && kind !== 'curtain') {
+    drawGroundShadow(ctx, px + s * 0.5, py + s * 0.86, s * 0.36, s * 0.11, 0.3);
+  }
+
+  // --- beds (larger silhouette + top/side 3D) ---
   if (kind === 'bed' || kind === 'bed_nice' || kind === 'bed_luxury') {
+    const m2 = s * 0.06;
+    const bx = px + m2;
+    const by = py + m2 * 0.8;
+    const bw = s - m2 * 2;
+    const bh = s - m2 * 1.6;
+    const side = Math.max(3, s * 0.1);
     const frame = kind === 'bed_luxury' ? gold : kind === 'bed_nice' ? wood : shadeColor(th.wallEdge, 20);
+    const frameDk = typeof frame === 'string' && frame[0] === '#' ? shadeColor(frame, -35) : woodDk;
+    ctx.fillStyle = frameDk;
+    ctx.fillRect(bx + bw - side, by + side * 0.4, side, bh - side * 0.4);
     ctx.fillStyle = frame;
-    ctx.fillRect(px + m, py + m * 1.2, s - m * 2, s - m * 2.2);
+    roundRect(ctx, bx, by, bw - side * 0.4, bh - side * 0.35, 3);
+    ctx.fill();
     const mattress = kind === 'bed_luxury'
       ? (floor === 1 ? '#e8e0f0' : floor === 2 ? '#f8d8e0' : '#fff4d8')
       : kind === 'bed_nice'
         ? (floor === 1 ? '#d0dcc8' : floor === 2 ? '#f0d0c0' : '#f5e8c8')
         : (floor === 1 ? '#c8d4e8' : floor === 2 ? '#f0c8d0' : '#f0e0c0');
     ctx.fillStyle = mattress;
-    ctx.fillRect(px + m + 2, py + m * 1.2 + 2, s - m * 2 - 4, s - m * 2.2 - 4);
+    roundRect(ctx, bx + 3, by + 3, bw - side * 0.4 - 6, bh - side * 0.35 - 8, 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.fillRect(bx + 4, by + 3, bw * 0.55, Math.max(2, s * 0.06));
     ctx.fillStyle = '#fff8ee';
-    ctx.fillRect(px + m + 3, py + m * 1.2 + 3, s * 0.28, s * 0.18);
+    roundRect(ctx, bx + 4, by + 5, s * 0.3, s * 0.2, 2);
+    ctx.fill();
     if (kind === 'bed_luxury') {
       ctx.fillStyle = gold;
-      ctx.fillRect(px + m, py + m * 1.2, s - m * 2, 2);
-      ctx.fillRect(px + m + 2, py + s * 0.50, s - m * 2 - 4, s * 0.14);
-      ctx.fillStyle = 'rgba(255,255,255,0.35)';
-      ctx.fillRect(px + m + 4, py + s * 0.52, s - m * 2 - 8, 2);
+      ctx.fillRect(bx, by, bw - side * 0.4, 3);
+      ctx.fillRect(bx + 3, by + bh * 0.55, bw - side * 0.4 - 6, s * 0.16);
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.fillRect(bx + 5, by + bh * 0.57, bw - side * 0.4 - 10, 2);
     } else {
       ctx.fillStyle = th.rug.replace(/0\.\d+/g, '0.45');
-      ctx.fillRect(px + m + 2, py + s * 0.52, s - m * 2 - 4, s * 0.12);
+      ctx.fillRect(bx + 3, by + bh * 0.58, bw - side * 0.4 - 6, s * 0.14);
       if (kind === 'bed_nice') {
         ctx.fillStyle = woodHi;
-        ctx.fillRect(px + m, py + m * 1.2, s - m * 2, 2);
+        ctx.fillRect(bx, by, bw - side * 0.4, 3);
       }
     }
     return;
   }
 
-  // --- tables ---
+  // --- tables (larger top + side depth) ---
   if (kind === 'table' || kind === 'table_wood' || kind === 'table_elegant' || kind === 'table_grand') {
-    const topH = kind === 'table' ? s * 0.36 : s * 0.42;
-    const topY = py + m * (kind === 'table' ? 1.6 : 1.3);
+    const m2 = s * 0.06;
+    const topH = kind === 'table' ? s * 0.4 : s * 0.46;
+    const topY = py + m2 * 1.1;
+    const side = Math.max(3, s * 0.1);
+    const bodyW = s - m2 * 2;
+    ctx.fillStyle = woodDk;
+    ctx.fillRect(px + m2 + bodyW - side, topY + side * 0.35, side, topH);
     ctx.fillStyle = kind === 'table_grand' || kind === 'table_elegant' ? woodDk : wood;
-    ctx.fillRect(px + m, topY, s - m * 2, topH);
+    roundRect(ctx, px + m2, topY, bodyW - side * 0.35, topH, 3);
+    ctx.fill();
     ctx.fillStyle = kind === 'table_grand' ? gold : kind === 'table_elegant' ? woodHi : shadeColor(th.doorLight, -40);
-    ctx.fillRect(px + m + 2, topY + 2, s - m * 2 - 4, topH - 6);
+    roundRect(ctx, px + m2 + 2, topY + 2, bodyW - side * 0.35 - 4, topH - 7, 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.fillRect(px + m2 + 3, topY + 3, bodyW * 0.5, Math.max(2, s * 0.05));
     if (kind === 'table_elegant' || kind === 'table_grand') {
       ctx.strokeStyle = gold;
-      ctx.lineWidth = 1;
-      ctx.strokeRect(px + m + 3, topY + 3, s - m * 2 - 6, topH - 8);
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(px + m2 + 3, topY + 3, bodyW - side * 0.35 - 6, topH - 8);
     }
     if (kind === 'table_grand') {
-      // Center runner
       ctx.fillStyle = th.rug.replace(/0\.\d+/g, '0.5');
       ctx.fillRect(px + s * 0.38, topY + 4, s * 0.24, topH - 10);
     }
     ctx.fillStyle = woodDk;
-    const legW = Math.max(2, s * 0.06);
+    const legW = Math.max(2, s * 0.07);
     const legY = topY + topH;
-    const legH = s * (kind === 'table' ? 0.18 : 0.22);
-    ctx.fillRect(px + m + 2, legY, legW, legH);
-    ctx.fillRect(px + s - m - 2 - legW, legY, legW, legH);
+    const legH = s * (kind === 'table' ? 0.2 : 0.24);
+    ctx.fillRect(px + m2 + 2, legY, legW, legH);
+    ctx.fillRect(px + s - m2 - 2 - legW - side * 0.35, legY, legW, legH);
     if (kind === 'table_grand') {
-      ctx.fillRect(px + m + 2 + legW * 3, legY, legW, legH);
-      ctx.fillRect(px + s - m - 2 - legW * 4, legY, legW, legH);
+      ctx.fillRect(px + m2 + 2 + legW * 3, legY, legW, legH);
+      ctx.fillRect(px + s - m2 - 2 - legW * 4 - side * 0.35, legY, legW, legH);
     }
     return;
   }
 
-  // --- sofa ---
+  // --- sofa (larger + side/top depth) ---
   if (kind === 'sofa') {
-    ctx.fillStyle = shadeColor(th.wall, 10);
-    ctx.fillRect(px + m * 0.8, py + m, s - m * 1.6, s * 0.28);
+    const m2 = s * 0.05;
     const seat = skinId === 'villa'
       ? (floor === 1 ? '#6a7088' : floor === 2 ? '#a88840' : '#8a7860')
       : skinId === 'mansion'
@@ -1871,16 +2103,26 @@ function drawFurnitureSprite(ctx, kind, px, py, cellSize, floor, skinId = 'basic
         : skinId === 'cottage'
           ? (floor === 1 ? '#6a8860' : floor === 2 ? '#a87060' : '#a07040')
           : (floor === 1 ? '#5a7aaa' : floor === 2 ? '#b06070' : '#a05040');
+    const side = Math.max(3, s * 0.1);
+    // Backrest side + body side
+    ctx.fillStyle = shadeColor(seat, -40);
+    ctx.fillRect(px + s - m2 - side, py + m2 + s * 0.12, side, s * 0.62);
+    ctx.fillStyle = shadeColor(th.wall, 10);
+    roundRect(ctx, px + m2, py + m2, s - m2 * 2 - side * 0.35, s * 0.3, 4);
+    ctx.fill();
     ctx.fillStyle = seat;
-    ctx.fillRect(px + m * 0.8, py + m + s * 0.22, s - m * 1.6, s * 0.38);
+    roundRect(ctx, px + m2, py + m2 + s * 0.22, s - m2 * 2 - side * 0.35, s * 0.42, 4);
+    ctx.fill();
     ctx.fillStyle = shadeColor(seat, -25);
-    ctx.fillRect(px + m * 0.8, py + m + s * 0.18, s * 0.12, s * 0.42);
-    ctx.fillRect(px + s - m * 0.8 - s * 0.12, py + m + s * 0.18, s * 0.12, s * 0.42);
-    ctx.fillStyle = 'rgba(255,255,255,0.18)';
-    ctx.fillRect(px + m + s * 0.14, py + m + s * 0.28, s * 0.5, s * 0.1);
+    roundRect(ctx, px + m2, py + m2 + s * 0.18, s * 0.14, s * 0.46, 3);
+    ctx.fill();
+    roundRect(ctx, px + s - m2 - side * 0.35 - s * 0.14, py + m2 + s * 0.18, s * 0.14, s * 0.46, 3);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.fillRect(px + m2 + s * 0.16, py + m2 + s * 0.28, s * 0.48, s * 0.1);
     if (skinId === 'mansion' || skinId === 'villa') {
       ctx.fillStyle = gold;
-      ctx.fillRect(px + m * 0.8, py + m, s - m * 1.6, 2);
+      ctx.fillRect(px + m2, py + m2, s - m2 * 2 - side * 0.35, 3);
     }
     return;
   }
@@ -2604,8 +2846,9 @@ export function drawHouse(ctx, blueprint, houseData, floor, opts = {}) {
       ox + mapW / 2, oy + mapH / 2, mapW * 0.72
     );
     grd.addColorStop(0, th.glow);
-    grd.addColorStop(0.55, 'rgba(0,0,0,0)');
-    grd.addColorStop(1, 'rgba(0,0,0,0.28)');
+    grd.addColorStop(0.45, 'rgba(0,0,0,0)');
+    grd.addColorStop(0.75, 'rgba(0,0,0,0.12)');
+    grd.addColorStop(1, 'rgba(0,0,0,0.34)');
     ctx.fillStyle = grd;
     ctx.fillRect(ox, oy, mapW, mapH);
   }
@@ -2642,60 +2885,74 @@ export function drawHouse(ctx, blueprint, houseData, floor, opts = {}) {
 export function drawPlayer(ctx, x, y, color, ox, oy, cellSize = TILE, pulse = 0) {
   const px = ox + x * cellSize + cellSize / 2;
   const py = oy + y * cellSize + cellSize / 2;
-  const bob = Math.sin(pulse) * 1.2;
+  const bob = Math.sin(pulse) * 1.4;
   const s = cellSize;
 
-  // Soft shadow
-  ctx.fillStyle = 'rgba(0,0,0,0.28)';
-  ctx.beginPath();
-  ctx.ellipse(px, py + s * 0.28, s * 0.22, s * 0.1, 0, 0, Math.PI * 2);
+  // Stronger oval shadow under feet
+  drawGroundShadow(ctx, px, py + s * 0.32, s * 0.26, s * 0.11, 0.38);
+
+  // Legs (rounded)
+  ctx.fillStyle = shadeColor(color, -40);
+  roundRect(ctx, px - s * 0.16, py + s * 0.1 + bob, s * 0.12, s * 0.2, 3);
+  ctx.fill();
+  roundRect(ctx, px + s * 0.04, py + s * 0.1 + bob, s * 0.12, s * 0.2, 3);
   ctx.fill();
 
-  // Legs
-  ctx.fillStyle = shadeColor(color, -35);
-  ctx.fillRect(px - s * 0.14, py + s * 0.08 + bob, s * 0.1, s * 0.18);
-  ctx.fillRect(px + s * 0.04, py + s * 0.08 + bob, s * 0.1, s * 0.18);
-
-  // Body
-  ctx.fillStyle = color;
-  roundRect(ctx, px - s * 0.2, py - s * 0.12 + bob, s * 0.4, s * 0.28, 3);
+  // Body with soft shading (rounded capsule)
+  const bodyGrd = ctx.createLinearGradient(px - s * 0.22, py, px + s * 0.22, py);
+  bodyGrd.addColorStop(0, shadeColor(color, 35));
+  bodyGrd.addColorStop(0.45, color);
+  bodyGrd.addColorStop(1, shadeColor(color, -30));
+  ctx.fillStyle = bodyGrd;
+  roundRect(ctx, px - s * 0.22, py - s * 0.14 + bob, s * 0.44, s * 0.32, s * 0.1);
   ctx.fill();
-  // Body highlight
-  ctx.fillStyle = 'rgba(255,255,255,0.22)';
-  roundRect(ctx, px - s * 0.16, py - s * 0.1 + bob, s * 0.32, s * 0.1, 2);
+  ctx.fillStyle = 'rgba(255,255,255,0.28)';
+  roundRect(ctx, px - s * 0.16, py - s * 0.12 + bob, s * 0.28, s * 0.1, 3);
   ctx.fill();
 
-  // Head
-  ctx.fillStyle = '#f5d0b0';
+  // Head sphere with shading
+  const hr = s * 0.2;
+  const hy = py - s * 0.24 + bob;
+  const headGrd = ctx.createRadialGradient(px - hr * 0.25, hy - hr * 0.3, hr * 0.1, px, hy, hr);
+  headGrd.addColorStop(0, '#ffe0c0');
+  headGrd.addColorStop(0.7, '#f5d0b0');
+  headGrd.addColorStop(1, '#c89070');
+  ctx.fillStyle = headGrd;
   ctx.beginPath();
-  ctx.arc(px, py - s * 0.22 + bob, s * 0.18, 0, Math.PI * 2);
+  ctx.arc(px, hy, hr, 0, Math.PI * 2);
   ctx.fill();
-  // Hair / cap in player color
-  ctx.fillStyle = shadeColor(color, -20);
+
+  // Hair / cap
+  ctx.fillStyle = shadeColor(color, -25);
   ctx.beginPath();
-  ctx.arc(px, py - s * 0.28 + bob, s * 0.17, Math.PI, 0);
+  ctx.arc(px, hy - s * 0.04, hr * 0.95, Math.PI * 1.05, Math.PI * 1.95);
+  ctx.fill();
+  ctx.fillStyle = shadeColor(color, 20);
+  ctx.beginPath();
+  ctx.ellipse(px - hr * 0.2, hy - hr * 0.55, hr * 0.35, hr * 0.18, -0.3, 0, Math.PI * 2);
   ctx.fill();
 
   // Eyes
   ctx.fillStyle = '#1a1020';
   ctx.beginPath();
-  ctx.arc(px - s * 0.06, py - s * 0.22 + bob, s * 0.035, 0, Math.PI * 2);
-  ctx.arc(px + s * 0.06, py - s * 0.22 + bob, s * 0.035, 0, Math.PI * 2);
+  ctx.arc(px - s * 0.07, hy, s * 0.04, 0, Math.PI * 2);
+  ctx.arc(px + s * 0.07, hy, s * 0.04, 0, Math.PI * 2);
   ctx.fill();
-  // Eye shine
   ctx.fillStyle = '#fff';
   ctx.beginPath();
-  ctx.arc(px - s * 0.05, py - s * 0.23 + bob, s * 0.015, 0, Math.PI * 2);
-  ctx.arc(px + s * 0.07, py - s * 0.23 + bob, s * 0.015, 0, Math.PI * 2);
+  ctx.arc(px - s * 0.055, hy - s * 0.015, s * 0.016, 0, Math.PI * 2);
+  ctx.arc(px + s * 0.085, hy - s * 0.015, s * 0.016, 0, Math.PI * 2);
   ctx.fill();
 
   // Smile
   ctx.strokeStyle = '#8a5040';
-  ctx.lineWidth = 1.2;
+  ctx.lineWidth = 1.4;
+  ctx.lineCap = 'round';
   ctx.beginPath();
-  ctx.arc(px, py - s * 0.16 + bob, s * 0.07, 0.15 * Math.PI, 0.85 * Math.PI);
+  ctx.arc(px, hy + s * 0.06, s * 0.08, 0.15 * Math.PI, 0.85 * Math.PI);
   ctx.stroke();
 }
+
 
 function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath();
