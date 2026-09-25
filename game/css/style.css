@@ -71,14 +71,15 @@ body {
 
 /* ---- Title ---- */
 #screen-title {
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
   gap: clamp(2px, 0.8vh, 8px);
   text-align: center;
   padding-left: 14px;
   padding-right: 14px;
+  padding-top: max(12px, env(safe-area-inset-top, 0px), min(3.5vh, 28px));
   position: relative;
-  /* Keep all menu buttons reachable on short phones */
+  /* Pack title+buttons as one block; leftover empty space stays below (phone + PC) */
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
@@ -106,18 +107,18 @@ body {
 }
 .title-glow {
   position: absolute;
-  top: 18%;
+  top: 8%;
   left: 50%;
   transform: translateX(-50%);
   width: min(280px, 70vw);
-  height: min(120px, 18vh);
+  height: min(100px, 14vh);
   background: radial-gradient(ellipse, rgba(255, 200, 80, 0.22), transparent 70%);
   pointer-events: none;
   filter: blur(8px);
 }
 .title-logo {
   position: relative;
-  font-size: clamp(1.6rem, 7vh, 2.6rem);
+  font-size: clamp(1.55rem, 5.5vh, 2.35rem);
   font-weight: 900;
   letter-spacing: 0.08em;
   color: #ffe08a;
@@ -266,10 +267,11 @@ a.btn.link-btn {
 
 /* ---- Lobby ---- */
 #screen-lobby {
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
   gap: clamp(8px, 1.5vh, 14px);
   text-align: center;
+  padding-top: max(16px, env(safe-area-inset-top, 0px), min(4vh, 32px));
 }
 .lobby-label { color: #cbb896; font-size: clamp(0.8rem, 2.2vh, 0.95rem); }
 .room-code {
@@ -678,6 +680,24 @@ a.btn.link-btn {
   font-size: clamp(0.8rem, 2.2vh, 0.95rem);
   line-height: 1.45;
   max-width: 280px;
+}
+
+
+
+/* Wide/tall desktop: keep title packed in the centered phone column */
+@media (min-width: 500px) and (min-height: 800px) {
+  #screen-title {
+    justify-content: flex-start;
+    padding-top: 28px;
+    gap: 6px;
+  }
+  .title-logo { font-size: clamp(1.6rem, 3.2vh, 2.2rem); }
+  .title-sub { margin-bottom: 8px; }
+  .title-glow { top: 6%; height: 90px; }
+  #screen-lobby {
+    justify-content: flex-start;
+    padding-top: 36px;
+  }
 }
 
 @media (min-width: 500px) {
@@ -1160,6 +1180,7 @@ a.btn.link-btn {
 }
 #game-meta .meta-sep { opacity: 0.55; color: #c9a227; }
 #meta-version { color: #ffe08a; }
+#app-version { display: none; } /* duplicate of meta-version */
 #meta-visits { color: #fff; font-variant-numeric: tabular-nums; }
 #app { padding-bottom: 34px; }
 .build-stamp { display: none; }
