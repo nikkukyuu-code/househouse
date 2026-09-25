@@ -1,5 +1,5 @@
 /**
- * ハウスと罠 — House layout, placement, and rendering helpers
+ * ハウスの罠（仮） — House layout, placement, and rendering helpers
  */
 
 export const TILE = 32;

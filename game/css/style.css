@@ -1,4 +1,4 @@
-/* ハウスと罠 — Fixed single-viewport, no scroll (mobile-first) */
+/* ハウスの罠（仮） — Fixed single-viewport, no scroll (mobile-first) */
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
