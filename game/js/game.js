@@ -9,12 +9,12 @@ import {
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
   HOUSE_SKINS, getHouseSkin, preloadTextures,
-} from './house.js?v=20260925pt';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260925pt';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260925pt';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260925pt';
+} from './house.js?v=20260926ac';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260926ac';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260926ac';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260926ac';
 
-export const GAME_VERSION = '20260925pt';
+export const GAME_VERSION = '20260926ac';
 
 const blueprint = createBlueprint();
 
@@ -2903,38 +2903,39 @@ function refreshGameMeta() {
 
   const badge = document.getElementById('meta-visits-badge');
   const visitEl = document.getElementById('meta-visits');
-  const badgeUrl =
-    'https://visitor-badge.laobi.icu/badge?page_id=nikkukyuu.househouse.game&left_text=Access&left_color=%23333&right_color=%23c9a227';
+  const LAST_KEY = 'househouse_visitLast';
+  const readLast = () => {
+    try {
+      const n = Number(localStorage.getItem(LAST_KEY));
+      return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+    } catch (_) {
+      return 0;
+    }
+  };
+  const writeLast = (n) => {
+    try {
+      const prev = readLast();
+      if (n > prev) localStorage.setItem(LAST_KEY, String(n));
+    } catch (_) { /* ignore */ }
+  };
+  const showVisits = (n) => {
+    if (visitEl) visitEl.textContent = 'アクセス ' + n.toLocaleString('ja-JP') + '回';
+  };
+  const last = readLast();
+  if (last > 0) showVisits(last);
 
+  // Hide flaky badge image; prefer stable numeric count (never go backwards).
   if (badge) {
-    badge.referrerPolicy = 'no-referrer-when-downgrade';
-    badge.loading = 'eager';
-    badge.alt = 'access';
-    badge.src = badgeUrl + '&t=' + Date.now();
-    badge.onload = () => {
-      // keep badge visible; optional numeric overlay not required
-    };
-    badge.onerror = () => {
-      try {
-        const key = 'househouse-local-visits';
-        const n = (Number(localStorage.getItem(key)) || 0) + 1;
-        localStorage.setItem(key, String(n));
-        if (visitEl) visitEl.textContent = 'アクセス(端末) ' + n.toLocaleString('ja-JP') + '回';
-      } catch (_) {
-        if (visitEl) visitEl.textContent = 'アクセス —';
-      }
-    };
-  } else if (visitEl) {
-    visitEl.textContent = 'アクセス —';
+    badge.removeAttribute('src');
+    badge.style.display = 'none';
   }
 
-  // Best-effort number (2s timeout). If it works, replace badge with Japanese text.
   let done = false;
   const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
   const timer = setTimeout(() => {
     try { if (ctrl) ctrl.abort(); } catch (_) {}
-  }, 2000);
-  fetch('https://abacus.jasoncameron.dev/hit/nikkukyuu/househouse', {
+  }, 2500);
+  fetch('https://abacus.jasoncameron.dev/hit/nikkukyuu/househouse?_=' + Date.now(), {
     method: 'GET',
     mode: 'cors',
     cache: 'no-store',
@@ -2945,11 +2946,19 @@ function refreshGameMeta() {
       clearTimeout(timer);
       if (done) return;
       const n = Number(data && data.value);
-      if (!Number.isFinite(n) || !visitEl) return;
+      if (!Number.isFinite(n) || !visitEl) {
+        if (last <= 0 && visitEl) visitEl.textContent = 'アクセス —';
+        return;
+      }
       done = true;
-      visitEl.textContent = 'アクセス ' + n.toLocaleString('ja-JP') + '回';
+      const best = Math.max(Math.floor(n), last);
+      writeLast(best);
+      showVisits(best);
     })
-    .catch(() => { clearTimeout(timer); });
+    .catch(() => {
+      clearTimeout(timer);
+      if (last <= 0 && visitEl) visitEl.textContent = 'アクセス —';
+    });
 }
 
 export async function init() {
