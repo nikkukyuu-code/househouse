@@ -9,12 +9,12 @@ import {
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
   HOUSE_SKINS, getHouseSkin, preloadTextures,
-} from './house.js?v=20260921k';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260921k';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260921k';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260921k';
+} from './house.js?v=20260925pt';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260925pt';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260925pt';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260925pt';
 
-export const GAME_VERSION = '20260921k';
+export const GAME_VERSION = '20260925pt';
 
 const blueprint = createBlueprint();
 
@@ -479,29 +479,46 @@ function refreshComMemoryUi() {
 }
 
 
-/* ---------- Points wallet (remaining life → points after match) ---------- */
+/* ---------- Points wallet (remaining life → points after match) ----------
+ * NEVER rename POINTS_KEY — that would wipe player points on update.
+ * Backup: POINTS_BAK_KEY. Never clear storage / never one-shot reset to 0.
+ * Accidental decreases blocked unless opts.allowDecrease (shop purchase only).
+ */
 const POINTS_KEY = 'househouse-points-v1';
-/** One-time wipe so browsers that had test 1000 pt reset to 0. */
-const POINTS_RESET_KEY = 'househouse-points-reset-0-v1';
+const POINTS_BAK_KEY = 'househouse-points-v1-bak';
 
-function loadPoints() {
+function readPointsKey(key) {
   try {
-    if (!localStorage.getItem(POINTS_RESET_KEY)) {
-      localStorage.setItem(POINTS_KEY, '0');
-      localStorage.removeItem('househouse-points-test-grant-v1');
-      localStorage.setItem(POINTS_RESET_KEY, '1');
-      return 0;
-    }
-    const n = parseInt(localStorage.getItem(POINTS_KEY), 10);
-    return Number.isFinite(n) && n >= 0 ? n : 0;
+    const n = parseInt(localStorage.getItem(key), 10);
+    return Number.isFinite(n) && n >= 0 ? Math.floor(n) : null;
   } catch {
-    return 0;
+    return null;
   }
 }
 
-function savePoints(n) {
+function loadPoints() {
+  const primary = readPointsKey(POINTS_KEY);
+  if (primary != null) return primary;
+  const bak = readPointsKey(POINTS_BAK_KEY);
+  if (bak != null) {
+    try { localStorage.setItem(POINTS_KEY, String(bak)); } catch { /* ignore */ }
+    return bak;
+  }
+  return 0;
+}
+
+function savePoints(n, opts = {}) {
+  const next = Math.max(0, Math.floor(Number(n) || 0));
   try {
-    localStorage.setItem(POINTS_KEY, String(Math.max(0, Math.floor(n))));
+    const prev = readPointsKey(POINTS_KEY);
+    if (prev != null && prev > next && !opts.allowDecrease) {
+      // Guard: code bug / bad call must not erase earned points
+      return;
+    }
+    if (prev != null) {
+      try { localStorage.setItem(POINTS_BAK_KEY, String(prev)); } catch { /* ignore */ }
+    }
+    localStorage.setItem(POINTS_KEY, String(next));
   } catch {
     /* ignore quota / private mode */
   }
@@ -599,7 +616,7 @@ function buyHouseSkin(skinId) {
   if (owned.includes(skin.id)) return { ok: false, msg: 'すでに所持しています' };
   const pts = loadPoints();
   if (pts < skin.price) return { ok: false, msg: 'ポイントが足りません' };
-  savePoints(pts - skin.price);
+  savePoints(pts - skin.price, { allowDecrease: true });
   owned.push(skin.id);
   saveOwnedHouses(owned);
   saveSelectedHouseId(skin.id);
