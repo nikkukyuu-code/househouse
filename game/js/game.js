@@ -9,13 +9,13 @@ import {
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
   HOUSE_SKINS, getHouseSkin, preloadTextures,
-} from './house.js?v=20260927184445';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260927184445';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260927184445';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260927184445';
+} from './house.js?v=20260927185600';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260927185600';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260927185600';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260927185600';
 
-export const GAME_VERSION = '2026-09-27 18:44:45';
-export const GAME_VERSION_BUST = '20260927184445';
+export const GAME_VERSION = '2026-09-27 18:56:00';
+export const GAME_VERSION_BUST = '20260927185600';
 export const GAME_BUILD_TIME = 1790356550909;
 
 const blueprint = createBlueprint();
