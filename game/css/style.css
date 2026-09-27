@@ -1,4 +1,4 @@
-/* ハウスの罠（仮） — Fixed single-viewport, no scroll (mobile-first) */
+/* トリックハウスバトル — Fixed single-viewport, no scroll (mobile-first) */
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -118,9 +118,10 @@ body {
 }
 .title-logo {
   position: relative;
-  font-size: clamp(1.55rem, 5.5vh, 2.35rem);
+  font-size: clamp(1.25rem, min(5.5vh, 7.6vw), 2.35rem);
   font-weight: 900;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
   color: #ffe08a;
   text-shadow:
     0 3px 0 #8b5a1a,
@@ -691,7 +692,7 @@ a.btn.link-btn {
     padding-top: 28px;
     gap: 6px;
   }
-  .title-logo { font-size: clamp(1.6rem, 3.2vh, 2.2rem); }
+  .title-logo { font-size: clamp(1.25rem, min(3.2vh, 7.6vw), 2.2rem); }
   .title-sub { margin-bottom: 8px; }
   .title-glow { top: 6%; height: 90px; }
   #screen-lobby {

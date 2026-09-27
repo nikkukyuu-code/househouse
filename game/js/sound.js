@@ -1,5 +1,5 @@
 /**
- * ハウスの罠（仮） — procedural SFX via Web Audio (no external files)
+ * トリックハウスバトル — procedural SFX via Web Audio (no external files)
  */
 
 let ctx = null;

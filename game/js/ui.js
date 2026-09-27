@@ -1,5 +1,5 @@
 /**
- * ハウスの罠（仮） — Mobile-first UI screens & overlays
+ * トリックハウスバトル — Mobile-first UI screens & overlays
  */
 
 export function $(id) {

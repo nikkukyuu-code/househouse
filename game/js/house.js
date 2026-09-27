@@ -1,5 +1,5 @@
 /**
- * ハウスの罠（仮） — House layout, placement, and rendering helpers
+ * トリックハウスバトル — House layout, placement, and rendering helpers
  */
 
 export const TILE = 32;
