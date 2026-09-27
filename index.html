@@ -92,15 +92,55 @@
     .hint { color: #b8a890; font-size: 0.88rem; margin-top: 10px; }
     .win { color: #8ddea0; font-weight: 700; }
     .lose { color: #ff8a7a; }
-  </style>
+  /* β版 badge (beta) */
+  .beta-badge {
+    display: inline-block;
+    margin-left: 0.35em;
+    padding: 0.2em 0.55em 0.22em;
+    font-size: max(0.72rem, 0.42em);
+    font-weight: 900;
+    font-style: normal;
+    line-height: 1.1;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+    vertical-align: middle;
+    color: #fff;
+    -webkit-text-fill-color: #fff;
+    -webkit-text-stroke: 0;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+    background: linear-gradient(135deg, #ff2d55, #ff8a00);
+    border: 2px solid rgba(255, 255, 255, 0.85);
+    border-radius: 999px;
+    box-shadow: 0 0 12px rgba(255, 70, 70, 0.55), 0 2px 6px rgba(0, 0, 0, 0.35);
+    transform: rotate(-8deg);
+    filter: none;
+  }
+  .beta-banner {
+    margin: 10px auto 0;
+    max-width: 30em;
+    padding: 10px 14px;
+    border-radius: 12px;
+    border: 2px solid #ff8a00;
+    background: linear-gradient(135deg, rgba(255, 45, 85, 0.2), rgba(255, 138, 0, 0.18));
+    box-shadow: 0 0 18px rgba(255, 110, 40, 0.22);
+    color: #fff1dc;
+    font-size: 0.92rem;
+    font-weight: 700;
+    line-height: 1.55;
+    text-align: center;
+  }
+  .beta-banner strong { color: #ffd24a; font-weight: 900; letter-spacing: 0.04em; }
+  main > .beta-banner { margin: 10px 0 14px; max-width: none; }
+</style>
 </head>
 <body>
   <main>
-    <h1>トリックハウスバトル</h1>
+    <h1>トリックハウスバトル<span class="beta-badge">β版</span></h1>
+    <p class="beta-banner" role="note"><strong>⚠ β版（ベータ版）</strong> 現在ベータ版です。不具合や仕様変更があります</p>
     <p class="lead"><strong>自分の家に罠と宝箱を設置して、お互いの家に行って宝箱を探すゲーム</strong>です。爆弾や落とし穴で相手を邪魔しながら、先に宝箱を見つけた方が勝ち。</p>
     <p class="tagline">スマホ向け・タッチ操作／COM対戦・ネット対戦あり</p>
 
-    <a class="play" href="game/?v=20260927193350">今すぐ遊ぶ</a>
+    <a class="play" href="game/?v=20260927224909">今すぐ遊ぶ</a>
 
     <section>
       <h2>どんなゲーム？</h2>
@@ -164,7 +204,7 @@
       </div>
     </section>
 
-    <a class="play" href="game/?v=20260927193350">ゲームを始める</a>
+    <a class="play" href="game/?v=20260927224909">ゲームを始める</a>
     <p id="site-meta" style="margin-top:18px;text-align:center;color:#887868;font-size:0.8rem;">2026-09-26 02:15:50</p>
   </main>
 </body>
