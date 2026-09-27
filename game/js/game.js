@@ -9,15 +9,15 @@ import {
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
   HOUSE_SKINS, getHouseSkin, preloadTextures,
-} from './house.js?v=20260928054102';
-import { NetSession, QuickMatch, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260928054102';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260928054102';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260928054102';
-import { hitBattleCounter, loadBattleCount } from './stats.js?v=20260928054102';
+} from './house.js?v=20260928054933';
+import { NetSession, QuickMatch, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260928054933';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260928054933';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260928054933';
+import { hitBattleCounter, loadBattleCount } from './stats.js?v=20260928054933';
 
-export const GAME_VERSION = '2026-09-28 05:41:02';
-export const GAME_VERSION_BUST = '20260928054102';
-export const GAME_BUILD_TIME = 1790541662317;
+export const GAME_VERSION = '2026-09-28 05:49:33';
+export const GAME_VERSION_BUST = '20260928054933';
+export const GAME_BUILD_TIME = 1790542173428;
 
 const blueprint = createBlueprint();
 
@@ -610,14 +610,18 @@ function refreshPointsUi(gained) {
   const titleEl = $('title-points');
   if (titleEl) titleEl.textContent = 'ポイント ' + total;
   const resEl = $('result-points');
-  if (resEl) resEl.textContent = 'ポイント ' + total;
+  if (resEl) {
+    resEl.textContent = 'ポイント ' + total;
+    // PvP result: no points talk at all (balance hidden too) — COM results unchanged
+    resEl.classList.toggle('hidden', gained === 'pvp');
+  }
   const shopEl = $('shop-points');
   if (shopEl) shopEl.textContent = 'ポイント ' + total;
   const gainEl = $('result-points-gain');
   if (gainEl) {
     if (gained === 'pvp') {
-      gainEl.textContent = '対人戦ではポイントは入りません';
-      gainEl.classList.remove('hidden');
+      gainEl.textContent = '';
+      gainEl.classList.add('hidden');
     } else if (typeof gained === 'number' && gained > 0) {
       gainEl.textContent = '勝利ボーナス：ライフ残り → +' + gained + ' pt';
       gainEl.classList.remove('hidden');
