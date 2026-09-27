@@ -1709,3 +1709,6 @@ a.btn.link-btn {
   #screen-title .btn { min-height: 36px; }
   #screen-title .save-notice { line-height: 1.3; }
 }
+
+/* 引き継ぎ notice link */
+#screen-title .easy-link { color: #ffe07a; text-decoration: underline; text-underline-offset: 2px; white-space: nowrap; font-weight: 900; }
