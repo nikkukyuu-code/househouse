@@ -1652,9 +1652,9 @@ a.btn.link-btn {
   appearance: none;
   -webkit-appearance: none;
   display: block;
-  width: min(92vw, 400px);
-  margin: 6px auto 0;
-  padding: 5px 10px;
+  width: 100%;
+  margin: -2px auto 0;
+  padding: 4px 8px;
   border-radius: 10px;
   border: 1px solid rgba(255, 138, 0, 0.75);
   background: rgba(40, 18, 4, 0.72);
@@ -1676,4 +1676,36 @@ a.btn.link-btn {
   padding: 6px 4px;
   font-size: clamp(0.72rem, 1.8vh, 0.88rem);
   letter-spacing: 0;
+}
+
+/* Conspicuous 引き継ぎ button (title) */
+#screen-title .btn-transfer,
+.btn-transfer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0 4px;
+  text-decoration: none;
+  color: #fff;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  background: linear-gradient(180deg, #ff7ab8 0%, #ff4f7a 45%, #e0351f 100%);
+  border: 2px solid #ffe07a;
+  box-shadow:
+    0 4px 0 #8a1830,
+    0 0 18px rgba(255, 90, 120, 0.55),
+    inset 0 1px 0 rgba(255,255,255,0.4);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.45);
+  animation: btn-transfer-glow 2.4s ease-in-out infinite;
+}
+.btn-transfer small { font-size: 0.78em; font-weight: 800; }
+@keyframes btn-transfer-glow {
+  0%, 100% { box-shadow: 0 4px 0 #8a1830, 0 0 12px rgba(255, 90, 120, 0.45), inset 0 1px 0 rgba(255,255,255,0.4); }
+  50% { box-shadow: 0 4px 0 #8a1830, 0 0 24px rgba(255, 120, 150, 0.85), inset 0 1px 0 rgba(255,255,255,0.4); }
+}
+@media (prefers-reduced-motion: reduce) { .btn-transfer { animation: none; } }
+@media (max-height: 660px) {
+  #screen-title .btn { min-height: 36px; }
+  #screen-title .save-notice { line-height: 1.3; }
 }
