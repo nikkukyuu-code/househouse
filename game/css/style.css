@@ -1712,3 +1712,47 @@ a.btn.link-btn {
 
 /* 引き継ぎ notice link */
 #screen-title .easy-link { color: #ffe07a; text-decoration: underline; text-underline-offset: 2px; white-space: nowrap; font-weight: 900; }
+
+/* ---------- Online group on title: 対戦相手を探す (primary) + 部屋を作る/入る ---------- */
+.online-group { display: flex; flex-direction: column; gap: clamp(4px, 0.8vh, 6px); width: 100%; }
+.online-sub { display: flex; gap: 8px; width: 100%; }
+#screen-title .online-sub .btn-compact {
+  flex: 1;
+  min-width: 0;
+  min-height: clamp(32px, 4.6vh, 40px);
+  padding: 4px 6px;
+  font-size: clamp(0.78rem, 1.9vh, 0.9rem);
+  white-space: nowrap;
+}
+#screen-title .btn-find { font-weight: 900; letter-spacing: 0.04em; }
+
+/* Room code actions */
+.code-actions { display: flex; gap: 8px; justify-content: center; margin-top: 8px; }
+.code-actions .btn-compact { min-width: 96px; min-height: 38px; padding: 6px 14px; font-size: 0.9rem; }
+
+/* 対戦相手を探す — searching screen */
+#lobby-search-wrap { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; }
+#lobby-search-wrap.hidden { display: none; }
+.search-radar { position: relative; width: 132px; height: 132px; margin: 6px auto 4px; }
+.search-radar span {
+  position: absolute; inset: 0; border-radius: 50%;
+  border: 3px solid rgba(94, 207, 138, 0.8);
+  opacity: 0; transform: scale(0.3);
+}
+.searching .search-radar span { animation: search-ping 2.1s ease-out infinite; }
+.searching .search-radar span:nth-child(2) { animation-delay: 0.7s; }
+.searching .search-radar span:nth-child(3) { animation-delay: 1.4s; }
+.search-radar b {
+  position: absolute; inset: 34px; display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; font-size: 2.2rem;
+  background: radial-gradient(circle, rgba(94, 207, 138, 0.35), rgba(20, 40, 30, 0.8));
+  box-shadow: 0 0 22px rgba(94, 207, 138, 0.45);
+}
+.searching .search-radar b { animation: search-bob 1.4s ease-in-out infinite; }
+.no-match .search-radar b { filter: grayscale(0.8); opacity: 0.6; }
+@keyframes search-ping { 0% { opacity: 0.9; transform: scale(0.3); } 100% { opacity: 0; transform: scale(1.05); } }
+@keyframes search-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+.search-msg { margin: 0; font-size: clamp(1.05rem, 3vh, 1.25rem); font-weight: 900; color: #ffe08a; text-align: center; }
+.search-left { margin: 0; font-size: 0.85rem; color: #cbb896; text-align: center; min-height: 1.2em; }
+.search-btns { margin-top: 6px; }
+@media (prefers-reduced-motion: reduce) { .searching .search-radar span, .searching .search-radar b { animation: none; opacity: 0.6; transform: none; } }

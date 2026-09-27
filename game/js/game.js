@@ -9,15 +9,15 @@ import {
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
   HOUSE_SKINS, getHouseSkin, preloadTextures,
-} from './house.js?v=20260928041908';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260928041908';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260928041908';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260928041908';
-import { hitBattleCounter, loadBattleCount } from './stats.js?v=20260928041908';
+} from './house.js?v=20260928051829';
+import { NetSession, QuickMatch, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260928051829';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260928051829';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260928051829';
+import { hitBattleCounter, loadBattleCount } from './stats.js?v=20260928051829';
 
-export const GAME_VERSION = '2026-09-28 04:19:08';
-export const GAME_VERSION_BUST = '20260928041908';
-export const GAME_BUILD_TIME = 1790536748663;
+export const GAME_VERSION = '2026-09-28 05:18:29';
+export const GAME_VERSION_BUST = '20260928051829';
+export const GAME_BUILD_TIME = 1790540309280;
 
 const blueprint = createBlueprint();
 
@@ -2577,6 +2577,7 @@ function goTitle() {
   loadBattleCount(document.getElementById('meta-battles'));
   tutorialReturn = null;
   hideIngameTipUi();
+  cancelQuickMatch();
   if (S.net) { S.net.destroy(); S.net = null; }
   showScreen('screen-title');
   refreshPointsUi();
@@ -2799,12 +2800,86 @@ function startMatch() {
   enqueueTip('match-trap');
 }
 
+/* ---------- Online: 対戦相手を探す (random matchmaking, see net.js QuickMatch) ---------- */
+let quickMatch = null;
+function cancelQuickMatch() {
+  if (quickMatch) { quickMatch.cancel(); quickMatch = null; }
+}
+function showLobbyPart(part) {
+  $('lobby-code-wrap').classList.toggle('hidden', part !== 'code');
+  $('lobby-join-wrap').classList.toggle('hidden', part !== 'join');
+  $('lobby-search-wrap').classList.toggle('hidden', part !== 'search');
+}
+function attachOnlineSession(session, role) {
+  S.net = session;
+  S.net.onStatus = (m) => setStatus($('net-status'), m, '');
+  S.net.onMessage = handleNetMessage;
+  S.net.onPeerLost = () => setStatus($('net-status'), '相手が切断しました', 'warn');
+  S.mode = role === 'host' ? 'online-host' : 'online-guest';
+  startSetup();
+  S.net.flushQueue();
+}
+async function findOpponent() {
+  cancelQuickMatch();
+  if (S.net) { S.net.destroy(); S.net = null; }
+  showScreen('screen-lobby');
+  showLobbyPart('search');
+  const wrap = $('lobby-search-wrap');
+  wrap.classList.add('searching');
+  wrap.classList.remove('no-match');
+  $('btn-search-retry').classList.add('hidden');
+  $('btn-search-com').classList.add('hidden');
+  $('btn-lobby-back').textContent = 'キャンセル';
+  $('search-msg').textContent = '対戦相手を探しています…';
+  $('search-left').textContent = '';
+  setStatus($('net-status'), '同じゲームを遊んでいる人と自動でつなぎます', '');
+  const qm = new QuickMatch({
+    waitMs: 30000,
+    onStatus: (st) => {
+      if (quickMatch !== qm) return;
+      $('search-msg').textContent = st.msg;
+      $('search-left').textContent = st.left != null ? `残り ${Math.max(0, Math.ceil(st.left / 1000))} 秒` : '';
+    },
+  });
+  quickMatch = qm;
+  try {
+    const res = await qm.run();
+    if (quickMatch !== qm) { if (res.session) res.session.destroy(); return; }
+    quickMatch = null;
+    if (res.session) {
+      $('btn-lobby-back').textContent = 'タイトルへ';
+      wrap.classList.remove('searching');
+      attachOnlineSession(res.session, res.role);
+      return;
+    }
+    wrap.classList.remove('searching');
+    wrap.classList.add('no-match');
+    $('search-msg').textContent = '今は対戦相手がいません';
+    $('search-left').textContent = 'しばらくしてからもう一度探すか、COMと対戦してください';
+    $('btn-search-retry').classList.remove('hidden');
+    $('btn-search-com').classList.remove('hidden');
+    $('btn-lobby-back').textContent = 'タイトルへ';
+    setStatus($('net-status'), '', '');
+  } catch (e) {
+    if (quickMatch !== qm) return;
+    quickMatch = null;
+    wrap.classList.remove('searching');
+    wrap.classList.add('no-match');
+    $('search-msg').textContent = '接続できませんでした';
+    $('search-left').textContent = '通信状態を確認して、もう一度お試しください';
+    $('btn-search-retry').classList.remove('hidden');
+    $('btn-search-com').classList.remove('hidden');
+    $('btn-lobby-back').textContent = 'タイトルへ';
+    setStatus($('net-status'), String((e && (e.type || e.message)) || e), 'warn');
+  }
+}
+
 /* ---------- Online room UI ---------- */
 async function createRoom() {
   setStatus($('net-status'), 'PeerJS読み込み中…', '');
   showScreen('screen-lobby');
-  $('lobby-code-wrap').classList.remove('hidden');
-  $('lobby-join-wrap').classList.add('hidden');
+  showLobbyPart('code');
+  $('btn-lobby-back').textContent = 'タイトルへ';
   $('room-code-display').textContent = '------';
   try {
     S.net = new NetSession();
@@ -2848,8 +2923,8 @@ async function joinRoom() {
 
 function showJoinLobby() {
   showScreen('screen-lobby');
-  $('lobby-code-wrap').classList.add('hidden');
-  $('lobby-join-wrap').classList.remove('hidden');
+  showLobbyPart('join');
+  $('btn-lobby-back').textContent = 'タイトルへ';
   setStatus($('net-status'), 'ホストの6桁ルームコードを入力', '');
   S.mode = 'online-guest';
 }
@@ -2880,6 +2955,21 @@ function bindControls() {
   });
 
   bindTap($('btn-create'), () => { unlockAudio(); sfx('tap'); createRoom(); });
+  bindTap($('btn-find'), () => { unlockAudio(); sfx('tap'); findOpponent(); });
+  bindTap($('btn-search-retry'), () => { sfx('tap'); findOpponent(); });
+  bindTap($('btn-search-com'), () => { unlockAudio(); sfx('tap'); cancelQuickMatch(); S.mode = 'com'; startSetup(); });
+  bindTap($('btn-copy-code'), async () => {
+    const code = $('room-code-display').textContent.trim();
+    if (!/^\d{6}$/.test(code)) return;
+    try { await navigator.clipboard.writeText(code); setStatus($('net-status'), 'コードをコピーしました：' + code, 'ok'); }
+    catch (_) { setStatus($('net-status'), 'コピーできませんでした。コード ' + code + ' を相手に伝えてください', 'warn'); }
+  });
+  if (navigator.share) $('btn-share-code').classList.remove('hidden');
+  bindTap($('btn-share-code'), () => {
+    const code = $('room-code-display').textContent.trim();
+    if (!/^\d{6}$/.test(code) || !navigator.share) return;
+    navigator.share({ title: 'トリックハウスバトル', text: 'トリックハウスバトルで対戦しよう！「部屋に入る」でコード ' + code + ' を入力してね', url: 'https://nikkukyuu-code.github.io/househouse/game/' }).catch(() => {});
+  });
   bindTap($('btn-join'), () => { unlockAudio(); sfx('tap'); showJoinLobby(); });
   bindTap($('btn-com'), () => {
     unlockAudio();
@@ -3110,8 +3200,8 @@ export async function init() {
     const note = $('peer-note');
     if (note) {
       note.textContent = ok
-        ? 'オンライン対戦: PeerJS準備OK（HTTPS推奨・6桁コード）'
-        : 'PeerJS未読込 — ローカル練習は利用可能';
+        ? 'オンライン対戦OK（部屋番号は6桁の数字）'
+        : 'オンライン準備失敗 — COM対戦は遊べます';
     }
   });
 }

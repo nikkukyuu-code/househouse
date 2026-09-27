@@ -9,7 +9,7 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta name="theme-color" content="#120e18" />
   <title>トリックハウスバトル</title>
-  <link rel="stylesheet" href="css/style.css?v=20260928041908" />
+  <link rel="stylesheet" href="css/style.css?v=20260928051829" />
 </head>
 <body>
   <div id="app">
@@ -64,8 +64,13 @@
         <button type="button" class="btn btn-com" id="btn-com">COM対戦</button>
         <button type="button" class="btn btn-ghost" id="btn-tutorial">チュートリアル</button>
         <button type="button" class="btn btn-secondary" id="btn-shop">家ショップ</button>
-        <button type="button" class="btn btn-secondary" id="btn-create">ルームを作成</button>
-        <button type="button" class="btn btn-secondary" id="btn-join">ルームに参加</button>
+        <div class="online-group" role="group" aria-label="オンライン対戦">
+          <button type="button" class="btn btn-secondary btn-find" id="btn-find">🌐 対戦相手を探す</button>
+          <div class="online-sub">
+            <button type="button" class="btn btn-ghost btn-compact" id="btn-create">部屋を作る</button>
+            <button type="button" class="btn btn-ghost btn-compact" id="btn-join">部屋に入る</button>
+          </div>
+        </div>
         <a class="btn btn-transfer link-btn" id="btn-transfer" href="/transfer/?from=/househouse/game/">🔄 引き継ぎ<small>（機種変更・データ移行）</small></a>
         <a class="save-notice" id="save-notice" href="/transfer/?from=/househouse/game/">⚠ 記録はこの端末のブラウザ内だけ。iPhoneは7日ほど開かないと消えることも <span class="easy-link">→ かんたんな方法はこちら</span></a>
         <div class="title-footer-row">
@@ -116,6 +121,19 @@
       <div id="lobby-code-wrap">
         <p class="lobby-label">ルームコード（6桁）</p>
         <div class="room-code" id="room-code-display">------</div>
+        <div class="code-actions">
+          <button type="button" class="btn btn-ghost btn-compact" id="btn-copy-code">コピー</button>
+          <button type="button" class="btn btn-ghost btn-compact hidden" id="btn-share-code">共有</button>
+        </div>
+      </div>
+      <div id="lobby-search-wrap" class="hidden">
+        <div class="search-radar" aria-hidden="true"><span></span><span></span><span></span><b>🌐</b></div>
+        <p class="search-msg" id="search-msg">対戦相手を探しています…</p>
+        <p class="search-left" id="search-left"></p>
+        <div class="btn-col search-btns" style="max-width:280px">
+          <button type="button" class="btn btn-secondary hidden" id="btn-search-retry">もう一度探す</button>
+          <button type="button" class="btn btn-com hidden" id="btn-search-com">COMと対戦する</button>
+        </div>
       </div>
       <div id="lobby-join-wrap" class="hidden">
         <p class="lobby-label">6桁コードを入力</p>
@@ -125,7 +143,7 @@
           type="text"
           maxlength="6"
           inputmode="numeric"
-          pattern="[0-9]{6}"
+          pattern="[0-9]*"
           autocomplete="off"
           autocapitalize="off"
           placeholder="123456"
@@ -255,8 +273,8 @@
   </div>
 
   <footer id="game-meta" aria-label="バージョンとアクセス数">
-    <span id="meta-version">2026-09-28 04:19:08</span>
-    <span id="app-version">2026-09-28 04:19:08</span>
+    <span id="meta-version">2026-09-28 05:18:29</span>
+    <span id="app-version">2026-09-28 05:18:29</span>
     <span class="meta-sep" aria-hidden="true">｜</span>
     <span id="meta-visits" class="meta-visits"><span class="meta-visits-label">アクセス</span> <img id="meta-visits-badge" alt="access" width="70" height="20" /></span>
     <span class="meta-sep" aria-hidden="true" hidden>｜</span>
@@ -264,7 +282,7 @@
   </footer>
 
   <script type="module">
-    import { init } from './js/game.js?v=20260928041908';
+    import { init } from './js/game.js?v=20260928051829';
     init().catch((e) => {
       console.error(e);
       const n = document.getElementById('peer-note');
