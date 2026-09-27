@@ -1756,3 +1756,14 @@ a.btn.link-btn {
 .search-left { margin: 0; font-size: 0.85rem; color: #cbb896; text-align: center; min-height: 1.2em; }
 .search-btns { margin-top: 6px; }
 @media (prefers-reduced-motion: reduce) { .searching .search-radar span, .searching .search-radar b { animation: none; opacity: 0.6; transform: none; } }
+
+/* PvP: no points notice (lobby) */
+.pvp-note { margin: -4px 0 8px; font-size: 0.78rem; color: #ffcf7a; opacity: 0.9; text-align: center; }
+
+/* Short screens: loss result (chest map + PvP/points line) must keep every button visible */
+#result-overlay { overflow-y: auto; }
+@media (max-height: 720px) {
+  #result-chest-canvas { max-width: min(260px, calc(20vh * 10 / 7)); margin: 0 auto; }
+  #result-overlay.lose { padding-top: max(8px, env(safe-area-inset-top, 0px), 1.5vh); gap: 5px; }
+  #result-overlay.lose #result-chest-reveal { padding: 6px 10px 8px; gap: 4px; }
+}

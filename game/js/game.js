@@ -9,15 +9,15 @@ import {
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
   HOUSE_SKINS, getHouseSkin, preloadTextures,
-} from './house.js?v=20260928051829';
-import { NetSession, QuickMatch, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260928051829';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260928051829';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260928051829';
-import { hitBattleCounter, loadBattleCount } from './stats.js?v=20260928051829';
+} from './house.js?v=20260928054102';
+import { NetSession, QuickMatch, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260928054102';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260928054102';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260928054102';
+import { hitBattleCounter, loadBattleCount } from './stats.js?v=20260928054102';
 
-export const GAME_VERSION = '2026-09-28 05:18:29';
-export const GAME_VERSION_BUST = '20260928051829';
-export const GAME_BUILD_TIME = 1790540309280;
+export const GAME_VERSION = '2026-09-28 05:41:02';
+export const GAME_VERSION_BUST = '20260928054102';
+export const GAME_BUILD_TIME = 1790541662317;
 
 const blueprint = createBlueprint();
 
@@ -584,8 +584,18 @@ function savePoints(n, opts = {}) {
   }
 }
 
-/** Win only: 1 heart = 1 point; half-hearts use Math.round (e.g. 7.5 → 8). Loss → 0. */
+/** Points are awarded ONLY in COM matches: human-vs-human (online / room / matchmaking / local)
+ *  gives nothing — PvP rewards are easy to cheat. Returns 'pvp' for those matches. */
+function isPointsMatch() {
+  return S.mode === 'com';
+}
+
+/** COM win only: 1 heart = 1 point; half-hearts use Math.round (e.g. 7.5 → 8). Loss → 0. */
 function awardMatchPointsFromHp(iWon) {
+  if (!isPointsMatch()) {
+    S._pointsGained = 'pvp';
+    return 0;
+  }
   const gained = iWon ? Math.max(0, Math.round(S.myHp)) : 0;
   S._pointsGained = gained;
   if (gained > 0) {
@@ -605,7 +615,10 @@ function refreshPointsUi(gained) {
   if (shopEl) shopEl.textContent = 'ポイント ' + total;
   const gainEl = $('result-points-gain');
   if (gainEl) {
-    if (typeof gained === 'number' && gained > 0) {
+    if (gained === 'pvp') {
+      gainEl.textContent = '対人戦ではポイントは入りません';
+      gainEl.classList.remove('hidden');
+    } else if (typeof gained === 'number' && gained > 0) {
       gainEl.textContent = '勝利ボーナス：ライフ残り → +' + gained + ' pt';
       gainEl.classList.remove('hidden');
     } else if (typeof gained === 'number' && gained === 0) {
