@@ -9,14 +9,15 @@ import {
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
   HOUSE_SKINS, getHouseSkin, preloadTextures,
-} from './house.js?v=20260927185600';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260927185600';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260927185600';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260927185600';
+} from './house.js?v=20260927193350';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260927193350';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260927193350';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260927193350';
+import { hitBattleCounter, loadBattleCount } from './stats.js?v=20260927193350';
 
-export const GAME_VERSION = '2026-09-27 18:56:00';
-export const GAME_VERSION_BUST = '20260927185600';
-export const GAME_BUILD_TIME = 1790356550909;
+export const GAME_VERSION = '2026-09-27 19:33:50';
+export const GAME_VERSION_BUST = '20260927193350';
+export const GAME_BUILD_TIME = 1790505230916;
 
 const blueprint = createBlueprint();
 
@@ -2475,6 +2476,7 @@ function hideIngameTipUi() {
 /* ---------- Flow ---------- */
 function goTitle() {
   S.phase = 'title';
+  loadBattleCount(document.getElementById('meta-battles'));
   tutorialReturn = null;
   hideIngameTipUi();
   if (S.net) { S.net.destroy(); S.net = null; }
@@ -2618,6 +2620,8 @@ function onReadySetup() {
 }
 
 function startMatch() {
+  // bc: count once per match start (COM / local always; online: host only)
+  if (S.phase !== 'match' && S.mode !== 'online-guest') hitBattleCounter();
   S.phase = 'match';
   S.ended = false;
   S.winner = null;
@@ -2965,6 +2969,7 @@ function refreshGameMeta() {
 
 export async function init() {
   refreshGameMeta();
+  loadBattleCount(document.getElementById('meta-battles'));
   // House photo textures (floors/walls/furniture); procedural fallback if missing
   try { await preloadTextures(); } catch (_) { /* keep solid-color fallback */ }
   lockTouch($('app'));

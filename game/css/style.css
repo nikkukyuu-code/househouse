@@ -1183,6 +1183,8 @@ a.btn.link-btn {
 #meta-version { color: #ffe08a; }
 #app-version { display: none; } /* duplicate of meta-version */
 #meta-visits { color: #fff; font-variant-numeric: tabular-nums; }
+#meta-battles { color: #ffd68a; font-variant-numeric: tabular-nums; white-space: nowrap; }
+#game-meta [hidden] { display: none !important; }
 #app { padding-bottom: 34px; }
 .build-stamp { display: none; }
 
