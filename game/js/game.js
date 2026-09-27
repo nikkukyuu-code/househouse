@@ -9,15 +9,15 @@ import {
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
   HOUSE_SKINS, getHouseSkin, preloadTextures,
-} from './house.js?v=20260927224909';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260927224909';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260927224909';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260927224909';
-import { hitBattleCounter, loadBattleCount } from './stats.js?v=20260927224909';
+} from './house.js?v=20260928032327';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260928032327';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260928032327';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260928032327';
+import { hitBattleCounter, loadBattleCount } from './stats.js?v=20260928032327';
 
-export const GAME_VERSION = '2026-09-27 22:49:09';
-export const GAME_VERSION_BUST = '20260927224909';
-export const GAME_BUILD_TIME = 1790516949022;
+export const GAME_VERSION = '2026-09-28 03:23:27';
+export const GAME_VERSION_BUST = '20260928032327';
+export const GAME_BUILD_TIME = 1790533407319;
 
 const blueprint = createBlueprint();
 
@@ -383,25 +383,28 @@ function bumpHeatMap(map, key, amount, cap) {
   map[key] = Math.min(cap, (map[key] || 0) + amount);
 }
 
-/** Record player's house traps + chest at COM match start (for next sessions). */
-function recordPlayerHouseHeat(house) {
-  if (!house) return;
-  const mem = loadComMemory();
-  if (Array.isArray(house.traps)) {
+/**
+ * Fair-play memory (same information a human opponent would have):
+ * at match END, COM remembers only the player's traps it actually stepped on
+ * this match, plus the player's chest (both chests are revealed to both sides
+ * when a match ends). Untriggered trap positions are never recorded.
+ */
+function recordObservedPlayerHouse(mem, house, triggeredKeys) {
+  if (!mem || !house) return;
+  if (Array.isArray(house.traps) && triggeredKeys) {
     for (const raw of house.traps) {
       const tr = normalizeTrap(raw);
       if (!tr) continue;
-      bumpHeatMap(mem.trapHeat, `${tr.floor},${tr.x},${tr.y}`, 1, COM_HEAT_CELL_CAP);
+      const k = `${tr.floor},${tr.x},${tr.y}`;
+      if (!triggeredKeys.has(k)) continue;
+      // Weight 2: a trap you actually stepped on is remembered strongly
+      bumpHeatMap(mem.trapHeat, k, 2, COM_HEAT_CELL_CAP);
     }
   }
   if (house.chest && Number.isFinite(house.chest.floor)) {
     const c = house.chest;
     bumpHeatMap(mem.chestHeat, `${c.floor},${c.x},${c.y}`, 1, COM_HEAT_CELL_CAP);
   }
-  mem.level = comLevelFromMatches(mem.matches);
-  saveComMemory(mem);
-  // Do NOT write trap/chest heat into S._comMemory here — pathfinding must
-  // keep the pre-match snapshot only (no current-layout maphack).
 }
 
 /** Light pathHeat bump while the player explores (sampled). */
@@ -427,7 +430,9 @@ function flushPathHeatToStorage() {
 
 function finalizeComMatchMemory() {
   if (S.mode !== 'com') return;
-  const mem = loadComMemory(); // already has this match's trap/chest from start
+  const mem = loadComMemory();
+  // Only what COM observed this match (triggered traps + end-of-match chest reveal)
+  recordObservedPlayerHouse(mem, S.myHouse, S.foeTriggered);
   // PathHeat was bumped only on S._comMemory during the match
   if (S._comMemory && S._comMemory.pathHeat) {
     mem.pathHeat = sanitizeHeatMap(S._comMemory.pathHeat, COM_PATH_HEAT_CELL_CAP);
@@ -778,6 +783,13 @@ function aiTriggeredCount(ex) {
   return n;
 }
 
+/**
+ * How strongly COM trusts its memory of traps it actually stepped on in past
+ * matches (AI behavior only). Raised when memory became fair-play only
+ * (no longer records untriggered trap positions) to keep difficulty similar.
+ */
+const COM_RECALL_GAIN = 1.0;
+
 function aiEnterCost(ex, floor, x, y) {
   const lv = comMemoryLevel();
   const lvT = Math.min(1, (lv - 1) / 10); // 0 at Lv1 → 1 at Lv11
@@ -801,15 +813,15 @@ function aiEnterCost(ex, floor, x, y) {
   if (!visited && !nearSpawnSoft) {
     const past = trapHeatAt(floor, x, y);
     if (past > 0) {
-      const mult = 0.055 + lvT * 0.045;
-      const cap = 0.32 + lvT * 0.28;
+      const mult = (0.055 + lvT * 0.045) * COM_RECALL_GAIN;
+      const cap = (0.32 + lvT * 0.28) * COM_RECALL_GAIN;
       c += Math.min(cap, past * mult);
     }
     const ch = chestHeatAt(floor, x, y);
     if (ch > 0) c += Math.min(0.12 + lvT * 0.1, ch * (0.03 + lvT * 0.02));
   } else if (!visited && nearSpawnSoft) {
     const past = trapHeatAt(floor, x, y);
-    if (past > 0) c += Math.min(0.12, past * 0.02);
+    if (past > 0) c += Math.min(0.12 * COM_RECALL_GAIN, past * 0.02 * COM_RECALL_GAIN);
   }
   // Same-match dangerHeat (scales mildly with level)
   if (ex && ex.memory && ex.memory.dangerHeat) {
@@ -1025,29 +1037,26 @@ function aiCautionCost(ex, floor, x, y) {
 }
 
 function aiTakeStairsIfNeeded(ex, targetFloor) {
+  // Same rule as the player: floors change only by stepping ONTO a stairs tile
+  // (tryMove). If COM is already standing on the stairs it needs, it first steps
+  // off (one normal move); the planner then walks back on next step.
   if (targetFloor == null || targetFloor === ex.floor) return false;
   const here = tileAt(blueprint, ex.floor, ex.x, ex.y);
-  if (targetFloor > ex.floor && here === T.STAIRS_UP && ex.floor < FLOORS - 1) {
-    ex.floor += 1;
-    const down = findStairs(ex.floor, T.STAIRS_DOWN);
-    if (down) { ex.x = down.x; ex.y = down.y; }
-    ex.memory.stuck = 0;
-    ex.visited.add(`${ex.floor},${ex.x},${ex.y}`);
-    if (!ex.memory.recent) ex.memory.recent = [];
-    ex.memory.recent.push(`${ex.floor},${ex.x},${ex.y}`);
-    if (ex.memory.recent.length > 8) ex.memory.recent.shift();
-    return true;
-  }
-  if (targetFloor < ex.floor && here === T.STAIRS_DOWN && ex.floor > 0) {
-    ex.floor -= 1;
-    const up = findStairs(ex.floor, T.STAIRS_UP);
-    if (up) { ex.x = up.x; ex.y = up.y; }
-    ex.memory.stuck = 0;
-    ex.visited.add(`${ex.floor},${ex.x},${ex.y}`);
-    if (!ex.memory.recent) ex.memory.recent = [];
-    ex.memory.recent.push(`${ex.floor},${ex.x},${ex.y}`);
-    if (ex.memory.recent.length > 8) ex.memory.recent.shift();
-    return true;
+  const onUp = targetFloor > ex.floor && here === T.STAIRS_UP && ex.floor < FLOORS - 1;
+  const onDown = targetFloor < ex.floor && here === T.STAIRS_DOWN && ex.floor > 0;
+  if (!onUp && !onDown) return false;
+  const opts = aiNeighbors(ex.floor, ex.x, ex.y)
+    .map((n) => {
+      let s = Math.random() * 0.2;
+      if (aiIsCellTriggered(ex, ex.floor, n.x, n.y)) s -= 1; // known safe
+      else if (ex.visited && ex.visited.has(`${ex.floor},${n.x},${n.y}`)) s -= 0.6;
+      const t = tileAt(blueprint, ex.floor, n.x, n.y);
+      if (t === T.STAIRS_UP || t === T.STAIRS_DOWN) s += 5;
+      return { n, s };
+    })
+    .sort((a, b) => a.s - b.s);
+  for (const { n } of opts) {
+    if (aiApplyStep(ex, { dx: n.dx, dy: n.dy })) return true;
   }
   return false;
 }
@@ -1270,7 +1279,7 @@ function aiWanderStep(ex, lastDx, lastDy) {
         const lvT = Math.min(1, (lv - 1) / 10);
         const past = trapHeatAt(ex.floor, n.x, n.y);
         if (past > 0 && !ex.visited.has(nk)) {
-          const pen = Math.min(2.5 + lvT * 2.2, past * (0.35 + lvT * 0.25));
+          const pen = Math.min((2.5 + lvT * 2.2) * COM_RECALL_GAIN, past * (0.35 + lvT * 0.25) * COM_RECALL_GAIN);
           s -= neighbors.length <= 2 ? pen * 0.35 : pen;
         }
       }
@@ -1943,9 +1952,9 @@ function onTrapHit(who, tr) {
     S.myHp = Math.max(0, Math.round((S.myHp - dmg) * 2) / 2);
     if (isPit) {
       // Delay drop so the enlarge shot shows char + pit together
-      clearTimeout(S._pitTimer);
+      clearTimeout(S._pitTimerMe);
       const victim = S.me;
-      S._pitTimer = setTimeout(() => {
+      S._pitTimerMe = setTimeout(() => {
         if (victim) applyPitfallDrop(victim);
         if (S.mode && S.mode.startsWith('online') && S.net && victim) {
           S.net.send({
@@ -1971,9 +1980,9 @@ function onTrapHit(who, tr) {
     // Same-match learning: caution around hit + door-adjacent bias (this match only)
     if (S.foe) aiBoostDangerAround(S.foe, tr.floor, tr.x, tr.y);
     if (isPit && S.foe) {
-      clearTimeout(S._pitTimer);
+      clearTimeout(S._pitTimerFoe);
       const victim = S.foe;
-      S._pitTimer = setTimeout(() => {
+      S._pitTimerFoe = setTimeout(() => {
         if (victim) applyPitfallDrop(victim);
       }, willEnd ? 2800 : 900);
       addFx('top', '落とし穴作動！', '#aa66ff');
@@ -2043,7 +2052,7 @@ function applyMoveFromInput() {
   const d = map[S.holdDir];
   if (!d) return;
   if (tryMove(S.me, d[0], d[1])) {
-    S.moveCooldown = 140;
+    S.moveCooldown = MOVE_COOLDOWN_MS;
     maybeRecordPlayerPathHeat(S.me);
     checkHazards(S.me, S.myTriggered, (tr) => onTrapHit('me', tr), () => onChestFound('me'));
     syncPos();
@@ -2063,6 +2072,8 @@ function syncPos() {
 }
 
 let aiTimer = 0;
+/** Player hold-to-move cooldown; COM steps are never faster than this (same rule). */
+const MOVE_COOLDOWN_MS = 140;
 /** COM step interval: slightly faster with memory level + late healthy (capped). */
 function aiStepIntervalMs() {
   if (S.mode !== 'com') return 380;
@@ -2097,7 +2108,7 @@ function tick(ts) {
 
     if ((S.mode === 'local' || S.mode === 'com') && S.foe) {
       aiTimer += dt;
-      if (aiTimer > aiStepIntervalMs()) {
+      if (aiTimer > Math.max(MOVE_COOLDOWN_MS, aiStepIntervalMs())) {
         aiTimer = 0;
         aiStep(S.foe);
         checkHazards(S.foe, S.foeTriggered, (tr) => onTrapHit('foe', tr), () => onChestFound('foe'));
@@ -2581,10 +2592,14 @@ function onReadySetup() {
 
   if (S.mode === 'com') {
     S._comMemory = loadComMemory();
-    S.theirHouse = generateComHouse(blueprint, {
-      pathHeat: S._comMemory.pathHeat || {},
-      level: S._comMemory.level || 1,
-    });
+    // COM house obeys exactly the same placement rules as the player's (validateHouse)
+    for (let tries = 0; tries < 8; tries++) {
+      S.theirHouse = generateComHouse(blueprint, {
+        pathHeat: S._comMemory.pathHeat || {},
+        level: S._comMemory.level || 1,
+      });
+      if (validateHouse(S.theirHouse, blueprint).ok) break;
+    }
     setStatus($('setup-status'), 'COMが家を設計しました…', 'ok');
     refreshComMemoryUi();
     try { sfx('ready'); } catch (_) {}
@@ -2644,12 +2659,9 @@ function startMatch() {
   S.foe = makeExplorer(S.myHouse, 'foe');
 
   // Pathfinding uses PAST memory only (no live untriggered maphack).
-  // Record this match's placements into heat for future sessions.
+  // What COM observed this match is recorded at match end (finalizeComMatchMemory).
   S._comMemory = loadComMemory();
   S._pathHeatDirty = false;
-  if (S.mode === 'com' && S.myHouse) {
-    recordPlayerHouseHeat(S.myHouse);
-  }
   if (S.foe) {
     if (!S.foe.memory) {
       S.foe.memory = { stuck: 0, phase: 0, lastDx: 0, lastDy: 0, recent: [], escapeGoal: null, dangerHeat: {}, trapsHit: 0 };
@@ -2670,7 +2682,8 @@ function startMatch() {
   S.timeScale = 1;
   S.heroFocus = null;
   S.lastTrapHit = null;
-  clearTimeout(S._pitTimer);
+  clearTimeout(S._pitTimerMe);
+  clearTimeout(S._pitTimerFoe);
   clearTimeout(S._bannerTimer);
   clearTimeout(S._setupDoneTimer);
   const matchEl = $('screen-match');
