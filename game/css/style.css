@@ -1646,3 +1646,34 @@ a.btn.link-btn {
   filter: none;
 }
 #screen-title .title-logo .beta-badge { font-size: max(0.72rem, 0.36em); margin-left: 0.25em; align-self: center; }
+
+/* Data-loss notice on title (opens 引き継ぎ panel) */
+.save-notice {
+  appearance: none;
+  -webkit-appearance: none;
+  display: block;
+  width: min(92vw, 400px);
+  margin: 6px auto 0;
+  padding: 5px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 138, 0, 0.75);
+  background: rgba(40, 18, 4, 0.72);
+  color: #ffe6c0;
+  font-family: inherit;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: 0.02em;
+  text-align: center;
+  text-decoration: none;
+  box-sizing: border-box;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.title-footer-row .btn-compact {
+  min-width: 0;
+  white-space: nowrap;
+  padding: 6px 4px;
+  font-size: clamp(0.72rem, 1.8vh, 0.88rem);
+  letter-spacing: 0;
+}

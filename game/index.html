@@ -9,7 +9,7 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta name="theme-color" content="#120e18" />
   <title>トリックハウスバトル</title>
-  <link rel="stylesheet" href="css/style.css?v=20260928032327" />
+  <link rel="stylesheet" href="css/style.css?v=20260928033916" />
 </head>
 <body>
   <div id="app">
@@ -68,9 +68,11 @@
         <button type="button" class="btn btn-secondary" id="btn-join">ルームに参加</button>
         <div class="title-footer-row">
           <button type="button" class="btn btn-ghost btn-compact" id="btn-mute" aria-pressed="false">🔊 音</button>
+          <a class="btn btn-ghost btn-compact link-btn" id="btn-transfer" href="/transfer/?from=/househouse/game/">引き継ぎ</a>
           <a class="btn btn-ghost btn-compact link-btn" href="https://nikkukyuu-code.github.io/">トップへ</a>
         </div>
       </div>
+      <a class="save-notice" id="save-notice" href="/transfer/?from=/househouse/game/">⚠ 記録はこの端末のブラウザ内だけに保存。iPhoneは7日ほど開かないと消えることも →「引き継ぎ」でコードを控えてください</a>
       <p class="peer-note" id="peer-note">通信準備中…</p>
       <p class="build-stamp" id="build-stamp">build 20260921j</p>
     </section>
@@ -253,8 +255,8 @@
   </div>
 
   <footer id="game-meta" aria-label="バージョンとアクセス数">
-    <span id="meta-version">2026-09-28 03:23:27</span>
-    <span id="app-version">2026-09-28 03:23:27</span>
+    <span id="meta-version">2026-09-28 03:39:16</span>
+    <span id="app-version">2026-09-28 03:39:16</span>
     <span class="meta-sep" aria-hidden="true">｜</span>
     <span id="meta-visits" class="meta-visits"><span class="meta-visits-label">アクセス</span> <img id="meta-visits-badge" alt="access" width="70" height="20" /></span>
     <span class="meta-sep" aria-hidden="true" hidden>｜</span>
@@ -262,7 +264,7 @@
   </footer>
 
   <script type="module">
-    import { init } from './js/game.js?v=20260928032327';
+    import { init } from './js/game.js?v=20260928033916';
     init().catch((e) => {
       console.error(e);
       const n = document.getElementById('peer-note');

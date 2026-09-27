@@ -9,15 +9,15 @@ import {
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
   HOUSE_SKINS, getHouseSkin, preloadTextures,
-} from './house.js?v=20260928032327';
-import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260928032327';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260928032327';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260928032327';
-import { hitBattleCounter, loadBattleCount } from './stats.js?v=20260928032327';
+} from './house.js?v=20260928033916';
+import { NetSession, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260928033916';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260928033916';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260928033916';
+import { hitBattleCounter, loadBattleCount } from './stats.js?v=20260928033916';
 
-export const GAME_VERSION = '2026-09-28 03:23:27';
-export const GAME_VERSION_BUST = '20260928032327';
-export const GAME_BUILD_TIME = 1790533407319;
+export const GAME_VERSION = '2026-09-28 03:39:16';
+export const GAME_VERSION_BUST = '20260928033916';
+export const GAME_BUILD_TIME = 1790534356071;
 
 const blueprint = createBlueprint();
 
@@ -304,15 +304,58 @@ const LEGACY_TRAP_HEAT_KEY = 'househouse-player-trap-heat-v1';
 const COM_HEAT_CELL_CAP = 18;
 const COM_PATH_HEAT_CELL_CAP = 24;
 const COM_LEVEL_MAX = 11; // 1 + min(10, floor(matches/2))
+/**
+ * fair:2 = memory holds only what a human could learn under the same conditions:
+ *   trapHeat  = your traps COM actually stepped on
+ *   safeHeat  = tiles of your house COM walked on without a trap (known-safe)
+ *   chestHeat = your chest (revealed to both sides at match end)
+ *   pathHeat  = where you walked in COM's house (shown on COM's screen, like yours)
+ * Older memory (no fair marker) may contain positions learned by peeking at the whole
+ * layout: it is backed up to *_legacy_bak and its trap data is no longer used.
+ */
+const COM_MEMORY_FAIR = 2;
+const COM_MEMORY_LEGACY_BAK_KEY = 'househouse-com-memory-v1_legacy_bak';
+const LEGACY_TRAP_HEAT_BAK_KEY = 'househouse-player-trap-heat-v1_legacy_bak';
+const COM_SAFE_HEAT_CELL_CAP = 18;
 
 function emptyComMemory() {
   return {
+    fair: COM_MEMORY_FAIR,
     matches: 0,
     trapHeat: {},
+    safeHeat: {},
     chestHeat: {},
     pathHeat: {},
     level: 1,
   };
+}
+
+/** Back up + retire memory saved before fair-play rules (runs once per device). */
+function retireLegacyComMemory() {
+  try {
+    const legacyHeat = localStorage.getItem(LEGACY_TRAP_HEAT_KEY);
+    if (legacyHeat != null) {
+      if (localStorage.getItem(LEGACY_TRAP_HEAT_BAK_KEY) == null) localStorage.setItem(LEGACY_TRAP_HEAT_BAK_KEY, legacyHeat);
+      localStorage.removeItem(LEGACY_TRAP_HEAT_KEY);
+    }
+    const raw = localStorage.getItem(COM_MEMORY_KEY);
+    if (!raw) return;
+    const o = JSON.parse(raw);
+    if (!o || typeof o !== 'object' || Array.isArray(o) || Number(o.fair) >= COM_MEMORY_FAIR) return;
+    if (localStorage.getItem(COM_MEMORY_LEGACY_BAK_KEY) == null) localStorage.setItem(COM_MEMORY_LEGACY_BAK_KEY, raw);
+    // Keep only information that was always fair: match count, revealed chests, your path in COM's house.
+    // Trap positions can't be told apart from peeked ones → cleared.
+    const m = Math.max(0, Math.floor(Number(o.matches) || 0));
+    localStorage.setItem(COM_MEMORY_KEY, JSON.stringify({
+      fair: COM_MEMORY_FAIR,
+      matches: m,
+      trapHeat: {},
+      safeHeat: {},
+      chestHeat: sanitizeHeatMap(o.chestHeat, COM_HEAT_CELL_CAP),
+      pathHeat: sanitizeHeatMap(o.pathHeat, COM_PATH_HEAT_CELL_CAP),
+      level: comLevelFromMatches(m),
+    }));
+  } catch (_) { /* ignore */ }
 }
 
 function comLevelFromMatches(matches) {
@@ -333,6 +376,7 @@ function sanitizeHeatMap(o, cap) {
 }
 
 function loadComMemory() {
+  retireLegacyComMemory();
   try {
     const raw = localStorage.getItem(COM_MEMORY_KEY);
     if (raw) {
@@ -341,6 +385,7 @@ function loadComMemory() {
         const mem = emptyComMemory();
         mem.matches = Math.max(0, Math.floor(Number(o.matches) || 0));
         mem.trapHeat = sanitizeHeatMap(o.trapHeat, COM_HEAT_CELL_CAP);
+        mem.safeHeat = sanitizeHeatMap(o.safeHeat, COM_SAFE_HEAT_CELL_CAP);
         mem.chestHeat = sanitizeHeatMap(o.chestHeat, COM_HEAT_CELL_CAP);
         mem.pathHeat = sanitizeHeatMap(o.pathHeat, COM_PATH_HEAT_CELL_CAP);
         mem.level = comLevelFromMatches(mem.matches);
@@ -350,25 +395,17 @@ function loadComMemory() {
   } catch {
     /* fall through */
   }
-  // Migrate legacy trap-only heat once
-  const mem = emptyComMemory();
-  try {
-    const legacy = localStorage.getItem(LEGACY_TRAP_HEAT_KEY);
-    if (legacy) {
-      const o = JSON.parse(legacy);
-      mem.trapHeat = sanitizeHeatMap(o, COM_HEAT_CELL_CAP);
-    }
-  } catch {
-    /* ignore */
-  }
-  return mem;
+  // Legacy trap-only heat (peeked layouts) is backed up by retireLegacyComMemory and not used.
+  return emptyComMemory();
 }
 
 function saveComMemory(mem) {
   try {
     const clean = {
+      fair: COM_MEMORY_FAIR,
       matches: Math.max(0, Math.floor(Number(mem.matches) || 0)),
       trapHeat: sanitizeHeatMap(mem.trapHeat, COM_HEAT_CELL_CAP),
+      safeHeat: sanitizeHeatMap(mem.safeHeat, COM_SAFE_HEAT_CELL_CAP),
       chestHeat: sanitizeHeatMap(mem.chestHeat, COM_HEAT_CELL_CAP),
       pathHeat: sanitizeHeatMap(mem.pathHeat, COM_PATH_HEAT_CELL_CAP),
       level: comLevelFromMatches(mem.matches),
@@ -389,8 +426,18 @@ function bumpHeatMap(map, key, amount, cap) {
  * this match, plus the player's chest (both chests are revealed to both sides
  * when a match ends). Untriggered trap positions are never recorded.
  */
-function recordObservedPlayerHouse(mem, house, triggeredKeys) {
+function recordObservedPlayerHouse(mem, house, triggeredKeys, walkedKeys) {
   if (!mem || !house) return;
+  if (!mem.safeHeat) mem.safeHeat = {};
+  // Tiles COM walked on without anything happening = known-safe (a human remembers these too)
+  if (walkedKeys) {
+    for (const k of walkedKeys) {
+      if (triggeredKeys && triggeredKeys.has(k)) continue;
+      bumpHeatMap(mem.safeHeat, k, 1, COM_SAFE_HEAT_CELL_CAP);
+    }
+  }
+  // A trap on a tile believed safe: forget that it was safe
+  if (triggeredKeys) for (const k of triggeredKeys) delete mem.safeHeat[k];
   if (Array.isArray(house.traps) && triggeredKeys) {
     for (const raw of house.traps) {
       const tr = normalizeTrap(raw);
@@ -432,7 +479,7 @@ function finalizeComMatchMemory() {
   if (S.mode !== 'com') return;
   const mem = loadComMemory();
   // Only what COM observed this match (triggered traps + end-of-match chest reveal)
-  recordObservedPlayerHouse(mem, S.myHouse, S.foeTriggered);
+  recordObservedPlayerHouse(mem, S.myHouse, S.foeTriggered, S.foe && S.foe.visited);
   // PathHeat was bumped only on S._comMemory during the match
   if (S._comMemory && S._comMemory.pathHeat) {
     mem.pathHeat = sanitizeHeatMap(S._comMemory.pathHeat, COM_PATH_HEAT_CELL_CAP);
@@ -457,6 +504,11 @@ function trapHeatAt(floor, x, y) {
 
 function chestHeatAt(floor, x, y) {
   const heat = (S._comMemory && S._comMemory.chestHeat) || {};
+  return heat[`${floor},${x},${y}`] || 0;
+}
+
+function safeHeatAt(floor, x, y) {
+  const heat = (S._comMemory && S._comMemory.safeHeat) || {};
   return heat[`${floor},${x},${y}`] || 0;
 }
 
@@ -817,8 +869,9 @@ function aiEnterCost(ex, floor, x, y) {
       const cap = (0.32 + lvT * 0.28) * COM_RECALL_GAIN;
       c += Math.min(cap, past * mult);
     }
-    const ch = chestHeatAt(floor, x, y);
-    if (ch > 0) c += Math.min(0.12 + lvT * 0.1, ch * (0.03 + lvT * 0.02));
+    // Remembered as walked safely before (and never trapped there): cheaper, like a human's known route
+    const safe = past > 0 ? 0 : safeHeatAt(floor, x, y);
+    if (safe > 0) c -= Math.min(0.2 + lvT * 0.15, safe * (0.04 + lvT * 0.03));
   } else if (!visited && nearSpawnSoft) {
     const past = trapHeatAt(floor, x, y);
     if (past > 0) c += Math.min(0.12 * COM_RECALL_GAIN, past * 0.02 * COM_RECALL_GAIN);
@@ -1133,6 +1186,20 @@ function aiStep(ex) {
     }
   }
 
+  // 0) Hunch: first check where your chest was in earlier matches (revealed at match end),
+  //    like a human would. Decided once per match; dropped once the spot has been visited.
+  if (S.mode === 'com' && ex === S.foe) {
+    if (ex.memory.chestHunch === undefined) ex.memory.chestHunch = aiPickChestHunch();
+    const h = ex.memory.chestHunch;
+    if (h && ex.visited.has(`${h.floor},${h.x},${h.y}`)) ex.memory.chestHunch = null;
+    else if (h && (ex.memory.hunchSteps = (ex.memory.hunchSteps || 0) + 1) < 90) {
+      if (aiTakeStairsIfNeeded(ex, h.floor)) return true;
+      const step = aiPlanToward(ex, h, lastDx, lastDy);
+      if (aiApplyStep(ex, step)) return true;
+      ex.memory.chestHunch = null;
+    }
+  }
+
   // 1) Clear current floor: BFS to nearest unvisited (progress over caution)
   // Prefer leaving spawn / expanding other rooms — do NOT filter door-adjacent goals.
   const unvisHere = aiFloorUnvisited(ex.floor, ex.visited);
@@ -1222,6 +1289,24 @@ function aiStep(ex) {
   return false;
 }
 
+/** Past chest spot COM saw revealed (strongest memory), chance grows with memory level. */
+function aiPickChestHunch() {
+  const heat = (S._comMemory && S._comMemory.chestHeat) || {};
+  let best = null;
+  let bestN = 0;
+  for (const [k, n] of Object.entries(heat)) {
+    if (n > bestN || (n === bestN && Math.random() < 0.5)) {
+      const [floor, x, y] = k.split(',').map(Number);
+      if (!isPlaceable(blueprint, floor, x, y)) continue;
+      best = { floor, x, y };
+      bestN = n;
+    }
+  }
+  if (!best) return null;
+  const lvT = Math.min(1, (comMemoryLevel() - 1) / 10);
+  return Math.random() < 0.3 + lvT * 0.5 ? best : null;
+}
+
 /** Plan a step toward a multi-floor goal (uses stairs). */
 function aiPlanToward(ex, goal, lastDx, lastDy) {
   if (!goal) return null;
@@ -1281,6 +1366,8 @@ function aiWanderStep(ex, lastDx, lastDy) {
         if (past > 0 && !ex.visited.has(nk)) {
           const pen = Math.min((2.5 + lvT * 2.2) * COM_RECALL_GAIN, past * (0.35 + lvT * 0.25) * COM_RECALL_GAIN);
           s -= neighbors.length <= 2 ? pen * 0.35 : pen;
+        } else if (!ex.visited.has(nk)) {
+          s += Math.min(1.5 + lvT, safeHeatAt(ex.floor, n.x, n.y) * 0.3);
         }
       }
     }
