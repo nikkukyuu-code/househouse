@@ -1797,3 +1797,47 @@ a.btn.link-btn {
 .dl-note .dl-home { font-size: 0.8em; }
 @supports (width: 1cqi) { .dl-note .dl-home { font-size: min(0.92em, 3.25cqi); } }
 @media (min-height: 721px) and (max-height: 820px) { #screen-title .btn-col { gap: 6px; } }
+
+/* ---- 勝率 / 敵Lv panel (title top) ---- */
+#screen-title .title-lv {
+  position: relative;
+  width: 100%;
+  max-width: 340px;
+  margin: 0 auto clamp(3px, 0.8vh, 8px);
+  padding: 4px 10px 4px;
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(20, 30, 60, 0.88), rgba(10, 12, 30, 0.88));
+  border: 1px solid rgba(140, 190, 255, 0.6);
+  box-shadow: 0 0 12px rgba(100, 160, 255, 0.22);
+  box-sizing: border-box;
+  text-align: center;
+  line-height: 1.3;
+}
+#screen-title .title-lv p { margin: 0; }
+#screen-title .tl-row { display: flex; align-items: baseline; justify-content: center; gap: 0.6em; flex-wrap: nowrap; white-space: nowrap; font-size: 0.92rem; font-weight: 800; color: #eaf3ff; }
+#screen-title .tl-tier { font-weight: 900; color: #9fd0ff; }
+#screen-title .tl-rate small { font-size: 0.82em; font-weight: 700; color: #c8d8f0; }
+#screen-title .tl-lv { padding: 0 8px; border-radius: 999px; background: linear-gradient(180deg, #ff7a4a, #c8321e); color: #fff; font-weight: 900; text-shadow: 0 1px 1px rgba(0, 0, 0, 0.5); }
+#screen-title .tl-note { font-size: 0.66rem; font-weight: 700; color: #ffd98a; white-space: nowrap; }
+.btn-com-lv { display: inline-block; margin-left: 0.4em; padding: 0 0.55em; border-radius: 999px; background: rgba(120, 30, 0, 0.35); font-size: 0.78em; font-weight: 900; vertical-align: 0.08em; }
+.result-enemy-lv { margin: 2px 0 8px; font-size: 0.95rem; font-weight: 800; color: #cfe6ff; text-align: center; line-height: 1.35; }
+.result-enemy-lv b { color: #ff9a6a; font-size: 1.15em; }
+.result-enemy-lv small { font-size: 0.82em; color: #b8c8e0; font-weight: 700; }
+.result-enemy-lv.hidden { display: none; }
+/* Keep the title fitting: the subtitle gives way to the 勝率/敵Lv panel on shorter screens */
+@media (max-height: 820px) { #screen-title .title-sub { display: none; } }
+@media (min-height: 760px) and (min-width: 400px) {
+  #screen-title .tl-row { font-size: 1rem; }
+  #screen-title .tl-note { font-size: 0.72rem; }
+}
+/* Short screens: 敵Lv result on one line so every result button stays visible */
+@media (max-height: 720px) {
+  .result-enemy-lv { margin: 0 0 4px; font-size: 0.82rem; line-height: 1.25; white-space: nowrap; }
+  .result-enemy-lv .rl-br { display: none; }
+  .result-enemy-lv small { margin-left: 0.5em; }
+  #result-overlay.lose #result-chest-canvas { max-width: min(240px, calc(17vh * 10 / 7)); }
+  #result-overlay.lose { gap: 4px; }
+  #result-overlay.lose .rl-c { display: none; }
+  #result-overlay.win .result-enemy-lv { white-space: normal; }
+  #result-overlay.win .result-enemy-lv .rl-br { display: inline; }
+}

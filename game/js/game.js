@@ -9,15 +9,15 @@ import {
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
   HOUSE_SKINS, getHouseSkin, preloadTextures,
-} from './house.js?v=20260928183827';
-import { NetSession, QuickMatch, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260928183827';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260928183827';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260928183827';
-import { hitBattleCounter, loadBattleCount } from './stats.js?v=20260928183827';
+} from './house.js?v=20260928204327';
+import { NetSession, QuickMatch, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260928204327';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260928204327';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260928204327';
+import { hitBattleCounter, loadBattleCount } from './stats.js?v=20260928204327';
 
-export const GAME_VERSION = '2026-09-28 18:38:27';
-export const GAME_VERSION_BUST = '20260928183827';
-export const GAME_BUILD_TIME = 1790588307457;
+export const GAME_VERSION = '2026-09-28 20:43:27';
+export const GAME_VERSION_BUST = '20260928204327';
+export const GAME_BUILD_TIME = 1790595807656;
 
 const blueprint = createBlueprint();
 
@@ -522,6 +522,7 @@ function refreshComMemoryUi() {
   const lv = mem.level || 1;
   const m = mem.matches || 0;
   const line = `COM記憶 Lv.${lv}（対戦${m}回）`;
+  refreshEnemyLvUi();
   const titleEl = $('title-com-memory');
   if (titleEl) {
     titleEl.textContent = line;
@@ -530,7 +531,8 @@ function refreshComMemoryUi() {
   const setupEl = $('setup-com-memory');
   if (setupEl) {
     if (S.mode === 'com') {
-      setupEl.textContent = line;
+      const r = tierRecord();
+      setupEl.textContent = `敵Lv ${S.phase === 'match' && S._enemyLv ? S._enemyLv : enemyLevelFor(r)}（勝率 ${winRateText(r)}）・${line}`;
       setupEl.classList.remove('hidden');
     } else {
       setupEl.classList.add('hidden');
@@ -538,6 +540,107 @@ function refreshComMemoryUi() {
   }
 }
 
+
+/* ---------- COM win rate → enemy level (敵Lv 1–100) ----------
+ * Record: COM matches ONLY (online / room / matchmaking / local practice are never counted).
+ * House has one COM difficulty ('com'); the record is keyed per tier so more tiers can be added.
+ * NEW keys (never rename): COM_RECORD_KEY + COM_RECORD_BAK_KEY (previous value, written first).
+ * Counts never decrease: every save merges with what is stored (per tier, the record with more matches wins).
+ *
+ * Enemy level formula (smoothed so the first few matches don't jump):
+ *   p  = (wins + 5) / (wins + losses + 10)      … Bayesian prior of 10 matches at 50%
+ *   Lv = 1 + round(99 * clamp((p - 0.5) / 0.35, 0, 1))
+ *   → win rate ≤ 50% stays Lv1; Lv100 needs a smoothed win rate of 85% (e.g. 30勝0敗, 60勝8敗).
+ * The level changes ONLY how the COM plays (step pace, missteps, how much it trusts what it has
+ * learned the fair way, trap-placement judgment, floor hunches) — never HP, damage, trap count,
+ * rules or points. See aiSkillT() and generateComHouse(..., { skill }).
+ */
+const COM_RECORD_KEY = 'househouse-com-record-v1';
+const COM_RECORD_BAK_KEY = 'househouse-com-record-v1-bak';
+const COM_TIER = 'com';
+const COM_TIER_LABEL = { com: 'COM' };
+const ENEMY_LV_MAX = 100;
+const ENEMY_LV_PRIOR = 10; // prior matches at 50%
+const ENEMY_LV_SPAN = 0.35; // smoothed win rate 50% → Lv1, 85% → Lv100
+
+function cleanTierRec(o) {
+  const w = Math.max(0, Math.floor(Number(o && o.w) || 0));
+  const l = Math.max(0, Math.floor(Number(o && o.l) || 0));
+  return { w, l };
+}
+function readComRecordKey(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const o = JSON.parse(raw);
+    if (!o || typeof o !== 'object' || Array.isArray(o)) return null;
+    const out = {};
+    for (const [k, v] of Object.entries(o)) if (/^[a-z0-9_-]{1,16}$/.test(k) && v && typeof v === 'object') out[k] = cleanTierRec(v);
+    return out;
+  } catch { return null; }
+}
+/** Per tier keep the record with more matches (never decreases). */
+function mergeComRecords(a, b) {
+  const out = {};
+  for (const src of [a || {}, b || {}]) {
+    for (const [k, v] of Object.entries(src)) {
+      const cur = out[k];
+      if (!cur || v.w + v.l > cur.w + cur.l || (v.w + v.l === cur.w + cur.l && v.w > cur.w)) out[k] = cleanTierRec(v);
+    }
+  }
+  return out;
+}
+function loadComRecord() {
+  return mergeComRecords(readComRecordKey(COM_RECORD_KEY), readComRecordKey(COM_RECORD_BAK_KEY));
+}
+function saveComRecord(rec) {
+  try {
+    const prevRaw = localStorage.getItem(COM_RECORD_KEY);
+    const merged = mergeComRecords(loadComRecord(), rec);
+    if (prevRaw != null) localStorage.setItem(COM_RECORD_BAK_KEY, prevRaw);
+    localStorage.setItem(COM_RECORD_KEY, JSON.stringify(merged));
+  } catch { /* ignore quota / private mode */ }
+}
+function tierRecord(tier = COM_TIER) {
+  return cleanTierRec(loadComRecord()[tier]);
+}
+function enemyLevelFor(r) {
+  const w = r.w || 0;
+  const n = w + (r.l || 0);
+  const p = (w + ENEMY_LV_PRIOR / 2) / (n + ENEMY_LV_PRIOR);
+  const t = Math.max(0, Math.min(1, (p - 0.5) / ENEMY_LV_SPAN));
+  return Math.max(1, Math.min(ENEMY_LV_MAX, 1 + Math.round((ENEMY_LV_MAX - 1) * t)));
+}
+function winRateText(r) {
+  const n = r.w + r.l;
+  return n ? `${Math.round((r.w / n) * 100)}%` : '--%';
+}
+/** COM match end only. Returns { before, after } enemy level. */
+function recordComResult(iWon) {
+  if (S.mode !== 'com') return null;
+  const rec = loadComRecord();
+  const r = cleanTierRec(rec[COM_TIER]);
+  const before = enemyLevelFor(r);
+  if (iWon) r.w += 1; else r.l += 1;
+  rec[COM_TIER] = r;
+  saveComRecord(rec);
+  const after = enemyLevelFor(tierRecord());
+  return { before, after };
+}
+/** Enemy level used by the COM in the current / next COM match. */
+function currentEnemyLevel() {
+  return enemyLevelFor(tierRecord());
+}
+function refreshEnemyLvUi() {
+  const r = tierRecord();
+  const lv = enemyLevelFor(r);
+  const row = $('title-lv-com');
+  if (row) {
+    row.innerHTML = `<b class="tl-tier">${COM_TIER_LABEL[COM_TIER]}</b><span class="tl-rate">勝率 ${winRateText(r)}<small>（${r.w}勝${r.l}敗）</small></span><span class="tl-lv">敵Lv ${lv}</span>`;
+  }
+  const btn = $('btn-com-lv');
+  if (btn) btn.textContent = `敵Lv ${lv}`;
+}
 
 /* ---------- Points wallet (remaining life → points after match) ----------
  * NEVER rename POINTS_KEY — that would wipe player points on update.
@@ -859,9 +962,29 @@ function aiTriggeredCount(ex) {
  */
 const COM_RECALL_GAIN = 1.0;
 
+/**
+ * Enemy-level skill 0..1 for an explorer (0 = Lv1 = the COM's original behaviour, 1 = Lv100).
+ * Only the COM in a COM match uses it; test harnesses may set ex.skillOverride.
+ */
+function aiSkillT(ex) {
+  if (ex && typeof ex.skillOverride === 'number') return Math.max(0, Math.min(1, ex.skillOverride));
+  if (S.mode !== 'com' || !ex || ex !== S.foe) return 0;
+  const lv = S._enemyLv || 1;
+  return Math.max(0, Math.min(1, (lv - 1) / (ENEMY_LV_MAX - 1)));
+}
+/**
+ * Judgment level 0..1 = memory level (matches played, as before) raised toward 1 by skill:
+ * how strongly COM trusts routes/traps it learned the fair way, and how safe its routes are.
+ * Never adds information — with an empty memory only the same-match caution is affected.
+ */
+function aiLvT(ex) {
+  const memT = Math.min(1, (comMemoryLevel() - 1) / 10);
+  const sk = aiSkillT(ex);
+  return memT + (1 - memT) * sk;
+}
+
 function aiEnterCost(ex, floor, x, y) {
-  const lv = comMemoryLevel();
-  const lvT = Math.min(1, (lv - 1) / 10); // 0 at Lv1 → 1 at Lv11
+  const lvT = aiLvT(ex); // memory Lv1 & 敵Lv1 → 0 … 1
   if (aiIsCellTriggered(ex, floor, x, y)) {
     // Prefer known-safe highways more as level / traps-hit rise
     const trigN = aiTriggeredCount(ex);
@@ -871,9 +994,14 @@ function aiEnterCost(ex, floor, x, y) {
   const key = `${floor},${x},${y}`;
   const visited = ex && ex.visited && ex.visited.has(key);
   let c = visited ? 1.0 : 1.3;
+  // Experience (敵Lv): people usually hide traps next to doors, spawn exits and stairs — an
+  // experienced player steps around those spots when another way exists. Pure rule of thumb
+  // from the visible map; never looks at where traps really are.
+  const sk = aiSkillT(ex);
   if (!visited && (aiIsDoorAdjacent(floor, x, y) || aiNearSpawnExit(floor, x, y))) {
-    c += 0.05;
+    c += 0.05 + sk * 0.45;
   }
+  if (!visited && sk > 0 && aiIsStairsAdjacent(floor, x, y)) c += sk * 0.3;
   // Softlock guard: near spawn, don't over-penalize exit cells
   const nearSpawnSoft = aiNearSpawnExit(floor, x, y) && ex && ex.floor === 0
     && (ex.visited ? ex.visited.size < 14 : true);
@@ -1025,7 +1153,10 @@ function aiFindTile(floor, kind) {
 
 function aiApplyStep(ex, step) {
   if (!step) return false;
+  const tk = `${ex.floor},${ex.x + step.dx},${ex.y + step.dy}`;
+  const known = !!((ex.visited && ex.visited.has(tk)) || aiIsCellTriggered(ex, ex.floor, ex.x + step.dx, ex.y + step.dy));
   if (tryMove(ex, step.dx, step.dy)) {
+    if (ex.memory) ex.memory.lastStepKnown = known;
     ex.memory.lastDx = step.dx;
     ex.memory.lastDy = step.dy;
     ex.memory.stuck = 0;
@@ -1073,6 +1204,14 @@ function aiIsCellTriggered(ex, floor, x, y) {
 function aiIsDoorAdjacent(floor, x, y) {
   for (const [dx, dy] of AI_DIRS) {
     if (tileAt(blueprint, floor, x + dx, y + dy) === T.DOOR) return true;
+  }
+  return false;
+}
+
+function aiIsStairsAdjacent(floor, x, y) {
+  for (const [dx, dy] of AI_DIRS) {
+    const t = tileAt(blueprint, floor, x + dx, y + dy);
+    if (t === T.STAIRS_UP || t === T.STAIRS_DOWN) return true;
   }
   return false;
 }
@@ -1176,8 +1315,8 @@ function aiStep(ex) {
   const lastDx = ex.memory.lastDx;
   const lastDy = ex.memory.lastDy;
 
-  // Small randomness so play isn't perfectly deterministic
-  if (Math.random() < 0.06) {
+  // Small randomness so play isn't perfectly deterministic (a human misstep): 6% at 敵Lv1 → 3% at Lv100
+  if (Math.random() < 0.06 - 0.03 * aiSkillT(ex)) {
     const shuffled = AI_DIRS.slice().sort(() => Math.random() - 0.5);
     for (const [dx, dy] of shuffled) {
       if (lastDx === -dx && lastDy === -dy && Math.random() < 0.7) continue;
@@ -1206,7 +1345,7 @@ function aiStep(ex) {
   // 0) Hunch: first check where your chest was in earlier matches (revealed at match end),
   //    like a human would. Decided once per match; dropped once the spot has been visited.
   if (S.mode === 'com' && ex === S.foe) {
-    if (ex.memory.chestHunch === undefined) ex.memory.chestHunch = aiPickChestHunch();
+    if (ex.memory.chestHunch === undefined) ex.memory.chestHunch = aiPickChestHunch(ex);
     const h = ex.memory.chestHunch;
     if (h && ex.visited.has(`${h.floor},${h.x},${h.y}`)) ex.memory.chestHunch = null;
     else if (h && (ex.memory.hunchSteps = (ex.memory.hunchSteps || 0) + 1) < 90) {
@@ -1214,6 +1353,22 @@ function aiStep(ex) {
       const step = aiPlanToward(ex, h, lastDx, lastDy);
       if (aiApplyStep(ex, step)) return true;
       ex.memory.chestHunch = null;
+    }
+  }
+
+  // 0b) Floor hunch (higher 敵Lv only): if your chests were revealed mostly on one upper floor in
+  //     earlier matches, climb there first like an experienced human would. Uses only revealed
+  //     chest spots (chestHeat). Chance 0 at 敵Lv1 → 70% at Lv100; decided once per match.
+  if (S.mode === 'com' && ex === S.foe && !ex.memory.chestHunch) {
+    if (ex.memory.floorHunch === undefined) ex.memory.floorHunch = aiPickFloorHunch(ex);
+    const fh = ex.memory.floorHunch;
+    if (fh != null && ex.floor < fh && (ex.memory.floorHunchSteps = (ex.memory.floorHunchSteps || 0) + 1) < 70) {
+      if (aiTakeStairsIfNeeded(ex, fh)) return true;
+      const step = aiPlanToward(ex, { floor: fh, x: 0, y: 0 }, lastDx, lastDy);
+      if (aiApplyStep(ex, step)) return true;
+      ex.memory.floorHunch = null;
+    } else if (fh != null) {
+      ex.memory.floorHunch = null;
     }
   }
 
@@ -1307,7 +1462,7 @@ function aiStep(ex) {
 }
 
 /** Past chest spot COM saw revealed (strongest memory), chance grows with memory level. */
-function aiPickChestHunch() {
+function aiPickChestHunch(ex) {
   const heat = (S._comMemory && S._comMemory.chestHeat) || {};
   let best = null;
   let bestN = 0;
@@ -1320,8 +1475,26 @@ function aiPickChestHunch() {
     }
   }
   if (!best) return null;
-  const lvT = Math.min(1, (comMemoryLevel() - 1) / 10);
+  const lvT = aiLvT(ex);
   return Math.random() < 0.3 + lvT * 0.5 ? best : null;
+}
+
+/** Upper floor where most of your revealed chests were (needs ≥2 reveals, ≥60% share). */
+function aiPickFloorHunch(ex) {
+  const sk = aiSkillT(ex);
+  if (sk <= 0) return null;
+  const heat = (S._comMemory && S._comMemory.chestHeat) || {};
+  const perFloor = new Array(FLOORS).fill(0);
+  let total = 0;
+  for (const [k, n] of Object.entries(heat)) {
+    const f = Number(k.split(',')[0]);
+    if (f >= 0 && f < FLOORS) { perFloor[f] += n; total += n; }
+  }
+  if (total < 2) return null;
+  let best = 0;
+  for (let f = 1; f < FLOORS; f++) if (perFloor[f] > perFloor[best]) best = f;
+  if (best === 0 || perFloor[best] / total < 0.6) return null;
+  return Math.random() < 0.7 * sk ? best : null;
 }
 
 /** Plan a step toward a multi-floor goal (uses stairs). */
@@ -1370,15 +1543,14 @@ function aiWanderStep(ex, lastDx, lastDy) {
     const nk = `${ex.floor},${n.x},${n.y}`;
     if (!ex.visited.has(nk)) s += 10;
     if (aiIsCellTriggered(ex, ex.floor, n.x, n.y)) {
-      const lvT2 = Math.min(1, (comMemoryLevel() - 1) / 10);
+      const lvT2 = aiLvT(ex);
       s += 8 + Math.min(4, aiTriggeredCount(ex) * 0.4) + lvT2 * 3; // safer highways at higher Lv
     } else {
       s -= aiCautionCost(ex, ex.floor, n.x, n.y);
       const dh = (ex.memory.dangerHeat && ex.memory.dangerHeat[nk]) || 0;
       s -= dh * 4;
       {
-        const lv = comMemoryLevel();
-        const lvT = Math.min(1, (lv - 1) / 10);
+        const lvT = aiLvT(ex);
         const past = trapHeatAt(ex.floor, n.x, n.y);
         if (past > 0 && !ex.visited.has(nk)) {
           const pen = Math.min((2.5 + lvT * 2.2) * COM_RECALL_GAIN, past * (0.35 + lvT * 0.25) * COM_RECALL_GAIN);
@@ -1814,6 +1986,9 @@ function endGame(winner, reason) {
   finalizeComMatchMemory();
 
   const iWon = winner === 'me';
+  // COM matches only: win/loss record → next enemy level (PvP never counted, never shown)
+  S._enemyLvChange = S.mode === 'com' ? recordComResult(iWon) : null;
+  refreshEnemyLvUi();
   // Remaining life → points only on win
   awardMatchPointsFromHp(iWon);
   const reasonText = endReasonLabel(reason, iWon);
@@ -2026,6 +2201,19 @@ function showResultScreen(iWon, reasonText) {
   }
   if (reasonEl) reasonEl.textContent = '理由：' + reasonText;
   refreshPointsUi(S._pointsGained);
+  const lvEl = $('result-enemy-lv');
+  if (lvEl) {
+    const ch = S.mode === 'com' ? S._enemyLvChange : null;
+    if (ch) {
+      const r = tierRecord();
+      const arrow = ch.after > ch.before ? '（強くなった！）' : ch.after < ch.before ? '（少し弱くなった）' : '';
+      lvEl.innerHTML = `敵Lv ${ch.before} → <b>${ch.after}</b><span class="rl-c">${arrow}</span><br class="rl-br"><small>勝率 ${winRateText(r)}（${r.w}勝${r.l}敗）</small>`;
+      lvEl.classList.remove('hidden');
+    } else {
+      lvEl.textContent = '';
+      lvEl.classList.add('hidden');
+    }
+  }
 }
 
 /* ---------- Match loop ---------- */
@@ -2178,19 +2366,29 @@ function syncPos() {
 let aiTimer = 0;
 /** Player hold-to-move cooldown; COM steps are never faster than this (same rule). */
 const MOVE_COOLDOWN_MS = 140;
-/** COM step interval: slightly faster with memory level + late healthy (capped). */
-function aiStepIntervalMs() {
+/**
+ * COM step interval: slightly faster with memory level + late healthy (capped).
+ * 敵Lv blends this toward a human expert pace (Lv100): 215ms normally, 195ms mid-match,
+ * 172ms late on known tiles — still slower than the 140ms hold-to-move limit a human has, so
+ * COM never moves faster than a person could.
+ */
+const AI_EXPERT_STEP_MS = { base: 215, mid: 195, late: 172 };
+function aiStepIntervalMs(exArg) {
   if (S.mode !== 'com') return 380;
-  const ex = S.foe;
+  const ex = exArg || S.foe;
   const lv = comMemoryLevel();
+  // Like a person: quick over tiles already walked (known safe), careful on new tiles —
+  // on an unknown tile only 40% of the expert speed-up applies.
+  const sk = aiSkillT(ex) * (ex && ex.memory && ex.memory.lastStepKnown === false ? 0.4 : 1);
+  const mix = (cur, expert) => Math.round(cur + (Math.min(cur, expert) - cur) * sk);
   const lvCut = Math.min(55, (lv - 1) * 5); // Lv1:0 … Lv11:50ms faster base
-  if (!ex || !ex.memory) return Math.max(210, 270 - lvCut);
+  if (!ex || !ex.memory) return mix(Math.max(210, 270 - lvCut), AI_EXPERT_STEP_MS.base);
   const phase = ex.memory.phase || 0;
   const visited = ex.visited ? ex.visited.size : 0;
-  const healthy = (S.foeHp || 0) >= MAX_HP * 0.6;
-  if (healthy && (phase > 80 || visited >= 48)) return Math.max(175, 200 - lvCut * 0.45);
-  if (healthy && phase > 55) return Math.max(190, 235 - lvCut * 0.55);
-  return Math.max(210, 270 - lvCut);
+  const healthy = (ex === S.foe ? S.foeHp : S.myHp) >= MAX_HP * 0.6;
+  if (healthy && (phase > 80 || visited >= 48)) return mix(Math.max(175, 200 - lvCut * 0.45), AI_EXPERT_STEP_MS.late);
+  if (healthy && phase > 55) return mix(Math.max(190, 235 - lvCut * 0.55), AI_EXPERT_STEP_MS.mid);
+  return mix(Math.max(210, 270 - lvCut), AI_EXPERT_STEP_MS.base);
 }
 
 
@@ -2702,6 +2900,8 @@ function onReadySetup() {
       S.theirHouse = generateComHouse(blueprint, {
         pathHeat: S._comMemory.pathHeat || {},
         level: S._comMemory.level || 1,
+        // 敵Lv → trap-placement judgment only (same trap count / rules as the player)
+        skill: (currentEnemyLevel() - 1) / (ENEMY_LV_MAX - 1),
       });
       if (validateHouse(S.theirHouse, blueprint).ok) break;
     }
@@ -2767,6 +2967,9 @@ function startMatch() {
   // What COM observed this match is recorded at match end (finalizeComMatchMemory).
   S._comMemory = loadComMemory();
   S._pathHeatDirty = false;
+  // 敵Lv is fixed for the whole match (from the record before this match)
+  S._enemyLv = S.mode === 'com' ? currentEnemyLevel() : 0;
+  S._enemyLvChange = null;
   if (S.foe) {
     if (!S.foe.memory) {
       S.foe.memory = { stuck: 0, phase: 0, lastDx: 0, lastDy: 0, recent: [], escapeGoal: null, dangerHeat: {}, trapsHit: 0 };

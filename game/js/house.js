@@ -3013,7 +3013,11 @@ export function generateComHouse(blueprint, memoryBias = null) {
   const cells = listPlaceable(blueprint);
   const spawn = getSpawn();
   const memLevel = Math.max(1, Math.min(11, Math.floor(Number(memoryBias && memoryBias.level) || 1)));
-  const lvT = Math.min(1, (memLevel - 1) / 10);
+  // Trap-placement judgment 0..1: memory level (as before) raised toward 1 by 敵Lv skill (0..1).
+  // Same trap count / kinds / placement rules as the player's house — only WHERE it chooses changes.
+  const memT = Math.min(1, (memLevel - 1) / 10);
+  const skill = Math.max(0, Math.min(1, Number(memoryBias && memoryBias.skill) || 0));
+  const lvT = memT + (1 - memT) * skill;
   const pathHeatMap = (memoryBias && memoryBias.pathHeat && typeof memoryBias.pathHeat === 'object')
     ? memoryBias.pathHeat
     : {};
