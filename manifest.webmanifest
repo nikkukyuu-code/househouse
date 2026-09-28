@@ -1,0 +1,23 @@
+{
+ "id": "/househouse/",
+ "name": "トリックハウスバトル（遊び方）",
+ "short_name": "ハウスバトル",
+ "start_url": "/househouse/",
+ "scope": "/",
+ "display": "standalone",
+ "background_color": "#120e18",
+ "theme_color": "#120e18",
+ "lang": "ja",
+ "icons": [
+  {
+   "src": "/househouse/icon-192.png",
+   "sizes": "192x192",
+   "type": "image/png"
+  },
+  {
+   "src": "/househouse/icon-512.png",
+   "sizes": "512x512",
+   "type": "image/png"
+  }
+ ]
+}
