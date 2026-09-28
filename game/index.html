@@ -9,7 +9,7 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta name="theme-color" content="#120e18" />
   <title>トリックハウスバトル</title>
-  <link rel="stylesheet" href="css/style.css?v=20260928054933" />
+  <link rel="stylesheet" href="css/style.css?v=20260928160151" />
 </head>
 <body>
   <div id="app">
@@ -72,7 +72,7 @@
           </div>
         </div>
         <a class="btn btn-transfer link-btn" id="btn-transfer" href="/transfer/?from=/househouse/game/">🔄 引き継ぎ<small>（機種変更・データ移行）</small></a>
-        <a class="save-notice" id="save-notice" href="/transfer/?from=/househouse/game/">⚠ 記録はこの端末のブラウザ内だけ。iPhoneは7日ほど開かないと消えることも <span class="easy-link">→ かんたんな方法はこちら</span></a>
+        <a class="save-notice dl-note" id="save-notice" href="/transfer/?from=/househouse/game/"><b class="dl-h">⚠ 記録が消えることがあります：</b><span class="dl-li">・iPhoneのSafariで7日くらい遊ばなかったとき</span><span class="dl-li">・ブラウザの履歴やデータを消したとき</span><span class="dl-li">・プライベートモードで遊んだとき</span><span class="dl-p">スマホを買い替える前に「引き継ぎ」ボタンでコードを作って保存してください。<span class="easy-link">かんたんな方法はこちら ›</span></span></a>
         <div class="title-footer-row">
           <button type="button" class="btn btn-ghost btn-compact" id="btn-mute" aria-pressed="false">🔊 音</button>
           <a class="btn btn-ghost btn-compact link-btn" href="https://nikkukyuu-code.github.io/">トップへ</a>
@@ -274,8 +274,8 @@
   </div>
 
   <footer id="game-meta" aria-label="バージョンとアクセス数">
-    <span id="meta-version">2026-09-28 05:49:33</span>
-    <span id="app-version">2026-09-28 05:49:33</span>
+    <span id="meta-version">2026-09-28 16:01:51</span>
+    <span id="app-version">2026-09-28 16:01:51</span>
     <span class="meta-sep" aria-hidden="true">｜</span>
     <span id="meta-visits" class="meta-visits"><span class="meta-visits-label">アクセス</span> <img id="meta-visits-badge" alt="access" width="70" height="20" /></span>
     <span class="meta-sep" aria-hidden="true" hidden>｜</span>
@@ -283,7 +283,7 @@
   </footer>
 
   <script type="module">
-    import { init } from './js/game.js?v=20260928054933';
+    import { init } from './js/game.js?v=20260928160151';
     init().catch((e) => {
       console.error(e);
       const n = document.getElementById('peer-note');

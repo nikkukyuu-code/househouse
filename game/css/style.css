@@ -1767,3 +1767,26 @@ a.btn.link-btn {
   #result-overlay.lose { padding-top: max(8px, env(safe-area-inset-top, 0px), 1.5vh); gap: 5px; }
   #result-overlay.lose #result-chest-reveal { padding: 6px 10px 8px; gap: 4px; }
 }
+
+/* Data-loss notice (title): heading + 3 short bullets + 2 sentences */
+.dl-note .dl-h, .dl-note .dl-li, .dl-note .dl-p { display: block; }
+.dl-note .dl-h { font-weight: 900; }
+.dl-note .dl-li { text-align: left; padding-left: 1em; text-indent: -1em; }
+.dl-note .dl-p { margin-top: 1px; }
+.dl-note .dl-lis { display: inline-block; text-align: left; }
+/* Title fit: bullets flow inline (2 lines instead of 3); status line hidden on shorter screens */
+#screen-title .dl-note .dl-li { display: inline; padding: 0; text-indent: 0; margin-right: 0.5em; }
+#screen-title .dl-note .dl-li:nth-of-type(3) { margin-right: 0; }
+#screen-title .dl-note .dl-p { display: block; }
+@media (max-height: 760px) { #screen-title .peer-note { display: none; } }
+#screen-title .dl-note .dl-h { display: inline; margin-right: 0.3em; }
+@media (max-height: 860px) { #screen-title .peer-note { display: none; } }
+@media (max-height: 720px) {
+  #screen-title .btn { min-height: 34px; }
+  #screen-title .btn-col { gap: 6px; }
+  #screen-title .online-group { gap: 4px; }
+}
+/* bullets wrap as whole items (never split mid-phrase) */
+#screen-title .dl-note .dl-h { display: block; margin: 0; }
+#screen-title .dl-note .dl-li { display: inline-block; white-space: nowrap; margin: 0 0.35em; }
+@media (max-height: 700px) { #screen-title .title-com-memory { display: none; } }
