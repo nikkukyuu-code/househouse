@@ -3204,7 +3204,8 @@ export function generateComHouse(blueprint, memoryBias = null) {
     // Prefer floors the player must visit
     if (c.floor > chest.floor) s -= 4;
     else if (c.floor > 0) s += 1;
-    s += Math.random() * (1.2 - lvT * 0.4); // slightly less random at high Lv
+    // Less random at high Lv; 敵Lv skill halves the leftover noise at Lv100 (fewer careless placements)
+    s += Math.random() * (1.2 - lvT * 0.4) * (1 - skill * 0.5);
     return s;
   }
 

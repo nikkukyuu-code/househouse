@@ -9,15 +9,15 @@ import {
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
   HOUSE_SKINS, getHouseSkin, preloadTextures,
-} from './house.js?v=20260928210059';
-import { NetSession, QuickMatch, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260928210059';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260928210059';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260928210059';
-import { hitBattleCounter, loadBattleCount } from './stats.js?v=20260928210059';
+} from './house.js?v=20260928211437';
+import { NetSession, QuickMatch, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20260928211437';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20260928211437';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20260928211437';
+import { hitBattleCounter, loadBattleCount } from './stats.js?v=20260928211437';
 
-export const GAME_VERSION = '2026-09-28 21:00:59';
-export const GAME_VERSION_BUST = '20260928210059';
-export const GAME_BUILD_TIME = 1790596859737;
+export const GAME_VERSION = '2026-09-28 21:14:37';
+export const GAME_VERSION_BUST = '20260928211437';
+export const GAME_BUILD_TIME = 1790597677441;
 
 const blueprint = createBlueprint();
 
@@ -993,15 +993,17 @@ function aiEnterCost(ex, floor, x, y) {
   }
   const key = `${floor},${x},${y}`;
   const visited = ex && ex.visited && ex.visited.has(key);
-  let c = visited ? 1.0 : 1.3;
   // Experience (敵Lv): people usually hide traps next to doors, spawn exits and stairs — an
-  // experienced player steps around those spots when another way exists. Pure rule of thumb
-  // from the visible map; never looks at where traps really are.
+  // experienced player steps around those spots when another way exists, and sticks to tiles it
+  // already walked. Pure rule of thumb from the visible map; never looks at where traps really are.
+  // Fewer careless routes at high Lv: linear + squared term (smooth, monotonic, strongest near Lv100).
   const sk = aiSkillT(ex);
+  const sk2 = sk * sk;
+  let c = visited ? 1.0 : 1.3 + sk * 0.25;
   if (!visited && (aiIsDoorAdjacent(floor, x, y) || aiNearSpawnExit(floor, x, y))) {
-    c += 0.05 + sk * 0.45;
+    c += 0.05 + sk * 0.45 + sk2 * 0.4;
   }
-  if (!visited && sk > 0 && aiIsStairsAdjacent(floor, x, y)) c += sk * 0.3;
+  if (!visited && sk > 0 && aiIsStairsAdjacent(floor, x, y)) c += sk * 0.3 + sk2 * 0.25;
   // Softlock guard: near spawn, don't over-penalize exit cells
   const nearSpawnSoft = aiNearSpawnExit(floor, x, y) && ex && ex.floor === 0
     && (ex.visited ? ex.visited.size < 14 : true);
@@ -1010,13 +1012,15 @@ function aiEnterCost(ex, floor, x, y) {
   if (!visited && !nearSpawnSoft) {
     const past = trapHeatAt(floor, x, y);
     if (past > 0) {
-      const mult = (0.055 + lvT * 0.045) * COM_RECALL_GAIN;
-      const cap = (0.32 + lvT * 0.28) * COM_RECALL_GAIN;
+      // Less forgetting at high 敵Lv: remembered traps weigh up to 1.6× more
+      const recall = 1 + sk * 0.6;
+      const mult = (0.055 + lvT * 0.045) * COM_RECALL_GAIN * recall;
+      const cap = (0.32 + lvT * 0.28) * COM_RECALL_GAIN * recall;
       c += Math.min(cap, past * mult);
     }
     // Remembered as walked safely before (and never trapped there): cheaper, like a human's known route
     const safe = past > 0 ? 0 : safeHeatAt(floor, x, y);
-    if (safe > 0) c -= Math.min(0.2 + lvT * 0.15, safe * (0.04 + lvT * 0.03));
+    if (safe > 0) c -= Math.min((0.2 + lvT * 0.15) * (1 + sk * 0.5), safe * (0.04 + lvT * 0.03) * (1 + sk * 0.5));
   } else if (!visited && nearSpawnSoft) {
     const past = trapHeatAt(floor, x, y);
     if (past > 0) c += Math.min(0.12 * COM_RECALL_GAIN, past * 0.02 * COM_RECALL_GAIN);
@@ -1024,7 +1028,8 @@ function aiEnterCost(ex, floor, x, y) {
   // Same-match dangerHeat (scales mildly with level)
   if (ex && ex.memory && ex.memory.dangerHeat) {
     const dh = ex.memory.dangerHeat[key] || 0;
-    if (dh > 0) c += Math.min(0.38 + lvT * 0.12, dh * (1 + lvT * 0.25));
+    // Same-match caution after a hit: up to 1.8× at 敵Lv100 (doesn't shrug off what just happened)
+    if (dh > 0) c += Math.min((0.38 + lvT * 0.12) * (1 + sk * 0.8), dh * (1 + lvT * 0.25) * (1 + sk * 0.8));
   }
   return c;
 }
@@ -1315,8 +1320,9 @@ function aiStep(ex) {
   const lastDx = ex.memory.lastDx;
   const lastDy = ex.memory.lastDy;
 
-  // Small randomness so play isn't perfectly deterministic (a human misstep): 6% at 敵Lv1 → 3% at Lv100
-  if (Math.random() < 0.06 - 0.03 * aiSkillT(ex)) {
+  // Small randomness so play isn't perfectly deterministic (a human misstep): 6% at 敵Lv1 → 3.5% at
+  // Lv50 → 1% at Lv100 (never zero — still a person-like slip now and then)
+  if (Math.random() < 0.06 - 0.05 * aiSkillT(ex)) {
     const shuffled = AI_DIRS.slice().sort(() => Math.random() - 0.5);
     for (const [dx, dy] of shuffled) {
       if (lastDx === -dx && lastDy === -dy && Math.random() < 0.7) continue;
@@ -1476,7 +1482,8 @@ function aiPickChestHunch(ex) {
   }
   if (!best) return null;
   const lvT = aiLvT(ex);
-  return Math.random() < 0.3 + lvT * 0.5 ? best : null;
+  // Forgets the hunch less at high 敵Lv (max 95%)
+  return Math.random() < Math.min(0.95, 0.3 + lvT * 0.5 + aiSkillT(ex) * 0.15) ? best : null;
 }
 
 /** Upper floor where most of your revealed chests were (needs ≥2 reveals, ≥60% share). */
@@ -1494,7 +1501,7 @@ function aiPickFloorHunch(ex) {
   let best = 0;
   for (let f = 1; f < FLOORS; f++) if (perFloor[f] > perFloor[best]) best = f;
   if (best === 0 || perFloor[best] / total < 0.6) return null;
-  return Math.random() < 0.7 * sk ? best : null;
+  return Math.random() < 0.7 * sk + 0.2 * sk * sk ? best : null; // 0 → ~40% (Lv50) → 90% (Lv100)
 }
 
 /** Plan a step toward a multi-floor goal (uses stairs). */
@@ -1537,7 +1544,8 @@ function aiWanderStep(ex, lastDx, lastDy) {
   let bestS = -1e9;
   const neighbors = aiNeighbors(ex.floor, ex.x, ex.y);
   for (const n of neighbors) {
-    let s = Math.random() * 2;
+    const skW = aiSkillT(ex);
+    let s = Math.random() * (2 - skW * 1.2); // less aimless wandering at high 敵Lv
     const t = tileAt(blueprint, ex.floor, n.x, n.y);
     if (t === T.STAIRS_UP || t === T.STAIRS_DOWN) s += 0.5;
     const nk = `${ex.floor},${n.x},${n.y}`;
@@ -1548,7 +1556,7 @@ function aiWanderStep(ex, lastDx, lastDy) {
     } else {
       s -= aiCautionCost(ex, ex.floor, n.x, n.y);
       const dh = (ex.memory.dangerHeat && ex.memory.dangerHeat[nk]) || 0;
-      s -= dh * 4;
+      s -= dh * 4 * (1 + skW);
       {
         const lvT = aiLvT(ex);
         const past = trapHeatAt(ex.floor, n.x, n.y);
