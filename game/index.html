@@ -5,7 +5,7 @@
 <!--nk-autoupdate--><script>
 /* 自動更新: 新しい版が公開されたら、安全なとき（タイトル画面など・試合中でない）だけ自動で読み込み直す。記録(localStorage)には触れない。 */
 (function () {
-  var PAGE_LABEL = '2026-10-05 01:26:26';
+  var PAGE_LABEL = '2026-10-05 01:29:40';
   var URL = '/househouse/version.json', KEY = 'nkReloadFor:househouse', EVERY = 60;
   function safe() { try { return !!(document.querySelector('#screen-title.active') && !(document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName))); } catch (e) { return false; } }
   var busy = false;
@@ -17,7 +17,7 @@
       var v = d && d.label;
       if (!v || v === PAGE_LABEL || !safe()) return;
       try { if (sessionStorage.getItem(KEY) === v) return; sessionStorage.setItem(KEY, v); } catch (e) { return; }
-      location.replace(location.pathname + '?r=' + String(v).replace(/[^0-9]/g, '') + location.hash);
+      var q = location.search.replace(/^\?/, '').split('&').filter(function (s) { return s && s.indexOf('r=') !== 0; }); q.push('r=' + String(v).replace(/[^0-9]/g, '')); location.replace(location.pathname + '?' + q.join('&') + location.hash);
     }).catch(function () { busy = false; });
   }
   window.__nkCheckUpdate = check;
@@ -33,7 +33,7 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta name="theme-color" content="#120e18" />
   <title>トリックハウスバトル</title>
-  <link rel="stylesheet" href="css/style.css?v=20261005012626" />
+  <link rel="stylesheet" href="css/style.css?v=20261005012940" />
 <link rel="apple-touch-icon" href="/househouse/apple-touch-icon.png" />
 <meta name="apple-mobile-web-app-title" content="ハウスバトル" />
 </head>
@@ -313,7 +313,7 @@
   </footer>
 
   <script type="module">
-    import { init } from './js/game.js?v=20261005012626';
+    import { init } from './js/game.js?v=20261005012940';
     init().catch((e) => {
       console.error(e);
       const n = document.getElementById('peer-note');

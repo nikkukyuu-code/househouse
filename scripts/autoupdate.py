@@ -15,7 +15,7 @@ TPL = r'''<!--nk-autoupdate--><script>
       var v = d && d.label;
       if (!v || v === PAGE_LABEL || !safe()) return;
       try { if (sessionStorage.getItem(KEY) === v) return; sessionStorage.setItem(KEY, v); } catch (e) { return; }
-      location.replace(location.pathname + '?r=' + String(v).replace(/[^0-9]/g, '') + location.hash);
+      var q = location.search.replace(/^\?/, '').split('&').filter(function (s) { return s && s.indexOf('r=') !== 0; }); q.push('r=' + String(v).replace(/[^0-9]/g, '')); location.replace(location.pathname + '?' + q.join('&') + location.hash);
     }).catch(function () { busy = false; });
   }
   window.__nkCheckUpdate = check;

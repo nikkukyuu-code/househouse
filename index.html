@@ -5,7 +5,7 @@
 <!--nk-autoupdate--><script>
 /* 自動更新: 新しい版が公開されたら、安全なとき（タイトル画面など・試合中でない）だけ自動で読み込み直す。記録(localStorage)には触れない。 */
 (function () {
-  var PAGE_LABEL = '2026-10-05 01:26:26';
+  var PAGE_LABEL = '2026-10-05 01:29:40';
   var URL = '/househouse/version.json', KEY = 'nkReloadFor:househouse-top', EVERY = 0;
   function safe() { try { return !!(true); } catch (e) { return false; } }
   var busy = false;
@@ -17,7 +17,7 @@
       var v = d && d.label;
       if (!v || v === PAGE_LABEL || !safe()) return;
       try { if (sessionStorage.getItem(KEY) === v) return; sessionStorage.setItem(KEY, v); } catch (e) { return; }
-      location.replace(location.pathname + '?r=' + String(v).replace(/[^0-9]/g, '') + location.hash);
+      var q = location.search.replace(/^\?/, '').split('&').filter(function (s) { return s && s.indexOf('r=') !== 0; }); q.push('r=' + String(v).replace(/[^0-9]/g, '')); location.replace(location.pathname + '?' + q.join('&') + location.hash);
     }).catch(function () { busy = false; });
   }
   window.__nkCheckUpdate = check;
@@ -178,7 +178,7 @@
     <p class="lead"><strong>自分の家に罠と宝箱を設置して、お互いの家に行って宝箱を探すゲーム</strong>です。爆弾や落とし穴で相手を邪魔しながら、先に宝箱を見つけた方が勝ち。</p>
     <p class="tagline">スマホ向け・タッチ操作／COM対戦・ネット対戦あり</p>
 
-    <a class="play" href="game/?v=20261005012626">今すぐ遊ぶ</a>
+    <a class="play" href="game/?v=20261005012940">今すぐ遊ぶ</a>
 
     <div class="save-banner" role="note">
       <strong>⚠ 記録（ポイント・持っている家・選んだ家・COMが覚えた場所など）はこの端末に保存されています。</strong>記録が消えることがあります：
@@ -254,7 +254,7 @@
       </div>
     </section>
 
-    <a class="play" href="game/?v=20261005012626">ゲームを始める</a>
+    <a class="play" href="game/?v=20261005012940">ゲームを始める</a>
     <p id="site-meta" style="margin-top:18px;text-align:center;color:#887868;font-size:0.8rem;">2026-09-26 02:15:50</p>
   </main>
 </body>
