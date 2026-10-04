@@ -10,6 +10,7 @@ export function showScreen(id) {
   document.querySelectorAll('.screen').forEach((el) => {
     el.classList.toggle('active', el.id === id);
   });
+  if (id === 'screen-title' && window.__nkCheckUpdate) setTimeout(() => { try { window.__nkCheckUpdate(); } catch (_) {} }, 1500);
 }
 
 export function setStatus(el, text, kind = '') {
