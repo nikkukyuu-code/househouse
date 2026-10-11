@@ -2015,3 +2015,19 @@ a.btn.link-btn {
 @media (prefers-reduced-motion: reduce) {
   .fb-new, .fall-banner, .fall-fx.landed .fb-to, .floor-badge.fallpulse { animation:none !important; }
 }
+
+/* ===== Footer always one line; app reserves its real height (incl. safe area) ===== */
+:root { --meta-h: calc(30px + env(safe-area-inset-bottom, 0px)); }
+#game-meta { flex-wrap: nowrap; white-space: nowrap; overflow: hidden; height: var(--meta-h); box-sizing: border-box;
+  padding-top: 0; padding-bottom: env(safe-area-inset-bottom, 0px); gap: 6px; font-size: clamp(0.62rem, 3.1vw, 0.78rem); }
+#game-meta img { height: 16px; width: auto; }
+#app { padding-bottom: var(--meta-h); }
+/* Result: content shrinks (chest map first), buttons stay fully visible above the footer */
+#result-overlay { justify-content: center; padding-bottom: max(10px, 1.5dvh); overscroll-behavior: contain; }
+#result-overlay.lose { justify-content: flex-start; }
+#result-overlay > * { flex-shrink: 0; }
+#result-overlay #result-chest-reveal { flex-shrink: 1; min-height: 0; }
+#result-chest-canvas { max-height: max(70px, 22dvh); width: auto !important; max-width: 100%; object-fit: contain; min-height: 0; }
+#result-overlay .btn-col { margin-top: auto; padding-top: 4px; }
+#result-overlay:not(.lose) .btn-col { margin-top: 6px; }
+@media (max-height: 600px) { #result-chest-canvas { max-height: max(60px, 17dvh); } #result-reason { padding: 6px 10px; } }

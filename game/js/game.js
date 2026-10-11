@@ -9,14 +9,14 @@ import {
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
   HOUSE_SKINS, getHouseSkin, preloadTextures,
-} from './house.js?v=20261012013155';
-import { NetSession, QuickMatch, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20261012013155';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20261012013155';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20261012013155';
-import { hitBattleCounter, loadBattleCount } from './stats.js?v=20261012013155';
+} from './house.js?v=20261012015050';
+import { NetSession, QuickMatch, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20261012015050';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20261012015050';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20261012015050';
+import { hitBattleCounter, loadBattleCount } from './stats.js?v=20261012015050';
 
-export const GAME_VERSION = '2026-10-12 01:31:55';
-export const GAME_VERSION_BUST = '20261012013155';
+export const GAME_VERSION = '2026-10-12 01:50:50';
+export const GAME_VERSION_BUST = '20261012015050';
 export const GAME_BUILD_TIME = 1791131380525;
 
 const blueprint = createBlueprint();
@@ -264,7 +264,7 @@ function playFallFx(view, fromFloor, willDrop, delayMs = 900) {
   }, delayMs);
   wrap._fallT2 = setTimeout(() => el.remove(), delayMs + 600);
 }
-if (typeof window !== 'undefined' && /[?&]debug=1\b/.test(location.search)) { window.__debugFallFx = playFallFx; window.__hhState = S; window.__hh = { S, startMatch, tryMove, checkHazards, onTrapHit, isWalkable, tileAt, blueprint: () => blueprint, aiStep }; }
+if (typeof window !== 'undefined' && /[?&]debug=1\b/.test(location.search)) { window.__debugFallFx = playFallFx; window.__hhState = S; window.__hh = { S, endGame, startMatch, tryMove, checkHazards, onTrapHit, isWalkable, tileAt, blueprint: () => blueprint, aiStep }; }
 
 /** Big floor badge + 3-step gauge on each board (match + setup). */
 function updateFloorBadges() {
