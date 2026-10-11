@@ -128,6 +128,14 @@ export const SFX = {
     beep({ type: 'sine', freq: 160, freqEnd: 55, dur: 0.35, gain: 0.2 });
     beep({ type: 'triangle', freq: 90, freqEnd: 40, dur: 0.4, gain: 0.12, delay: 0.05 });
   },
+  fall() {
+    beep({ type: 'sine', freq: 900, freqEnd: 120, dur: 0.8, gain: 0.14, delay: 0.1 });
+    noiseBurst(0.5, 0.06);
+  },
+  thud() {
+    noiseBurst(0.15, 0.22);
+    beep({ type: 'sine', freq: 110, freqEnd: 35, dur: 0.3, gain: 0.3 });
+  },
   chest() {
     beep({ type: 'sine', freq: 523, dur: 0.12, gain: 0.14 });
     beep({ type: 'sine', freq: 659, dur: 0.12, gain: 0.14, delay: 0.1 });

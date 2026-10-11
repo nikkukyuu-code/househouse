@@ -1881,3 +1881,71 @@ a.btn.link-btn {
   #result-overlay .btn-col { gap: 6px; }
   #result-overlay .btn { min-height: 38px; padding-top: 6px; padding-bottom: 6px; }
 }
+
+/* ===== Pitfall fall FX ===== */
+.match-canvas-wrap.fall-shake canvas { animation: fallShake 0.9s ease-in forwards; }
+.match-canvas-wrap.fall-land canvas { animation: fallLand 0.45s cubic-bezier(.2,1.4,.4,1); }
+@keyframes fallShake {
+  0%{transform:translate(0,0)} 10%{transform:translate(-5px,2px)} 20%{transform:translate(5px,-2px)}
+  30%{transform:translate(-4px,3px)} 45%{transform:translate(3px,0)}
+  100%{transform:translate(0,14%);filter:brightness(.35)}
+}
+@keyframes fallLand { 0%{transform:translateY(-22%);filter:brightness(.5)} 70%{transform:translateY(2%)} 100%{transform:none} }
+.fall-fx { position:absolute; inset:0; pointer-events:none; z-index:6; overflow:hidden;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; }
+.fall-hole { position:relative; width:min(34%,140px); aspect-ratio:1; border-radius:50%;
+  background:radial-gradient(circle,#000 35%,#2a0a44 65%,rgba(60,20,90,0) 72%);
+  animation:holeOpen .9s ease-out forwards; }
+.fall-swirl { position:absolute; inset:8%; border-radius:50%;
+  background:conic-gradient(from 0deg,rgba(170,102,255,.9),transparent 30%,rgba(170,102,255,.7) 50%,transparent 80%);
+  -webkit-mask:radial-gradient(circle,transparent 30%,#000 32%); mask:radial-gradient(circle,transparent 30%,#000 32%);
+  animation:swirl .5s linear infinite; }
+.fall-char { position:absolute; left:50%; top:50%; font-size:min(14vw,3rem); line-height:1;
+  animation:charSink .85s ease-in forwards; }
+.fall-fx.small .fall-char { font-size:min(9vw,2rem); }
+.fall-banner { margin-top:6px; padding:4px 14px; border-radius:999px; background:rgba(40,10,70,.92);
+  border:2px solid #aa66ff; color:#fff; font-weight:900; white-space:nowrap; max-width:94%;
+  font-size:clamp(1.05rem,4.5vh,1.7rem); text-shadow:0 2px 6px #000; animation:bannerPop .3s cubic-bezier(.2,1.6,.4,1); }
+.fall-fx.small .fall-banner { font-size:clamp(.9rem,3.2vh,1.3rem); }
+.fall-fx.landed .fall-hole { animation:holeClose .25s forwards; }
+.fall-dust { position:absolute; left:50%; top:50%; width:0; height:0; }
+.fall-dust i { position:absolute; width:22px; height:22px; margin:-11px; border-radius:50%;
+  background:rgba(230,215,190,.85); animation:dust .6s ease-out forwards; }
+.fall-dust i:nth-child(1){--dx:-48px} .fall-dust i:nth-child(2){--dx:48px}
+.fall-dust i:nth-child(3){--dx:-24px;animation-delay:.05s} .fall-dust i:nth-child(4){--dx:24px;animation-delay:.05s}
+.fall-dust::before { content:''; position:absolute; width:64px; height:64px; margin:-32px; border-radius:10px;
+  border:4px solid #ffe14d; box-shadow:0 0 16px #ffe14d; animation:tileHi .7s ease-out forwards; }
+.fall-floor { position:absolute; top:6px; right:8px; padding:2px 12px; border-radius:8px; background:#ffe14d;
+  color:#222; font-weight:900; font-size:clamp(1rem,4vh,1.5rem); animation:floorFlash .7s ease-out; }
+@keyframes holeOpen { from{transform:scale(.1)} to{transform:scale(1)} }
+@keyframes holeClose { to{transform:scale(0);opacity:0} }
+@keyframes swirl { to{transform:rotate(360deg)} }
+@keyframes charSink { 0%{transform:translate(-50%,-80%) scale(1)} 30%{transform:translate(-50%,-60%) scale(1) rotate(-15deg)}
+  100%{transform:translate(-50%,-50%) scale(.1) rotate(540deg);opacity:0} }
+@keyframes bannerPop { from{transform:scale(.4);opacity:0} to{transform:scale(1);opacity:1} }
+@keyframes dust { from{transform:translate(0,0) scale(.4);opacity:1} to{transform:translate(var(--dx),-14px) scale(1.6);opacity:0} }
+@keyframes tileHi { 0%{transform:scale(1.4);opacity:0} 25%{opacity:1;transform:scale(1)} 100%{opacity:0} }
+@keyframes floorFlash { 0%,40%{transform:scale(1.5);box-shadow:0 0 18px #ffe14d} 100%{transform:scale(1)} }
+@media (prefers-reduced-motion: reduce) {
+  .match-canvas-wrap.fall-shake canvas, .match-canvas-wrap.fall-land canvas { animation:fadeDim .4s; }
+  .fall-fx *, .fall-fx *::before { animation-name:fadeIn !important; animation-duration:.25s !important; animation-iteration-count:1 !important; }
+  .fall-char { transform:translate(-50%,-50%); }
+  .fall-dust i { display:none; }
+}
+@keyframes fadeDim { 50%{filter:brightness(.5)} }
+@keyframes fadeIn { from{opacity:0} to{opacity:1} }
+/* ===== Floor badge ===== */
+.floor-badge { position:absolute; left:4px; top:4px; z-index:4; pointer-events:none; display:flex; align-items:center; gap:3px;
+  padding:2px 5px; border-radius:8px; background:rgba(0,0,0,.72); border:2px solid #ffe14d; }
+.floor-badge[hidden] { display:none; }
+.floor-badge b { color:#ffe14d; font-weight:900; font-size:clamp(1rem,3.6vh,1.5rem); line-height:1; text-shadow:0 1px 3px #000; }
+.floor-badge .fg { display:flex; flex-direction:column; gap:1px; }
+.floor-badge .fg i { font-style:normal; font-size:8px; line-height:9px; padding:0 3px; border-radius:3px; color:#888; background:#333; font-weight:700; }
+.floor-badge .fg i.on { color:#222; background:#ffe14d; }
+.floor-badge.small b { font-size:clamp(.85rem,2.8vh,1.2rem); }
+.floor-badge.bump { animation:floorFlash .6s ease-out; }
+@media (prefers-reduced-motion: reduce) { .floor-badge.bump { animation:fadeIn .25s; } }
+.fall-banner { white-space:normal; text-align:center; font-size:clamp(.95rem,5vw,1.6rem); }
+.fall-fx.small .fall-banner { font-size:clamp(.85rem,4.2vw,1.25rem); }
+.floor-badge b { font-size:clamp(.95rem,5vw,1.4rem); }
+.floor-badge.small b { font-size:clamp(.85rem,4vw,1.15rem); }

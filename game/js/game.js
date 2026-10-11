@@ -9,14 +9,14 @@ import {
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
   HOUSE_SKINS, getHouseSkin, preloadTextures,
-} from './house.js?v=20261005012940';
-import { NetSession, QuickMatch, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20261005012940';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20261005012940';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20261005012940';
-import { hitBattleCounter, loadBattleCount } from './stats.js?v=20261005012940';
+} from './house.js?v=20261011165057';
+import { NetSession, QuickMatch, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20261011165057';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20261011165057';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20261011165057';
+import { hitBattleCounter, loadBattleCount } from './stats.js?v=20261011165057';
 
-export const GAME_VERSION = '2026-10-05 01:29:40';
-export const GAME_VERSION_BUST = '20261005012940';
+export const GAME_VERSION = '2026-10-11 16:50:57';
+export const GAME_VERSION_BUST = '20261011165057';
 export const GAME_BUILD_TIME = 1791131380525;
 
 const blueprint = createBlueprint();
@@ -216,6 +216,84 @@ function updateChestAlarms() {
   }
   S.chestAlarm = { top, bot: false };
 }
+
+/** Clear, short pitfall presentation (DOM overlay over a match canvas). */
+function playFallFx(view, fromFloor, willDrop, delayMs = 900) {
+  const canvas = $(view === 'bot' ? 'canvas-bot' : 'canvas-top');
+  const wrap = canvas && canvas.parentElement;
+  if (!wrap) return;
+  const old = wrap.querySelector('.fall-fx');
+  if (old) old.remove();
+  clearTimeout(wrap._fallT1); clearTimeout(wrap._fallT2);
+  wrap.classList.remove('fall-shake', 'fall-land');
+  const drop = willDrop && fromFloor > 0;
+  const el = document.createElement('div');
+  el.className = 'fall-fx' + (view === 'top' ? ' small' : '');
+  const chained = wrap._chain && Date.now() < (wrap._chainUntil || 0)
+    && wrap._chain[wrap._chain.length - 1] === fromFloor;
+  const chain = chained ? wrap._chain.slice() : [fromFloor];
+  if (drop) chain.push(fromFloor - 1);
+  wrap._chain = chain;
+  wrap._chainUntil = Date.now() + delayMs + 400;
+  const path = chain.map(floorLabel).join('→');
+  const label = chained
+    ? `連続落下！ ${path}${drop ? '' : ' -1'}`
+    : (drop ? `落とし穴！ ${path}` : '落とし穴！ -1');
+  if (chained && !drop) sfx('thud');
+  el.innerHTML = `<div class="fall-hole"><div class="fall-swirl"></div><div class="fall-char">${view === 'bot' ? '😱' : '😵'}</div></div>`
+    + `<div class="fall-banner">🕳 ${label}</div>`;
+  wrap.appendChild(el);
+  void wrap.offsetWidth;
+  wrap.classList.add('fall-shake');
+  if (drop) sfx('fall');
+  wrap._fallT1 = setTimeout(() => {
+    wrap.classList.remove('fall-shake');
+    if (drop) {
+      el.classList.add('landed');
+      el.insertAdjacentHTML('beforeend',
+        `<div class="fall-dust"><i></i><i></i><i></i><i></i></div><div class="fall-floor">${floorLabel(fromFloor - 1)}</div>`);
+      void wrap.offsetWidth;
+      wrap.classList.add('fall-land');
+      sfx('thud');
+    }
+  }, delayMs);
+  wrap._fallT2 = setTimeout(() => {
+    wrap.classList.remove('fall-shake', 'fall-land');
+    el.remove();
+  }, delayMs + 750);
+}
+if (typeof window !== 'undefined') { window.__debugFallFx = playFallFx; window.__hhState = S; }
+
+/** Big floor badge + 3-step gauge on each board (match + setup). */
+function updateFloorBadges() {
+  const items = [
+    ['canvas-bot', S.me ? S.me.floor : null],
+    ['canvas-top', S.foe ? S.foe.floor : null],
+    ['setup-canvas', S.setupFloor],
+  ];
+  for (const [id, f] of items) {
+    const c = $(id);
+    const wrap = c && c.parentElement;
+    if (!wrap) continue;
+    let b = wrap.querySelector(':scope > .floor-badge');
+    if (!b) {
+      b = document.createElement('div');
+      b.className = 'floor-badge' + (id === 'canvas-top' ? ' small' : '');
+      b.innerHTML = '<b></b><span class="fg"><i>3F</i><i>2F</i><i>1F</i></span>';
+      if (getComputedStyle(wrap).position === 'static') wrap.style.position = 'relative';
+      wrap.appendChild(b);
+    }
+    if (f == null || f < 0) { b.hidden = true; continue; }
+    b.hidden = false;
+    if (b._f !== f) {
+      if (b._f != null) { b.classList.remove('bump'); void b.offsetWidth; b.classList.add('bump'); }
+      b._f = f;
+      b.querySelector('b').textContent = floorLabel(f);
+      b.querySelectorAll('i').forEach((el, i) => el.classList.toggle('on', 2 - i === f));
+    }
+  }
+}
+if (typeof window !== 'undefined') setInterval(() => { try { updateFloorBadges(); } catch (_) {} }, 120);
 
 /**
  * Pitfall drop: if not on 1F, go to floor below.
@@ -2256,6 +2334,8 @@ function onTrapHit(who, tr) {
       const victim = S.me;
       S._pitTimerMe = setTimeout(() => {
         if (victim) applyPitfallDrop(victim);
+        // Chain fall: landing on another pit triggers it too
+        if (victim && !S.ended) checkHazards(victim, S.myTriggered, (t2) => onTrapHit('me', t2), () => onChestFound('me'));
         if (S.mode && S.mode.startsWith('online') && S.net && victim) {
           S.net.send({
             type: 'pos',
@@ -2267,7 +2347,7 @@ function onTrapHit(who, tr) {
         }
       }, willEnd ? 2800 : 900);
       addFx('bot', '落とし穴！', '#aa66ff');
-      flashOverlay($('flash-bot'), '🕳 落とし穴！', 700);
+      playFallFx('bot', tr.floor, !willEnd, 900);
       if (S.myHp > 0) sfx('pit');
     } else {
       addFx('bot', '爆弾だ！', '#ff4444');
@@ -2284,9 +2364,10 @@ function onTrapHit(who, tr) {
       const victim = S.foe;
       S._pitTimerFoe = setTimeout(() => {
         if (victim) applyPitfallDrop(victim);
+        if (victim && !S.ended) checkHazards(victim, S.foeTriggered, (t2) => onTrapHit('foe', t2), () => onChestFound('foe'));
       }, willEnd ? 2800 : 900);
       addFx('top', '落とし穴作動！', '#aa66ff');
-      flashOverlay($('flash-top'), '🕳 落とし穴！', 700);
+      playFallFx('top', tr.floor, !willEnd, 900);
       if (S.foeHp > 0) sfx('pit');
     } else {
       addFx('top', '爆弾作動！', '#ffaa00');
@@ -2499,6 +2580,7 @@ function handleNetMessage(msg) {
         });
         if (msg.kind === TRAP_PIT) {
           addFx('top', '落とし穴作動！', '#aa66ff');
+          playFallFx('top', msg.floor, !willEnd, 900);
           // Floor drop arrives via later pos sync after peer's delayed drop
         } else {
           addFx('top', '爆弾作動！', '#ffaa00');
@@ -2551,7 +2633,7 @@ const TUTORIAL_STEPS = [
   },
   {
     title: '家の設計',
-    body: '宝箱1個・罠10個は必須です。\n罠は「爆弾」と「落とし穴」の2種類。\n1Fの落とし穴は下に落ちないので、爆弾向きです。',
+    body: '宝箱1個・罠10個は必須です。\n罠は「爆弾」と「落とし穴」の2種類。\n1Fの落とし穴は下に落ちないので、爆弾向きです。\n真下の階の同じマスにも落とし穴があると連続落下（1個ごとに1ダメージ）！',
     tip: '宝箱は見つかりにくい場所に隠そう。',
   },
   {
