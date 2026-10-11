@@ -1949,3 +1949,18 @@ a.btn.link-btn {
 .fall-fx.small .fall-banner { font-size:clamp(.85rem,4.2vw,1.25rem); }
 .floor-badge b { font-size:clamp(.95rem,5vw,1.4rem); }
 .floor-badge.small b { font-size:clamp(.85rem,4vw,1.15rem); }
+/* v2: straight-down drop, no rotation */
+.fall-hole { overflow:hidden; background:radial-gradient(ellipse at 50% 40%,#000 55%,#1a0a2a 70%,rgba(30,10,50,0) 74%); }
+.fall-swirl { display:none; }
+.fall-char { animation:charDrop .85s cubic-bezier(.55,0,1,.45) forwards; }
+@keyframes charDrop { 0%{transform:translate(-50%,-95%)} 20%{transform:translate(-50%,-85%)} 100%{transform:translate(-50%,160%)} }
+.fall-lines { position:absolute; inset:0; }
+.fall-lines i { position:absolute; top:0; width:3px; height:45%; border-radius:2px;
+  background:linear-gradient(to bottom,rgba(255,255,255,0),rgba(255,255,255,.85)); animation:streak .3s linear infinite; }
+.fall-lines i:nth-child(1){left:28%} .fall-lines i:nth-child(2){left:50%;animation-delay:.1s} .fall-lines i:nth-child(3){left:72%;animation-delay:.2s}
+@keyframes streak { from{transform:translateY(120%);opacity:0} 30%{opacity:1} to{transform:translateY(-120%);opacity:0} }
+@keyframes fallShake {
+  0%{transform:translate(0,0)} 10%{transform:translate(-4px,0)} 20%{transform:translate(4px,0)} 30%{transform:translate(0,0)}
+  100%{transform:translate(0,14%);filter:brightness(.35)}
+}
+@media (prefers-reduced-motion: reduce) { .fall-lines { display:none; } .fall-char { transform:translate(-50%,-50%); } }

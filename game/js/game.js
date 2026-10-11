@@ -9,14 +9,14 @@ import {
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
   HOUSE_SKINS, getHouseSkin, preloadTextures,
-} from './house.js?v=20261011165057';
-import { NetSession, QuickMatch, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20261011165057';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20261011165057';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20261011165057';
-import { hitBattleCounter, loadBattleCount } from './stats.js?v=20261011165057';
+} from './house.js?v=20261011190811';
+import { NetSession, QuickMatch, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20261011190811';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20261011190811';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20261011190811';
+import { hitBattleCounter, loadBattleCount } from './stats.js?v=20261011190811';
 
-export const GAME_VERSION = '2026-10-11 16:50:57';
-export const GAME_VERSION_BUST = '20261011165057';
+export const GAME_VERSION = '2026-10-11 19:08:11';
+export const GAME_VERSION_BUST = '20261011190811';
 export const GAME_BUILD_TIME = 1791131380525;
 
 const blueprint = createBlueprint();
@@ -240,7 +240,7 @@ function playFallFx(view, fromFloor, willDrop, delayMs = 900) {
     ? `連続落下！ ${path}${drop ? '' : ' -1'}`
     : (drop ? `落とし穴！ ${path}` : '落とし穴！ -1');
   if (chained && !drop) sfx('thud');
-  el.innerHTML = `<div class="fall-hole"><div class="fall-swirl"></div><div class="fall-char">${view === 'bot' ? '😱' : '😵'}</div></div>`
+  el.innerHTML = `<div class="fall-hole"><div class="fall-lines"><i></i><i></i><i></i></div><div class="fall-char">${view === 'bot' ? '😱' : '😵'}</div></div>`
     + `<div class="fall-banner">🕳 ${label}</div>`;
   wrap.appendChild(el);
   void wrap.offsetWidth;
@@ -262,7 +262,7 @@ function playFallFx(view, fromFloor, willDrop, delayMs = 900) {
     el.remove();
   }, delayMs + 750);
 }
-if (typeof window !== 'undefined') { window.__debugFallFx = playFallFx; window.__hhState = S; }
+if (typeof window !== 'undefined' && /[?&]debug=1\b/.test(location.search)) { window.__debugFallFx = playFallFx; window.__hhState = S; }
 
 /** Big floor badge + 3-step gauge on each board (match + setup). */
 function updateFloorBadges() {
