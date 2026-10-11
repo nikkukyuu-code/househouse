@@ -9,14 +9,14 @@ import {
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
   HOUSE_SKINS, getHouseSkin, preloadTextures,
-} from './house.js?v=20261012015050';
-import { NetSession, QuickMatch, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20261012015050';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20261012015050';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20261012015050';
-import { hitBattleCounter, loadBattleCount } from './stats.js?v=20261012015050';
+} from './house.js?v=20261012024326';
+import { NetSession, QuickMatch, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20261012024326';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20261012024326';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20261012024326';
+import { hitBattleCounter, loadBattleCount } from './stats.js?v=20261012024326';
 
-export const GAME_VERSION = '2026-10-12 01:50:50';
-export const GAME_VERSION_BUST = '20261012015050';
+export const GAME_VERSION = '2026-10-12 02:43:26';
+export const GAME_VERSION_BUST = '20261012024326';
 export const GAME_BUILD_TIME = 1791131380525;
 
 const blueprint = createBlueprint();
@@ -264,7 +264,7 @@ function playFallFx(view, fromFloor, willDrop, delayMs = 900) {
   }, delayMs);
   wrap._fallT2 = setTimeout(() => el.remove(), delayMs + 600);
 }
-if (typeof window !== 'undefined' && /[?&]debug=1\b/.test(location.search)) { window.__debugFallFx = playFallFx; window.__hhState = S; window.__hh = { S, endGame, startMatch, tryMove, checkHazards, onTrapHit, isWalkable, tileAt, blueprint: () => blueprint, aiStep }; }
+if (typeof window !== 'undefined' && /[?&]debug=1\b/.test(location.search)) { window.__debugFallFx = playFallFx; window.__hhState = S; window.__hh = { S, T, endGame, startMatch, generateComHouse, dropFromTrap, aiBoostDangerAround, aiFloorUnvisited, FLOORS, tryMove, checkHazards, onTrapHit, isWalkable, tileAt, blueprint: () => blueprint, aiStep }; }
 
 /** Big floor badge + 3-step gauge on each board (match + setup). */
 function updateFloorBadges() {
@@ -1017,7 +1017,42 @@ function aiNeighbors(floor, x, y) {
 }
 
 /** Walkable cells on a floor that are not yet in visited. */
+/** Walkable cells reachable on a floor from its stairs (or spawn on 1F). Static map only. */
+const _aiReachCache = new Map();
+function aiReachable(floor) {
+  if (_aiReachCache.has(floor)) return _aiReachCache.get(floor);
+  const seeds = [];
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+    const t = tileAt(blueprint, floor, x, y);
+    if (t === T.STAIRS_UP || t === T.STAIRS_DOWN) seeds.push([x, y]);
+  }
+  if (floor === 0) { const sp = getSpawn(); seeds.push([sp.x, sp.y]); }
+  const seen = new Set();
+  const q = seeds.filter(([x, y]) => isWalkable(tileAt(blueprint, floor, x, y)));
+  q.forEach(([x, y]) => seen.add(`${x},${y}`));
+  while (q.length) {
+    const [x, y] = q.shift();
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx, ny = y + dy, k = `${nx},${ny}`;
+      if (seen.has(k) || !isWalkable(tileAt(blueprint, floor, nx, ny))) continue;
+      seen.add(k); q.push([nx, ny]);
+    }
+  }
+  _aiReachCache.set(floor, seen);
+  return seen;
+}
+
+/** Unvisited, reachable, non-stairs cells (stairs are never exploration goals). */
 function aiFloorUnvisited(floor, visited) {
+  const reach = aiReachable(floor);
+  return aiFloorUnvisitedRaw(floor, visited).filter((c) => {
+    if (!reach.has(`${c.x},${c.y}`)) return false;
+    const t = tileAt(blueprint, floor, c.x, c.y);
+    return t !== T.STAIRS_UP && t !== T.STAIRS_DOWN;
+  });
+}
+
+function aiFloorUnvisitedRaw(floor, visited) {
   const cells = [];
   for (let y = 0; y < ROWS; y++) {
     for (let x = 0; x < COLS; x++) {
@@ -1504,8 +1539,13 @@ function aiStep(ex) {
     if (aiApplyStep(ex, step)) return true;
   }
 
-  // 2) Floor fully explored (or BFS failed): prefer stairs UP to clear higher floors
-  if (ex.floor < FLOORS - 1) {
+  // 2) Floor fully explored (or BFS failed): go UP only if a higher floor still has
+  //    unexplored tiles (otherwise 2F↔3F ping-pong when only 1F is left).
+  let upperHasUnvis = false;
+  for (let f = ex.floor + 1; f < FLOORS; f++) {
+    if (aiFloorUnvisited(f, ex.visited).length) { upperHasUnvis = true; break; }
+  }
+  if (ex.floor < FLOORS - 1 && upperHasUnvis) {
     if (aiTakeStairsIfNeeded(ex, ex.floor + 1)) return true;
     const up = aiFindTile(ex.floor, T.STAIRS_UP);
     if (up) {
@@ -1531,7 +1571,7 @@ function aiStep(ex) {
       if (aiFloorUnvisited(f, ex.visited).length) { anyOtherUnvis = true; break; }
     }
   }
-  if (anyOtherUnvis && ex.floor > 0) {
+  if (lowerHasUnvis && ex.floor > 0) {
     if (aiTakeStairsIfNeeded(ex, ex.floor - 1)) return true;
     const down = aiFindTile(ex.floor, T.STAIRS_DOWN);
     if (down) {
