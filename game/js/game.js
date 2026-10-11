@@ -9,14 +9,14 @@ import {
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
   HOUSE_SKINS, getHouseSkin, preloadTextures,
-} from './house.js?v=20261012011340';
-import { NetSession, QuickMatch, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20261012011340';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20261012011340';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20261012011340';
-import { hitBattleCounter, loadBattleCount } from './stats.js?v=20261012011340';
+} from './house.js?v=20261012013155';
+import { NetSession, QuickMatch, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20261012013155';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20261012013155';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20261012013155';
+import { hitBattleCounter, loadBattleCount } from './stats.js?v=20261012013155';
 
-export const GAME_VERSION = '2026-10-12 01:13:40';
-export const GAME_VERSION_BUST = '20261012011340';
+export const GAME_VERSION = '2026-10-12 01:31:55';
+export const GAME_VERSION_BUST = '20261012013155';
 export const GAME_BUILD_TIME = 1791131380525;
 
 const blueprint = createBlueprint();
@@ -361,12 +361,13 @@ function applyPitfallDrop(ex) {
   return true;
 }
 
-function checkHazards(ex, triggeredSet, onTrap, onChest) {
+function checkHazards(ex, triggeredSet, onTrap, onChest, onlyKind) {
   const h = ex.house;
   if (!h) return;
   for (const raw of h.traps) {
     const tr = normalizeTrap(raw);
     if (!tr) continue;
+    if (onlyKind && tr.kind !== onlyKind) continue;
     if (tr.floor === ex.floor && tr.x === ex.x && tr.y === ex.y) {
       const key = `${tr.floor},${tr.x},${tr.y}`;
       if (!triggeredSet.has(key)) {
@@ -2312,6 +2313,22 @@ function showResultScreen(iWon, reasonText) {
 }
 
 /* ---------- Match loop ---------- */
+/** After any trap: freeze that character for the whole hit effect, and drop held input. */
+const TRAP_LOCK_MS = 1450;
+function lockAfterTrap(who) {
+  const until = performance.now() + TRAP_LOCK_MS;
+  if (who === 'me') {
+    S._lockMeUntil = until;
+    S.holdDir = null;          // a held d-pad / key must be pressed again
+    S._holdCancelled = true;
+  } else {
+    S._lockFoeUntil = until;
+  }
+}
+function isTrapLocked(who) {
+  return performance.now() < ((who === 'me' ? S._lockMeUntil : S._lockFoeUntil) || 0);
+}
+
 function onTrapHit(who, tr) {
   const kind = tr.kind === TRAP_PIT ? TRAP_PIT : TRAP_BOMB;
   const isPit = kind === TRAP_PIT;
@@ -2342,14 +2359,12 @@ function onTrapHit(who, tr) {
       clearTimeout(S._pitTimerMe);
       const victim = S.me;
       // Lock input until the drop resolves (prevents walking onto other pits mid-fall)
-      S._fallLockMe = true;
-      S.holdDir = null;
+      lockAfterTrap('me');
       S._holdCancelled = true;
       S._pitTimerMe = setTimeout(() => {
-        S._fallLockMe = false;
         if (victim && dropFromTrap(victim, tr) && !S.ended) {
           // Chain fall: only the pit directly below (same x,y) can trigger
-          checkHazards(victim, S.myTriggered, (t2) => onTrapHit('me', t2), () => onChestFound('me'));
+          checkHazards(victim, S.myTriggered, (t2) => onTrapHit('me', t2), () => onChestFound('me'), TRAP_PIT);
         }
         if (S.mode && S.mode.startsWith('online') && S.net && victim) {
           S.net.send({
@@ -2365,11 +2380,7 @@ function onTrapHit(who, tr) {
       playFallFx('bot', tr.floor, !willEnd, 900);
       if (S.myHp > 0) sfx('pit');
     } else {
-      S.holdDir = null;
-      S._holdCancelled = true;
-      S._fallLockMe = true;
-      clearTimeout(S._pitTimerMe);
-      S._pitTimerMe = setTimeout(() => { S._fallLockMe = false; }, 600);
+      lockAfterTrap('me');
       addFx('bot', '爆弾だ！', '#ff4444');
       flashOverlay($('flash-bot'), '💥 爆弾！', 600);
       if (S.myHp > 0) sfx('trap');
@@ -2382,20 +2393,17 @@ function onTrapHit(who, tr) {
     if (isPit && S.foe) {
       clearTimeout(S._pitTimerFoe);
       const victim = S.foe;
-      S._fallLockFoe = true;
+      lockAfterTrap('foe');
       S._pitTimerFoe = setTimeout(() => {
-        S._fallLockFoe = false;
         if (victim && dropFromTrap(victim, tr) && !S.ended) {
-          checkHazards(victim, S.foeTriggered, (t2) => onTrapHit('foe', t2), () => onChestFound('foe'));
+          checkHazards(victim, S.foeTriggered, (t2) => onTrapHit('foe', t2), () => onChestFound('foe'), TRAP_PIT);
         }
       }, willEnd ? 2800 : 900);
       addFx('top', '落とし穴作動！', '#aa66ff');
       playFallFx('top', tr.floor, !willEnd, 900);
       if (S.foeHp > 0) sfx('pit');
     } else {
-      S._fallLockFoe = true;
-      clearTimeout(S._pitTimerFoe);
-      S._pitTimerFoe = setTimeout(() => { S._fallLockFoe = false; }, 600);
+      lockAfterTrap('foe');
       addFx('top', '爆弾作動！', '#ffaa00');
       flashOverlay($('flash-top'), '💥 爆弾作動！', 600);
       if (S.foeHp > 0) sfx('trap');
@@ -2453,7 +2461,7 @@ function onChestFound(who) {
 
 function applyMoveFromInput() {
   if (S.ended || !S.me) return;
-  if (S._fallLockMe) return;
+  if (isTrapLocked('me')) return;
   if (!S.holdDir) return;
   if (S.moveCooldown > 0) return;
   const map = { u: [0, -1], d: [0, 1], l: [-1, 0], r: [1, 0] };
@@ -2526,7 +2534,7 @@ function tick(ts) {
 
     if ((S.mode === 'local' || S.mode === 'com') && S.foe) {
       aiTimer += dt;
-      if (!S._fallLockFoe && aiTimer > Math.max(MOVE_COOLDOWN_MS, aiStepIntervalMs())) {
+      if (!isTrapLocked('foe') && aiTimer > Math.max(MOVE_COOLDOWN_MS, aiStepIntervalMs())) {
         aiTimer = 0;
         aiStep(S.foe);
         checkHazards(S.foe, S.foeTriggered, (tr) => onTrapHit('foe', tr), () => onChestFound('foe'));
@@ -3067,8 +3075,8 @@ function startMatch() {
   S.foeHp = MAX_HP;
   S.myTriggered = new Set();
   S.foeTriggered = new Set();
-  S._fallLockMe = false;
-  S._fallLockFoe = false;
+  S._lockMeUntil = 0;
+  S._lockFoeUntil = 0;
   S.fx = [];
   S.holdDir = null;
   S.moveCooldown = 0;
