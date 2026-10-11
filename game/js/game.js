@@ -9,14 +9,14 @@ import {
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
   HOUSE_SKINS, getHouseSkin, preloadTextures,
-} from './house.js?v=20261011190811';
-import { NetSession, QuickMatch, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20261011190811';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20261011190811';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20261011190811';
-import { hitBattleCounter, loadBattleCount } from './stats.js?v=20261011190811';
+} from './house.js?v=20261011210433';
+import { NetSession, QuickMatch, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20261011210433';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20261011210433';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20261011210433';
+import { hitBattleCounter, loadBattleCount } from './stats.js?v=20261011210433';
 
-export const GAME_VERSION = '2026-10-11 19:08:11';
-export const GAME_VERSION_BUST = '20261011190811';
+export const GAME_VERSION = '2026-10-11 21:04:33';
+export const GAME_VERSION_BUST = '20261011210433';
 export const GAME_BUILD_TIME = 1791131380525;
 
 const blueprint = createBlueprint();
@@ -2633,7 +2633,7 @@ const TUTORIAL_STEPS = [
   },
   {
     title: '家の設計',
-    body: '宝箱1個・罠10個は必須です。\n罠は「爆弾」と「落とし穴」の2種類。\n1Fの落とし穴は下に落ちないので、爆弾向きです。\n真下の階の同じマスにも落とし穴があると連続落下（1個ごとに1ダメージ）！',
+    body: '宝箱1個・罠10個は必須です。\n罠は「爆弾」（ハート1.5個）と「落とし穴」（ハート1個）の2種類。\n1Fの落とし穴は下に落ちないので、爆弾向きです。\n真下の階の同じマスにも落とし穴があると連続落下（1個ごとに1ダメージ）！',
     tip: '宝箱は見つかりにくい場所に隠そう。',
   },
   {
