@@ -9,14 +9,14 @@ import {
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
   HOUSE_SKINS, getHouseSkin, preloadTextures,
-} from './house.js?v=20261012024326';
-import { NetSession, QuickMatch, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20261012024326';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20261012024326';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20261012024326';
-import { hitBattleCounter, loadBattleCount } from './stats.js?v=20261012024326';
+} from './house.js?v=20261012031814';
+import { NetSession, QuickMatch, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20261012031814';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20261012031814';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20261012031814';
+import { hitBattleCounter, loadBattleCount } from './stats.js?v=20261012031814';
 
-export const GAME_VERSION = '2026-10-12 02:43:26';
-export const GAME_VERSION_BUST = '20261012024326';
+export const GAME_VERSION = '2026-10-12 03:18:14';
+export const GAME_VERSION_BUST = '20261012031814';
 export const GAME_BUILD_TIME = 1791131380525;
 
 const blueprint = createBlueprint();
@@ -246,13 +246,32 @@ function playFallFx(view, fromFloor, willDrop, delayMs = 900) {
   const color = view === 'bot' ? COLORS.player1 : COLORS.player2;
   const el = document.createElement('div');
   el.className = 'fall-fx' + (view === 'top' ? ' small' : '') + (drop ? '' : ' nodrop') + (chained ? ' chained' : '');
-  const face = '<svg viewBox="0 0 40 40" aria-hidden="true">'
-    + '<path d="M8 11 Q13 6 18 10 M22 10 Q27 6 32 11" stroke="#222" stroke-width="2.4" fill="none" stroke-linecap="round"/>'
-    + '<circle cx="13" cy="17" r="5" fill="#fff" stroke="#222" stroke-width="1.5"/><circle cx="27" cy="17" r="5" fill="#fff" stroke="#222" stroke-width="1.5"/>'
-    + '<circle cx="13" cy="17" r="2" fill="#111"/><circle cx="27" cy="17" r="2" fill="#111"/>'
-    + '<ellipse cx="20" cy="29" rx="3.6" ry="4.6" fill="#3a0d0d" stroke="#222" stroke-width="1.2"/>'
-    + '<path d="M34 4 Q37 9 34 11 Q31 9 34 4Z" fill="#7fd3ff" stroke="#2a6f9a" stroke-width=".8"/></svg>';
-  el.innerHTML = `<div class="fall-bang">!</div><div class="fall-hole"><div class="fall-char" style="background:${color}">${face}</div></div>`
+  const shade = (hex, amt) => {
+    const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ''));
+    if (!m) return hex;
+    const n = parseInt(m[1], 16);
+    const c = (v) => Math.max(0, Math.min(255, v + amt));
+    return `rgb(${c(n >> 16)},${c((n >> 8) & 255)},${c(n & 255)})`;
+  };
+  // Full body in a panicked "banzai" pose, same look as the board piece (cap, skin head, body, legs)
+  const body = '<svg viewBox="0 0 40 68" aria-hidden="true">'
+    // arms raised
+    + `<path d="M11 33 L4 13 M29 33 L36 13" stroke="${color}" stroke-width="5" stroke-linecap="round"/>`
+    + '<circle cx="4" cy="12" r="3" fill="#f5d0b0"/><circle cx="36" cy="12" r="3" fill="#f5d0b0"/>'
+    // legs dangling
+    + `<rect x="12" y="50" width="6" height="15" rx="3" fill="${shade(color, -40)}"/><rect x="22" y="50" width="6" height="15" rx="3" fill="${shade(color, -40)}"/>`
+    // body
+    + `<rect x="9" y="31" width="22" height="21" rx="6" fill="${color}"/><rect x="12" y="33" width="14" height="5" rx="2.5" fill="rgba(255,255,255,.28)"/>`
+    // head + cap
+    + '<circle cx="20" cy="20" r="11" fill="#f5d0b0" stroke="#c89070" stroke-width="1"/>'
+    + `<path d="M9.5 17 A10.5 10.5 0 0 1 30.5 17 Z" fill="${shade(color, -25)}"/>`
+    // surprised face
+    + '<path d="M12 15.5 Q15 13 17.5 15 M22.5 15 Q25 13 28 15.5" stroke="#222" stroke-width="1.4" fill="none" stroke-linecap="round"/>'
+    + '<circle cx="15" cy="20" r="3" fill="#fff" stroke="#222" stroke-width="1"/><circle cx="25" cy="20" r="3" fill="#fff" stroke="#222" stroke-width="1"/>'
+    + '<circle cx="15" cy="20" r="1.3" fill="#111"/><circle cx="25" cy="20" r="1.3" fill="#111"/>'
+    + '<ellipse cx="20" cy="27" rx="2.2" ry="2.8" fill="#3a0d0d"/>'
+    + '<path d="M32 8 Q34.5 12 32 13.5 Q29.5 12 32 8Z" fill="#7fd3ff" stroke="#2a6f9a" stroke-width=".6"/></svg>';
+  el.innerHTML = `<div class="fall-bang">!</div><div class="fall-hole"><div class="fall-clip"><div class="fall-body">${body}</div></div></div>`
     + `<div class="fall-banner">${label}</div>`;
   wrap.appendChild(el);
   if (drop) sfx('fall'); else if (chained) sfx('thud');

@@ -2031,3 +2031,16 @@ a.btn.link-btn {
 #result-overlay .btn-col { margin-top: auto; padding-top: 4px; }
 #result-overlay:not(.lose) .btn-col { margin-top: 6px; }
 @media (max-height: 600px) { #result-chest-canvas { max-height: max(60px, 17dvh); } #result-reason { padding: 6px 10px; } }
+/* v6: full body falls feet-first into the hole (clipped at the hole's rim) */
+.fall-hole { overflow: visible; position: relative; width: min(30%, 124px); aspect-ratio: 1.6; border-radius: 50%; margin-top: min(18%, 70px); }
+.fall-fx.small .fall-hole { margin-top: min(14%, 46px); }
+.fall-clip { position: absolute; left: 6%; right: 6%; bottom: 45%; height: 320%; overflow: hidden;
+  border-radius: 0 0 50% 50% / 0 0 12% 12%; pointer-events: none; }
+.fall-body { position: absolute; left: 50%; bottom: -6%; width: 62%; transform: translateX(-50%);
+  animation: bodyDrop .85s cubic-bezier(.55,0,1,.45) both; }
+.fall-body svg { display: block; width: 100%; height: auto; overflow: visible; }
+@keyframes bodyDrop { 0%,18% { transform: translate(-50%, 0); } 100% { transform: translate(-50%, 115%); } }
+.fall-fx.nodrop .fall-body { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .fall-body { animation: fadeOut .3s .55s both !important; transform: translateX(-50%); }
+}
