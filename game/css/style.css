@@ -1964,3 +1964,19 @@ a.btn.link-btn {
   100%{transform:translate(0,14%);filter:brightness(.35)}
 }
 @media (prefers-reduced-motion: reduce) { .fall-lines { display:none; } .fall-char { transform:translate(-50%,-50%); } }
+/* v3: simple straight drop only */
+.fall-fx .fall-lines, .fall-fx .fall-dust, .fall-fx .fall-floor, .fall-fx .fall-swirl { display:none; }
+.match-canvas-wrap.fall-shake canvas, .match-canvas-wrap.fall-land canvas { animation:none; }
+.fall-hole { width:min(26%,110px); aspect-ratio:1; overflow:hidden; border-radius:50%;
+  background:radial-gradient(circle,#000 60%,rgba(0,0,0,.6) 68%,rgba(0,0,0,0) 72%); animation:holeOpen .2s ease-out; }
+.fall-char { width:44%; height:44%; border-radius:50%; border:3px solid #fff; box-sizing:border-box; font-size:0;
+  animation:charDrop .7s cubic-bezier(.55,0,1,.45) .15s both; }
+@keyframes charDrop { 0%{transform:translate(-50%,-50%)} 100%{transform:translate(-50%,180%)} }
+.fall-fx.nodrop .fall-char { animation:none; transform:translate(-50%,-50%); }
+.fall-banner { background:rgba(0,0,0,.8); border:none; border-radius:8px; padding:3px 12px; animation:none; font-size:clamp(.95rem,4.6vw,1.4rem); }
+.fall-fx.small .fall-banner { font-size:clamp(.8rem,3.8vw,1.1rem); }
+@media (prefers-reduced-motion: reduce) {
+  .fall-char { animation:fadeOut .3s .5s both !important; transform:translate(-50%,-50%); }
+}
+@keyframes fadeOut { to{opacity:0} }
+.floor-badge { top:auto; bottom:4px; }
