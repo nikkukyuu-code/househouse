@@ -2044,3 +2044,20 @@ a.btn.link-btn {
 @media (prefers-reduced-motion: reduce) {
   .fall-body { animation: fadeOut .3s .55s both !important; transform: translateX(-50%); }
 }
+/* v7: drop-in landing from the top of the board */
+.fall-land { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.fall-land-body { position: absolute; left: 50%; bottom: 50%; width: min(17%, 70px); margin-left: calc(min(17%, 70px) / -2);
+  transform-origin: 50% 100%; animation: landIn .45s cubic-bezier(.5,0,1,.6) both; }
+.fall-fx.small .fall-land-body { width: min(15%, 56px); margin-left: calc(min(15%, 56px) / -2); }
+.fall-land-body svg { display: block; width: 100%; height: auto; }
+@keyframes landIn {
+  0% { transform: translateY(-260%); }
+  62% { transform: translateY(0) scale(1, 1); }
+  74% { transform: translateY(0) scale(1.18, .78); }
+  88% { transform: translateY(-8%) scale(.96, 1.05); }
+  100% { transform: translateY(0) scale(1, 1); }
+}
+.fall-fx.landed .fall-hole, .fall-fx.landed .fall-bang { opacity: 0; transition: opacity .12s; }
+@media (prefers-reduced-motion: reduce) {
+  .fall-land-body { animation: fadeIn .25s both !important; }
+}

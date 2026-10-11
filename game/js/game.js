@@ -9,14 +9,14 @@ import {
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
   HOUSE_SKINS, getHouseSkin, preloadTextures,
-} from './house.js?v=20261012031814';
-import { NetSession, QuickMatch, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20261012031814';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20261012031814';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20261012031814';
-import { hitBattleCounter, loadBattleCount } from './stats.js?v=20261012031814';
+} from './house.js?v=20261012033924';
+import { NetSession, QuickMatch, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20261012033924';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20261012033924';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20261012033924';
+import { hitBattleCounter, loadBattleCount } from './stats.js?v=20261012033924';
 
-export const GAME_VERSION = '2026-10-12 03:18:14';
-export const GAME_VERSION_BUST = '20261012031814';
+export const GAME_VERSION = '2026-10-12 03:39:24';
+export const GAME_VERSION_BUST = '20261012033924';
 export const GAME_BUILD_TIME = 1791131380525;
 
 const blueprint = createBlueprint();
@@ -217,6 +217,8 @@ function updateChestAlarms() {
   S.chestAlarm = { top, bot: false };
 }
 
+const FALL_LAND_MS = 450;
+
 /** Simple pitfall presentation: hole + character drops straight down, short banner. */
 function playFallFx(view, fromFloor, willDrop, delayMs = 900) {
   const canvas = $(view === 'bot' ? 'canvas-bot' : 'canvas-top');
@@ -231,7 +233,7 @@ function playFallFx(view, fromFloor, willDrop, delayMs = 900) {
   const chain = chained ? wrap._chain.slice() : [fromFloor];
   if (drop) chain.push(fromFloor - 1);
   wrap._chain = chain;
-  wrap._chainUntil = Date.now() + delayMs + 400;
+  wrap._chainUntil = Date.now() + delayMs + FALL_LAND_MS + 400;
   let label;
   if (chain.length > 1) {
     const last = chain.length - 1;
@@ -275,13 +277,17 @@ function playFallFx(view, fromFloor, willDrop, delayMs = 900) {
     + `<div class="fall-banner">${label}</div>`;
   wrap.appendChild(el);
   if (drop) sfx('fall'); else if (chained) sfx('thud');
+  if (!S._fallHide) S._fallHide = {};
+  if (drop) S._fallHide[view] = performance.now() + delayMs + FALL_LAND_MS;
   if (drop) wrap._fallT1 = setTimeout(() => {
-    sfx('thud');
     el.classList.add('landed');
+    // Same figure drops in from the top of the board onto the landing tile (board centre = focus cell)
+    el.insertAdjacentHTML('beforeend', `<div class="fall-land"><div class="fall-land-body">${body}</div></div>`);
+    setTimeout(() => sfx('thud'), FALL_LAND_MS * 0.6);
     const badge = wrap.querySelector(':scope > .floor-badge');
     if (badge) { badge.classList.remove('fallpulse'); void badge.offsetWidth; badge.classList.add('fallpulse'); }
   }, delayMs);
-  wrap._fallT2 = setTimeout(() => el.remove(), delayMs + 600);
+  wrap._fallT2 = setTimeout(() => el.remove(), delayMs + (drop ? FALL_LAND_MS + 30 : 600));
 }
 if (typeof window !== 'undefined' && /[?&]debug=1\b/.test(location.search)) { window.__debugFallFx = playFallFx; window.__hhState = S; window.__hh = { S, T, endGame, startMatch, generateComHouse, dropFromTrap, aiBoostDangerAround, aiFloorUnvisited, FLOORS, tryMove, checkHazards, onTrapHit, isWalkable, tileAt, blueprint: () => blueprint, aiStep }; }
 
@@ -1982,6 +1988,8 @@ function redrawMatchView(ctx, canvas, explorer, houseShown, showSecrets, trigger
 
   const color = isOpponentView ? COLORS.player2 : COLORS.player1;
   const pulse = S.time * 0.008;
+  // While the DOM fall/landing figure is shown, don't draw the board piece (no duplicate)
+  const pieceHidden = performance.now() < ((S._fallHide && S._fallHide[isOpponentView ? 'top' : 'bot']) || 0);
 
   if (hero) {
     // Giant character + chest/trap at the hit cell
@@ -2000,14 +2008,14 @@ function redrawMatchView(ctx, canvas, explorer, houseShown, showSecrets, trigger
     ctx.fill();
     if (hero.kind === 'chest') {
       drawChestSprite(ctx, -cs / 2, -cs / 2, cs);
-    } else {
+    } else if (hero.kind !== 'land') {
       const tr = { floor: hero.floor, x: hero.x, y: hero.y, kind: hero.trapKind || TRAP_BOMB };
       drawTrapSprite(ctx, tr, true, -cs / 2, -cs / 2, cs);
     }
     // Character slightly above the object
-    drawPlayer(ctx, 0, 0, color, -cs / 2, -cs / 2 - cs * 0.08, cs, pulse);
+    if (!pieceHidden) drawPlayer(ctx, 0, 0, color, -cs / 2, -cs / 2 - cs * 0.08, cs, pulse);
     ctx.restore();
-  } else {
+  } else if (!pieceHidden) {
     drawPlayer(ctx, explorer.x, explorer.y, color, ox, oy, cs, pulse);
   }
 
@@ -2421,9 +2429,16 @@ function onTrapHit(who, tr) {
       lockAfterTrap('me');
       S._holdCancelled = true;
       S._pitTimerMe = setTimeout(() => {
-        if (victim && dropFromTrap(victim, tr) && !S.ended) {
+        const dropped = victim && dropFromTrap(victim, tr);
+        // Camera stays on the cell but now shows the lower floor (no pit sprite there)
+        if (dropped && S.heroFocus && S.heroFocus.kind === 'trap' && S.heroFocus.x === tr.x && S.heroFocus.y === tr.y) { S.heroFocus.floor = victim.floor; S.heroFocus.kind = 'land'; }
+        if (dropped && !S.ended) {
           // Chain fall: only the pit directly below (same x,y) can trigger
-          checkHazards(victim, S.myTriggered, (t2) => onTrapHit('me', t2), () => onChestFound('me'), TRAP_PIT);
+          // wait for the drop-in landing animation before the next pit fires
+          clearTimeout(S._chainTimerMe);
+          S._chainTimerMe = setTimeout(() => {
+            if (!S.ended && S.me === victim) checkHazards(victim, S.myTriggered, (t2) => onTrapHit('me', t2), () => onChestFound('me'), TRAP_PIT);
+          }, FALL_LAND_MS);
         }
         if (S.mode && S.mode.startsWith('online') && S.net && victim) {
           S.net.send({
@@ -2454,8 +2469,14 @@ function onTrapHit(who, tr) {
       const victim = S.foe;
       lockAfterTrap('foe');
       S._pitTimerFoe = setTimeout(() => {
-        if (victim && dropFromTrap(victim, tr) && !S.ended) {
-          checkHazards(victim, S.foeTriggered, (t2) => onTrapHit('foe', t2), () => onChestFound('foe'), TRAP_PIT);
+        const dropped = victim && dropFromTrap(victim, tr);
+        // Camera stays on the cell but now shows the lower floor (no pit sprite there)
+        if (dropped && S.heroFocus && S.heroFocus.kind === 'trap' && S.heroFocus.x === tr.x && S.heroFocus.y === tr.y) { S.heroFocus.floor = victim.floor; S.heroFocus.kind = 'land'; }
+        if (dropped && !S.ended) {
+          clearTimeout(S._chainTimerFoe);
+          S._chainTimerFoe = setTimeout(() => {
+            if (!S.ended && S.foe === victim) checkHazards(victim, S.foeTriggered, (t2) => onTrapHit('foe', t2), () => onChestFound('foe'), TRAP_PIT);
+          }, FALL_LAND_MS);
         }
       }, willEnd ? 2800 : 900);
       addFx('top', '落とし穴作動！', '#aa66ff');
@@ -3178,6 +3199,9 @@ function startMatch() {
   S.lastTrapHit = null;
   clearTimeout(S._pitTimerMe);
   clearTimeout(S._pitTimerFoe);
+  clearTimeout(S._chainTimerMe);
+  clearTimeout(S._chainTimerFoe);
+  S._fallHide = {};
   clearTimeout(S._bannerTimer);
   clearTimeout(S._setupDoneTimer);
   const matchEl = $('screen-match');
