@@ -1994,3 +1994,24 @@ a.btn.link-btn {
   .fall-char { animation:fadeOut .3s .55s both !important; transform:translate(-50%,-50%); }
   .fall-bang { animation:fadeOut .3s .55s both !important; }
 }
+/* v5: emphasized floors */
+.fall-banner { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:2px 8px; max-width:96%; }
+.fb-title { font-size:.8em; }
+.fb-floors { display:inline-flex; align-items:center; gap:2px; }
+.fb-floors span { font-family:inherit; font-weight:900; line-height:1; }
+.fb-from { color:#ffe9a0; font-size:1.15em; -webkit-text-stroke:1px #000; }
+.fb-arr { color:#ffe14d; font-size:1.1em; }
+.fb-to { color:#ffe14d; font-size:1.75em; -webkit-text-stroke:1.5px #000; paint-order:stroke fill;
+  text-shadow:0 0 6px rgba(255,225,77,.7),0 2px 0 #000; }
+.fb-new { display:inline-block; animation:fbPop .35s cubic-bezier(.2,1.7,.4,1) both; }
+.fall-banner { animation:bannerPop .3s cubic-bezier(.2,1.6,.4,1) both; }
+.fall-fx.chained .fall-banner { animation:none; }
+.fall-fx.landed .fb-to { animation:fbPop .3s cubic-bezier(.2,1.7,.4,1); }
+.fall-fx.small .fall-banner { font-size:clamp(.8rem,3.8vw,1.05rem); }
+@keyframes fbPop { 0%{transform:scale(.3);opacity:0} 100%{transform:scale(1);opacity:1} }
+.floor-badge { transform-origin:left bottom; }
+.floor-badge.fallpulse { animation:badgePulse .7s ease-out; }
+@keyframes badgePulse { 0%{transform:scale(1)} 25%{transform:scale(1.5);box-shadow:0 0 22px #ffe14d} 100%{transform:scale(1)} }
+@media (prefers-reduced-motion: reduce) {
+  .fb-new, .fall-banner, .fall-fx.landed .fb-to, .floor-badge.fallpulse { animation:none !important; }
+}

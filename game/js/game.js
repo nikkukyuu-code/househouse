@@ -9,14 +9,14 @@ import {
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
   HOUSE_SKINS, getHouseSkin, preloadTextures,
-} from './house.js?v=20261012004909';
-import { NetSession, QuickMatch, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20261012004909';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20261012004909';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20261012004909';
-import { hitBattleCounter, loadBattleCount } from './stats.js?v=20261012004909';
+} from './house.js?v=20261012011340';
+import { NetSession, QuickMatch, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20261012011340';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20261012011340';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20261012011340';
+import { hitBattleCounter, loadBattleCount } from './stats.js?v=20261012011340';
 
-export const GAME_VERSION = '2026-10-12 00:49:09';
-export const GAME_VERSION_BUST = '20261012004909';
+export const GAME_VERSION = '2026-10-12 01:13:40';
+export const GAME_VERSION_BUST = '20261012011340';
 export const GAME_BUILD_TIME = 1791131380525;
 
 const blueprint = createBlueprint();
@@ -232,13 +232,20 @@ function playFallFx(view, fromFloor, willDrop, delayMs = 900) {
   if (drop) chain.push(fromFloor - 1);
   wrap._chain = chain;
   wrap._chainUntil = Date.now() + delayMs + 400;
-  const path = chain.map(floorLabel).join('→');
-  const label = chained
-    ? `連続落下！ ${path}${drop ? '' : ' -1'}`
-    : (drop ? `落とし穴！ ${path}` : '落とし穴！ -1');
+  let label;
+  if (chain.length > 1) {
+    const last = chain.length - 1;
+    const parts = chain.map((f, i) => {
+      const cls = i === last ? 'fb-to' + (chained || chain.length === 2 ? ' fb-new' : '') : 'fb-from';
+      return `<span class="${cls}">${floorLabel(f)}</span>`;
+    }).join('<span class="fb-arr">↓</span>');
+    label = `<span class="fb-title">${chained ? '連続落下！' : '落とし穴！'}</span><span class="fb-floors">${parts}</span>${drop ? '' : '<span class="fb-title"> -1</span>'}`;
+  } else {
+    label = '<span class="fb-title">落とし穴！ -1</span>';
+  }
   const color = view === 'bot' ? COLORS.player1 : COLORS.player2;
   const el = document.createElement('div');
-  el.className = 'fall-fx' + (view === 'top' ? ' small' : '') + (drop ? '' : ' nodrop');
+  el.className = 'fall-fx' + (view === 'top' ? ' small' : '') + (drop ? '' : ' nodrop') + (chained ? ' chained' : '');
   const face = '<svg viewBox="0 0 40 40" aria-hidden="true">'
     + '<path d="M8 11 Q13 6 18 10 M22 10 Q27 6 32 11" stroke="#222" stroke-width="2.4" fill="none" stroke-linecap="round"/>'
     + '<circle cx="13" cy="17" r="5" fill="#fff" stroke="#222" stroke-width="1.5"/><circle cx="27" cy="17" r="5" fill="#fff" stroke="#222" stroke-width="1.5"/>'
@@ -249,8 +256,13 @@ function playFallFx(view, fromFloor, willDrop, delayMs = 900) {
     + `<div class="fall-banner">${label}</div>`;
   wrap.appendChild(el);
   if (drop) sfx('fall'); else if (chained) sfx('thud');
-  if (drop) wrap._fallT1 = setTimeout(() => sfx('thud'), delayMs);
-  wrap._fallT2 = setTimeout(() => el.remove(), delayMs + 500);
+  if (drop) wrap._fallT1 = setTimeout(() => {
+    sfx('thud');
+    el.classList.add('landed');
+    const badge = wrap.querySelector(':scope > .floor-badge');
+    if (badge) { badge.classList.remove('fallpulse'); void badge.offsetWidth; badge.classList.add('fallpulse'); }
+  }, delayMs);
+  wrap._fallT2 = setTimeout(() => el.remove(), delayMs + 600);
 }
 if (typeof window !== 'undefined' && /[?&]debug=1\b/.test(location.search)) { window.__debugFallFx = playFallFx; window.__hhState = S; window.__hh = { S, startMatch, tryMove, checkHazards, onTrapHit, isWalkable, tileAt, blueprint: () => blueprint, aiStep }; }
 
