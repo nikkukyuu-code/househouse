@@ -2037,3 +2037,6 @@ a.btn.link-btn {
 @media (prefers-reduced-motion: reduce) {
   .fall-land-body { animation: fadeIn .25s both !important; }
 }
+/* フリーゲーム夢現 link in the title footer row */
+.title-footer-row .btn-compact { flex: 1 1 0; }
+.title-footer-row .mugen-btn { flex: 1.9 1 0; letter-spacing: 0; font-size: clamp(0.68rem, 1.75vh, 0.86rem); }

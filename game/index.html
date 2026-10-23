@@ -6,7 +6,7 @@
 <!--nk-autoupdate--><script>
 /* 自動更新: 新しい版が公開されたら、安全なとき（タイトル画面など・試合中でない）だけ自動で読み込み直す。記録(localStorage)には触れない。 */
 (function () {
-  var PAGE_LABEL = '2026-10-18 19:41:13';
+  var PAGE_LABEL = '2026-10-23 19:21:12';
   var URL = '/househouse/version.json', KEY = 'nkReloadFor:househouse', EVERY = 60;
   function safe() { try { return !!(document.querySelector('#screen-title.active') && !(document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName))); } catch (e) { return false; } }
   var busy = false;
@@ -34,7 +34,7 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta name="theme-color" content="#120e18" />
   <title>トリックハウスバトル</title>
-  <link rel="stylesheet" href="css/style.css?v=20261018194113" />
+  <link rel="stylesheet" href="css/style.css?v=20261023192112" />
 <link rel="apple-touch-icon" href="/househouse/apple-touch-icon.png" />
 <meta name="apple-mobile-web-app-title" content="ハウスバトル" />
 </head>
@@ -105,6 +105,7 @@
         <div class="title-footer-row">
           <button type="button" class="btn btn-ghost btn-compact" id="btn-mute" aria-pressed="false">🔊 音</button>
           <a class="btn btn-ghost btn-compact link-btn" href="https://nikkukyuu-code.github.io/">トップへ</a>
+          <a class="btn btn-ghost btn-compact link-btn mugen-btn" href="https://freegame-mugen.jp/cms/mt-cp.cgi?__mode=view&amp;blog_id=1&amp;id=13413" target="_blank" rel="noopener">フリーゲーム夢現</a>
         </div>
       </div>
       <p class="peer-note" id="peer-note">通信準備中…</p>
@@ -313,7 +314,7 @@
   </footer>
 
   <script type="module">
-    import { init } from './js/game.js?v=20261018194113';
+    import { init } from './js/game.js?v=20261023192112';
     init().catch((e) => {
       console.error(e);
       const n = document.getElementById('peer-note');
