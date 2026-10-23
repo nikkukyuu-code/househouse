@@ -2040,3 +2040,13 @@ a.btn.link-btn {
 /* フリーゲーム夢現 link in the title footer row */
 .title-footer-row .btn-compact { flex: 1 1 0; }
 .title-footer-row .mugen-btn { flex: 1.9 1 0; letter-spacing: 0; font-size: clamp(0.68rem, 1.75vh, 0.86rem); }
+.title-points-row { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.title-points-row .title-points { margin: 0; }
+.title-points-row .share-btn { flex: 0 0 auto; min-height: 30px; padding: 3px 12px; font-size: 0.8rem; white-space: nowrap; }
+#screen-title .title-points-row { margin: 0 0 clamp(2px, 0.6vh, 6px); }
+#screen-title .title-points-row .share-btn { min-height: 0; height: auto; padding: 2px 12px; line-height: 1.4; font-size: 0.78rem; border-radius: 999px; }
+/* tall phones: keep the whole title screen above the version footer */
+@media (min-height: 780px) and (max-width: 520px) {
+  #screen-title .btn-col { gap: 8px; }
+  #screen-title .title-sub { margin-top: 2px; margin-bottom: 4px; }
+}

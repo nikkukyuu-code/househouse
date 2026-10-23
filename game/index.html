@@ -6,7 +6,7 @@
 <!--nk-autoupdate--><script>
 /* 自動更新: 新しい版が公開されたら、安全なとき（タイトル画面など・試合中でない）だけ自動で読み込み直す。記録(localStorage)には触れない。 */
 (function () {
-  var PAGE_LABEL = '2026-10-23 19:21:12';
+  var PAGE_LABEL = '2026-10-24 01:22:54';
   var URL = '/househouse/version.json', KEY = 'nkReloadFor:househouse', EVERY = 60;
   function safe() { try { return !!(document.querySelector('#screen-title.active') && !(document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName))); } catch (e) { return false; } }
   var busy = false;
@@ -34,7 +34,7 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta name="theme-color" content="#120e18" />
   <title>トリックハウスバトル</title>
-  <link rel="stylesheet" href="css/style.css?v=20261023192112" />
+  <link rel="stylesheet" href="css/style.css?v=20261024012254" />
 <link rel="apple-touch-icon" href="/househouse/apple-touch-icon.png" />
 <meta name="apple-mobile-web-app-title" content="ハウスバトル" />
 </head>
@@ -88,7 +88,7 @@
         <p class="tl-note">勝率が上がるほど、敵が強くなります（敵レベル 最高100）</p>
       </div>
       <p class="title-sub">自分の家に罠と宝箱を設置して、<br />お互いの家に行って宝箱を探しだせ！</p>
-      <p class="title-points" id="title-points">ポイント 0</p>
+      <div class="title-points-row"><p class="title-points" id="title-points">ポイント 0</p><button type="button" class="btn btn-ghost btn-compact share-btn" data-share-btn data-share-title="トリックハウスバトル" data-share-text="ブラウザゲーム「トリックハウスバトル」 ほかのゲームもこちらから遊べます">📤 共有</button></div>
       <div class="btn-col">
         <button type="button" class="btn btn-com" id="btn-com">COM対戦 <span class="btn-com-lv" id="btn-com-lv">敵Lv 1</span></button>
         <button type="button" class="btn btn-ghost" id="btn-tutorial">チュートリアル</button>
@@ -314,12 +314,45 @@
   </footer>
 
   <script type="module">
-    import { init } from './js/game.js?v=20261023192112';
+    import { init } from './js/game.js?v=20261024012254';
     init().catch((e) => {
       console.error(e);
       const n = document.getElementById('peer-note');
       if (n) n.textContent = '起動エラー: ' + (e && e.message ? e.message : e);
     });
   </script>
+<script>
+/* 共有ボタン: navigator.share → fallback copy + toast (X / LINE) */
+(function () {
+  var URL_TOP = 'https://nikkukyuu-code.github.io/';
+  function toast(msg, title, text) {
+    var old = document.getElementById('share-toast'); if (old) old.remove();
+    var t = document.createElement('div'); t.id = 'share-toast'; t.setAttribute('role', 'status');
+    t.style.cssText = 'position:fixed;left:50%;bottom:max(18px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:2147483000;max-width:min(92vw,360px);padding:10px 14px;border-radius:12px;background:rgba(10,12,24,.94);color:#fff;font:700 14px/1.5 system-ui,sans-serif;text-align:center;box-shadow:0 4px 18px rgba(0,0,0,.5)';
+    var q = encodeURIComponent(text + ' ' + URL_TOP);
+    t.innerHTML = '<div></div><div style="margin-top:6px;display:flex;gap:10px;justify-content:center;font-size:13px">' +
+      '<a target="_blank" rel="noopener" style="color:#9ad4ff" href="https://twitter.com/intent/tweet?text=' + q + '">Xで共有</a>' +
+      '<a target="_blank" rel="noopener" style="color:#7be08f" href="https://social-plugins.line.me/lineit/share?url=' + encodeURIComponent(URL_TOP) + '">LINEで共有</a></div>';
+    t.firstChild.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(function () { if (t.parentNode) t.remove(); }, 4500);
+  }
+  function copy(s) {
+    if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(s);
+    return new Promise(function (ok, ng) {
+      try { var a = document.createElement('textarea'); a.value = s; a.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(a); a.select(); var r = document.execCommand('copy'); a.remove(); r ? ok() : ng(); } catch (e) { ng(e); }
+    });
+  }
+  document.addEventListener('click', function (ev) {
+    var b = ev.target.closest && ev.target.closest('[data-share-btn]'); if (!b) return;
+    ev.preventDefault();
+    var title = b.getAttribute('data-share-title') || document.title;
+    var text = b.getAttribute('data-share-text') || title;
+    var fb = function () { copy(URL_TOP).then(function () { toast('リンクをコピーしました', title, text); }, function () { toast(URL_TOP, title, text); }); };
+    if (navigator.share) navigator.share({ title: title, text: text, url: URL_TOP }).catch(function (e) { if (!e || e.name !== 'AbortError') fb(); });
+    else fb();
+  });
+})();
+</script>
 </body>
 </html>
