@@ -6,7 +6,7 @@
 <!--nk-autoupdate--><script>
 /* 自動更新: 新しい版が公開されたら、安全なとき（タイトル画面など・試合中でない）だけ自動で読み込み直す。記録(localStorage)には触れない。 */
 (function () {
-  var PAGE_LABEL = '2026-10-24 01:22:54';
+  var PAGE_LABEL = '2026-10-24 03:00:15';
   var URL = '/househouse/version.json', KEY = 'nkReloadFor:househouse', EVERY = 60;
   function safe() { try { return !!(document.querySelector('#screen-title.active') && !(document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName))); } catch (e) { return false; } }
   var busy = false;
@@ -34,7 +34,7 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta name="theme-color" content="#120e18" />
   <title>トリックハウスバトル</title>
-  <link rel="stylesheet" href="css/style.css?v=20261024012254" />
+  <link rel="stylesheet" href="css/style.css?v=20261024030015" />
 <link rel="apple-touch-icon" href="/househouse/apple-touch-icon.png" />
 <meta name="apple-mobile-web-app-title" content="ハウスバトル" />
 </head>
@@ -314,7 +314,7 @@
   </footer>
 
   <script type="module">
-    import { init } from './js/game.js?v=20261024012254';
+    import { init } from './js/game.js?v=20261024030015';
     init().catch((e) => {
       console.error(e);
       const n = document.getElementById('peer-note');
@@ -352,6 +352,36 @@
     if (navigator.share) navigator.share({ title: title, text: text, url: URL_TOP }).catch(function (e) { if (!e || e.name !== 'AbortError') fb(); });
     else fb();
   });
+})();
+</script>
+<script>
+/* タイトル画面を「実際に見えている高さ」に収める（ツールバー・セーフエリア対応） */
+(function () {
+  var root = document.documentElement, busy = false;
+  function visH() { var v = window.visualViewport; return Math.round(v ? Math.min(v.height, window.innerHeight) : window.innerHeight); }
+  function fit() {
+    if (busy) return; busy = true;
+    root.style.setProperty('--app-h', visH() + 'px');
+    var sc = document.getElementById('screen-title');
+    if (sc && sc.classList.contains('active')) {
+      sc.classList.remove('title-tight'); sc.style.setProperty('--title-zoom', '1');
+      var over = function () { return sc.scrollHeight > sc.clientHeight + 1; };
+      if (over()) sc.classList.add('title-tight');
+      var z = 1;
+      while (over() && z > 0.55) { z = Math.round((z - 0.03) * 100) / 100; sc.style.setProperty('--title-zoom', String(z)); }
+    }
+    if (obs) obs.takeRecords();
+    busy = false;
+  }
+  var obs = null;
+  var t = 0; function later() { clearTimeout(t); t = setTimeout(fit, 60); }
+  window.addEventListener('resize', later); window.addEventListener('orientationchange', later);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', later);
+  window.addEventListener('load', fit); document.addEventListener('DOMContentLoaded', later);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(later);
+  obs = new MutationObserver(function (m) { for (var i = 0; i < m.length; i++) { if (m[i].target.id === 'screen-title' || m[i].target.closest && m[i].target.closest('#screen-title')) { later(); return; } } })
+  obs.observe(document.getElementById('app') || document.body, { attributes: true, attributeFilter: ['class', 'hidden'], subtree: true, childList: true });
+  setTimeout(fit, 400); setTimeout(fit, 1500);
 })();
 </script>
 </body>

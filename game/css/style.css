@@ -2050,3 +2050,14 @@ a.btn.link-btn {
   #screen-title .btn-col { gap: 8px; }
   #screen-title .title-sub { margin-top: 2px; margin-bottom: 4px; }
 }
+
+/* ===== Title screen: always fit the *visible* viewport (toolbars, safe areas) ===== */
+html, body, #app { height: var(--app-h, 100dvh); }
+#app { padding-bottom: calc(34px + env(safe-area-inset-bottom, 0px)); }
+#screen-title > *:not(.title-scene):not(.title-glow) { zoom: var(--title-zoom, 1); }
+#screen-title.title-tight { gap: 2px; padding-top: max(6px, env(safe-area-inset-top, 0px)); }
+#screen-title.title-tight .title-sub { display: none; }
+#game-meta { top: var(--app-h, 100dvh); bottom: auto; transform: translate(-50%, -100%); }
+/* bottom row labels never clip (font follows width, not only height) */
+#screen-title .title-footer-row .btn-compact { font-size: min(clamp(0.72rem, 1.8vh, 0.88rem), 3.3vw); padding-left: 4px; padding-right: 4px; letter-spacing: 0; }
+#screen-title .title-footer-row .mugen-btn { font-size: min(clamp(0.68rem, 1.75vh, 0.86rem), 3.1vw); }
