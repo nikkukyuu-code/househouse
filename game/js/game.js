@@ -9,15 +9,15 @@ import {
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
   HOUSE_SKINS, getHouseSkin, preloadTextures,
-} from './house.js?v=20261025074554';
-import { NetSession, QuickMatch, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20261025074554';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20261025074554';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20261025074554';
-import { hitBattleCounter, loadBattleCount } from './stats.js?v=20261025074554';
+} from './house.js?v=20261025081304';
+import { NetSession, QuickMatch, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20261025081304';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay, attachScrollHint } from './ui.js?v=20261025081304';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20261025081304';
+import { hitBattleCounter, loadBattleCount } from './stats.js?v=20261025081304';
 
-export const GAME_VERSION = '2026-10-25 07:45:54';
-export const GAME_VERSION_BUST = '20261025074554';
-export const GAME_BUILD_TIME = 1792878232000;
+export const GAME_VERSION = '2026-10-25 08:13:04';
+export const GAME_VERSION_BUST = '20261025081304';
+export const GAME_BUILD_TIME = 1792883584098;
 
 const blueprint = createBlueprint();
 
@@ -989,6 +989,7 @@ function openHouseShop() {
   showScreen('screen-shop');
   renderHouseShop();
   refreshPointsUi();
+  requestAnimationFrame(() => attachScrollHint($('shop-list')));
 }
 
 function renderHouseShop() {
@@ -3578,7 +3579,8 @@ function bindControls() {
     goTitle();
   });
   const shopList = $('shop-list');
-  if (shopList) shopList.addEventListener('click', onShopListClick);
+  if (shopList) { shopList.addEventListener('click', onShopListClick); attachScrollHint(shopList); }
+  attachScrollHint($('tutorial-card'));
 
   window.addEventListener('resize', () => {
     resizeCanvases();

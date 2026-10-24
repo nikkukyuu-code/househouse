@@ -2075,3 +2075,44 @@ html, body, #app { height: var(--app-h, 100dvh); }
 #screen-tutorial, #screen-shop, #screen-lobby { position: relative; }
 #screen-tutorial > .sub-back, #screen-shop > .sub-back, #screen-lobby > .sub-back { position: absolute; left: 10px; top: max(10px, env(safe-area-inset-top)); z-index: 20; }
 .tutorial-heading-main, .shop-heading, #screen-lobby > .lobby-label { padding-left: 64px; padding-right: 64px; }
+
+/* ---- Reusable scroll affordance (attachScrollHint) ---- */
+.scroll-hint-wrap { position: relative; display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; width: 100%; }
+.scroll-hint-wrap > .scroll-hint-el { flex: 1 1 auto; min-height: 0; max-width: none; }
+.scroll-hint-wrap.is-overflow > .scroll-hint-el { padding-bottom: 30px !important; }
+.scroll-hint-fade { position: absolute; left: 0; right: 0; height: 34px; pointer-events: none; opacity: 0; transition: opacity .25s; z-index: 3; }
+.scroll-hint-fade.top { top: 0; background: linear-gradient(180deg, rgba(12,8,18,.95), rgba(12,8,18,0)); }
+.scroll-hint-fade.bottom { bottom: 0; height: 46px; background: linear-gradient(0deg, rgba(12,8,18,.97) 15%, rgba(12,8,18,0)); }
+.scroll-hint-wrap.show-top .scroll-hint-fade.top, .scroll-hint-wrap.show-bottom .scroll-hint-fade.bottom { opacity: 1; }
+.scroll-hint-chevron { position: absolute; left: 50%; bottom: 4px; width: 32px; height: 32px; margin-left: -16px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; color: #1a1208; background: #ffd25a;
+  box-shadow: 0 0 0 2px rgba(255,255,255,.35), 0 3px 10px rgba(0,0,0,.5), 0 0 14px rgba(255,200,60,.55);
+  z-index: 4; opacity: 0; pointer-events: none; transition: opacity .25s; animation: scrollHintBounce 1.1s ease-in-out infinite; cursor: pointer; }
+.scroll-hint-wrap.show-bottom .scroll-hint-chevron { opacity: 1; pointer-events: auto; }
+@keyframes scrollHintBounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(5px); } }
+@media (prefers-reduced-motion: reduce) { .scroll-hint-chevron { animation: none; } }
+
+/* ---- House shop: compact 2-column grid (all items visible without scrolling) ---- */
+#screen-shop { overflow: hidden !important; gap: clamp(3px, 0.8dvh, 8px) !important; padding: max(8px, env(safe-area-inset-top)) 10px 6px !important; }
+#screen-shop .shop-heading { margin: 2px 0 0; font-size: clamp(1.05rem, 3dvh, 1.5rem); line-height: 30px; }
+#screen-shop .shop-lead { font-size: clamp(0.62rem, 1.6dvh, 0.8rem); line-height: 1.3; }
+#screen-shop .shop-points { margin: 0 !important; }
+#screen-shop .scroll-hint-wrap { max-width: 460px; }
+#screen-shop .shop-list { display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: max-content; align-content: start;
+  gap: clamp(5px, 1dvh, 10px); overflow-y: auto; padding: 1px; max-width: none; }
+#screen-shop .shop-item { display: grid; grid-template-columns: auto 1fr; grid-template-areas: "sw info" "desc desc" "act act";
+  gap: 3px 7px; padding: clamp(5px, 1dvh, 9px); align-items: center; }
+#screen-shop .shop-swatch { grid-area: sw; width: clamp(40px, 7.5dvh, 64px); height: clamp(40px, 7.5dvh, 64px); border-radius: 9px; }
+#screen-shop .shop-item-info { grid-area: info; display: contents; }
+#screen-shop .shop-item-name, #screen-shop .shop-item-price { grid-column: 2; }
+#screen-shop .shop-item-name { grid-row: 1; align-self: start; margin-top: 2px; font-size: clamp(0.74rem, 2dvh, 0.95rem); line-height: 1.2; }
+#screen-shop .shop-item-price { grid-row: 1; align-self: end; margin: 0 0 2px; font-size: clamp(0.7rem, 1.8dvh, 0.85rem); }
+#screen-shop .shop-item-desc { grid-area: desc; margin: 0; font-size: clamp(0.62rem, 1.6dvh, 0.76rem); line-height: 1.3; color: #b4a48e; }
+#screen-shop .shop-item-actions { grid-area: act; }
+#screen-shop .shop-item-actions .btn { width: 100%; min-width: 0; min-height: clamp(28px, 4.6dvh, 38px); padding: 3px 6px; font-size: 0.8rem; }
+#screen-shop .shop-badge { font-size: 9px; line-height: 13px; }
+#screen-shop .shop-badge.is-lock { width: 16px; line-height: 16px; font-size: 9px; top: 2px; right: 2px; }
+#screen-shop #shop-status { min-height: 1.1em; margin: 0; font-size: 0.75rem; }
+#screen-shop .btn-col { margin-top: 0 !important; }
+#screen-shop #btn-shop-back { min-height: clamp(34px, 5.5dvh, 44px); }
+#screen-tutorial .scroll-hint-wrap { max-width: 340px; }
