@@ -6,7 +6,7 @@
 <!--nk-autoupdate--><script>
 /* 自動更新: 新しい版が公開されたら、安全なとき（タイトル画面など・試合中でない）だけ自動で読み込み直す。記録(localStorage)には触れない。 */
 (function () {
-  var PAGE_LABEL = '2026-10-25 06:23:11';
+  var PAGE_LABEL = '2026-10-25 06:43:52';
   var URL = '/househouse/version.json', KEY = 'nkReloadFor:househouse', EVERY = 60;
   function safe() { try { return !!(document.querySelector('#screen-title.active') && !(document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName))); } catch (e) { return false; } }
   var busy = false;
@@ -34,7 +34,7 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta name="theme-color" content="#120e18" />
   <title>トリックハウスバトル</title>
-  <link rel="stylesheet" href="css/style.css?v=20261025062311" />
+  <link rel="stylesheet" href="css/style.css?v=20261025064352" />
 <link rel="apple-touch-icon" href="/househouse/apple-touch-icon.png" />
 <meta name="apple-mobile-web-app-title" content="ハウスバトル" />
 </head>
@@ -115,6 +115,7 @@
 
     <!-- チュートリアル -->
     <section id="screen-tutorial" class="screen">
+      <button type="button" class="sub-back" data-back="btn-tutorial-home" aria-label="タイトルへ戻る">◀ 戻る</button>
       <h2 class="tutorial-heading-main">チュートリアル</h2>
       <p class="tutorial-step-ind" id="tutorial-step-ind" aria-live="polite">1/8</p>
       <div class="tutorial-card allow-scroll" id="tutorial-card">
@@ -135,6 +136,7 @@
 
     <!-- 家ショップ -->
     <section id="screen-shop" class="screen">
+      <button type="button" class="sub-back" data-back="btn-shop-back" aria-label="タイトルへ戻る">◀ 戻る</button>
       <h2 class="shop-heading">家ショップ</h2>
       <p class="shop-lead">見た目だけのスキンです。罠・階層・歩ける場所は変わりません。</p>
       <p class="title-points shop-points" id="shop-points">ポイント 0</p>
@@ -147,6 +149,7 @@
 
     <!-- ロビー -->
     <section id="screen-lobby" class="screen">
+      <button type="button" class="sub-back" data-back="btn-lobby-back" aria-label="タイトルへ戻る">◀ 戻る</button>
       <p class="lobby-label">オンライン対戦</p>
       <p class="pvp-note">対人戦ではポイントは入りません</p>
       <div id="lobby-code-wrap">
@@ -314,7 +317,7 @@
   </footer>
 
   <script type="module">
-    import { init } from './js/game.js?v=20261025062311';
+    import { init } from './js/game.js?v=20261025064352';
     init().catch((e) => {
       console.error(e);
       const n = document.getElementById('peer-note');

@@ -2061,3 +2061,13 @@ html, body, #app { height: var(--app-h, 100dvh); }
 /* bottom row labels never clip (font follows width, not only height) */
 #screen-title .title-footer-row .btn-compact { font-size: min(clamp(0.72rem, 1.8vh, 0.88rem), 3.3vw); padding-left: 4px; padding-right: 4px; letter-spacing: 0; }
 #screen-title .title-footer-row .mugen-btn { font-size: min(clamp(0.68rem, 1.75vh, 0.86rem), 3.1vw); }
+
+/* ===== 共通「◀ 戻る」ボタン（全ゲーム同じ見た目・見出し左端） ===== */
+.sub-back { appearance: none; height: 30px; padding: 0 9px; border-radius: 9px;
+  border: 1px solid rgba(140, 200, 255, 0.6); background: linear-gradient(180deg, rgba(40, 80, 150, 0.95), rgba(18, 36, 80, 0.95));
+  color: #e8f4ff; font: 800 0.8rem/1 sans-serif; letter-spacing: 0; white-space: nowrap; cursor: pointer; box-shadow: 0 0 10px rgba(80, 160, 255, 0.35); -webkit-tap-highlight-color: transparent; }
+.sub-back:active { transform: translateY(1px); }
+.sub-back:focus-visible { outline: 2px solid #5fe0ff; outline-offset: 1px; }
+#screen-tutorial, #screen-shop, #screen-lobby { position: relative; }
+#screen-tutorial > .sub-back, #screen-shop > .sub-back, #screen-lobby > .sub-back { position: absolute; left: 10px; top: max(10px, env(safe-area-inset-top)); z-index: 20; }
+.tutorial-heading-main, .shop-heading, #screen-lobby > .lobby-label { padding-left: 64px; padding-right: 64px; }
