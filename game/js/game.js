@@ -9,14 +9,14 @@ import {
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
   HOUSE_SKINS, getHouseSkin, preloadTextures,
-} from './house.js?v=20261025064352';
-import { NetSession, QuickMatch, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20261025064352';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20261025064352';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20261025064352';
-import { hitBattleCounter, loadBattleCount } from './stats.js?v=20261025064352';
+} from './house.js?v=20261025071735';
+import { NetSession, QuickMatch, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20261025071735';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20261025071735';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20261025071735';
+import { hitBattleCounter, loadBattleCount } from './stats.js?v=20261025071735';
 
-export const GAME_VERSION = '2026-10-25 06:43:52';
-export const GAME_VERSION_BUST = '20261025064352';
+export const GAME_VERSION = '2026-10-25 07:17:35';
+export const GAME_VERSION_BUST = '20261025071735';
 export const GAME_BUILD_TIME = 1792878232000;
 
 const blueprint = createBlueprint();
@@ -924,6 +924,66 @@ function equipHouseSkin(skinId) {
   return { ok: true };
 }
 
+
+/* Shop thumbnail: inline SVG exterior illustration per house skin */
+const HOUSE_ICON_SVG = {
+  basic: `<rect width="64" height="64" fill="#9fd3f0"/><rect y="50" width="64" height="14" fill="#7cbf5a"/>
+    <rect x="16" y="30" width="32" height="22" fill="#f1dcb0" stroke="#6b4a2b" stroke-width="1.5"/>
+    <polygon points="11,32 32,14 53,32" fill="#c0503a" stroke="#6b2a1f" stroke-width="1.5" stroke-linejoin="round"/>
+    <rect x="28" y="38" width="9" height="14" fill="#8a5a33"/><rect x="19" y="35" width="7" height="7" fill="#bfe3ff" stroke="#6b4a2b"/>
+    <rect x="40" y="35" width="6" height="7" fill="#bfe3ff" stroke="#6b4a2b"/>`,
+  cottage: `<rect width="64" height="64" fill="#ffd9a8"/><circle cx="52" cy="12" r="6" fill="#fff3b0"/><rect y="50" width="64" height="14" fill="#8ccf62"/>
+    <rect x="15" y="30" width="34" height="22" fill="#a8703f" stroke="#5a3418" stroke-width="1.5"/>
+    <path d="M15 36H49M15 42H49M15 47H49" stroke="#7a4a24" stroke-width="1"/>
+    <path d="M8 33 Q32 6 56 33 Z" fill="#d9b25a" stroke="#8a6a24" stroke-width="1.5"/>
+    <path d="M16 26 Q32 14 48 26" stroke="#b08a34" fill="none"/>
+    <rect x="41" y="12" width="5" height="10" fill="#7a4a3a"/>
+    <rect x="28" y="39" width="9" height="13" rx="4" fill="#5a3418"/>
+    <rect x="18" y="35" width="7" height="6" fill="#ffe8a0" stroke="#5a3418"/><rect x="40" y="35" width="6" height="6" fill="#ffe8a0" stroke="#5a3418"/>
+    <circle cx="10" cy="49" r="4" fill="#e85a7a"/><circle cx="54" cy="49" r="4" fill="#f0c040"/>`,
+  mansion: `<rect width="64" height="64" fill="#5a5f8a"/><circle cx="50" cy="12" r="5" fill="#f2f0d0"/><rect y="52" width="64" height="12" fill="#3f6a3a"/>
+    <rect x="8" y="26" width="48" height="27" fill="#e8dcc4" stroke="#4a3a2a" stroke-width="1.5"/>
+    <polygon points="6,27 32,12 58,27" fill="#4a3f5a" stroke="#2a2030" stroke-width="1.5"/>
+    <rect x="27" y="6" width="10" height="14" fill="#e8dcc4" stroke="#4a3a2a"/><polygon points="25,7 32,1 39,7" fill="#4a3f5a"/>
+    <g fill="#ffd77a" stroke="#4a3a2a" stroke-width=".8"><rect x="12" y="30" width="6" height="8"/><rect x="21" y="30" width="6" height="8"/><rect x="37" y="30" width="6" height="8"/><rect x="46" y="30" width="6" height="8"/>
+    <rect x="12" y="42" width="6" height="8"/><rect x="46" y="42" width="6" height="8"/></g>
+    <path d="M28 53V44a4 4 0 0 1 8 0V53Z" fill="#7a2a34"/>
+    <path d="M22 41H42" stroke="#4a3a2a"/><rect x="23" y="41" width="2" height="12" fill="#fff"/><rect x="39" y="41" width="2" height="12" fill="#fff"/>`,
+  villa: `<rect width="64" height="64" fill="#8fd6ff"/><rect y="44" width="64" height="20" fill="#6fcf6a"/>
+    <rect x="6" y="22" width="40" height="24" fill="#fafafa" stroke="#7a7a7a" stroke-width="1.2"/>
+    <rect x="30" y="14" width="22" height="32" fill="#fff6e6" stroke="#7a7a7a" stroke-width="1.2"/>
+    <rect x="4" y="19" width="44" height="4" fill="#c99a3a"/><rect x="28" y="11" width="26" height="4" fill="#c99a3a"/>
+    <g fill="#5ab4e6"><rect x="10" y="27" width="16" height="9"/><rect x="34" y="19" width="14" height="8"/><rect x="34" y="31" width="14" height="8"/></g>
+    <path d="M18 27V36" stroke="#fff"/>
+    <ellipse cx="22" cy="55" rx="16" ry="5" fill="#3fb6e8" stroke="#fff" stroke-width="1.5"/>
+    <path d="M56 54V36" stroke="#8a5a2a" stroke-width="2"/><path d="M56 36q-8-2-10 4M56 36q8-2 8 4M56 36q-3-6-9-5M56 36q4-6 8-4" stroke="#2f9a3a" stroke-width="2.5" fill="none"/>`,
+  castle_keep: `<rect width="64" height="64" fill="#bcd8e8"/><rect y="54" width="64" height="10" fill="#8a8a8a"/>
+    <polygon points="10,56 54,56 50,46 14,46" fill="#9a9a96" stroke="#555" stroke-width="1"/>
+    <rect x="16" y="36" width="32" height="10" fill="#f4f1ea" stroke="#333" stroke-width="1"/>
+    <path d="M8 38 Q32 30 56 38 L50 33 H14 Z" fill="#3a3f4a"/>
+    <rect x="20" y="24" width="24" height="10" fill="#f4f1ea" stroke="#333" stroke-width="1"/>
+    <path d="M12 26 Q32 18 52 26 L46 21 H18 Z" fill="#3a3f4a"/>
+    <rect x="24" y="13" width="16" height="9" fill="#f4f1ea" stroke="#333" stroke-width="1"/>
+    <path d="M18 15 Q32 7 46 15 L40 8 H24 Z" fill="#3a3f4a"/>
+    <g fill="#333"><rect x="22" y="39" width="4" height="4"/><rect x="30" y="39" width="4" height="4"/><rect x="38" y="39" width="4" height="4"/><rect x="26" y="27" width="3" height="4"/><rect x="35" y="27" width="3" height="4"/></g>`,
+  osaka: `<rect width="64" height="64" fill="#3a8fd8"/><rect y="54" width="64" height="10" fill="#4a7a3a"/>
+    <polygon points="8,56 56,56 51,46 13,46" fill="#a8a29a" stroke="#555"/>
+    <rect x="15" y="36" width="34" height="10" fill="#fff" stroke="#222"/>
+    <path d="M6 38 Q32 29 58 38 L51 33 H13 Z" fill="#1f5a4a"/>
+    <rect x="19" y="24" width="26" height="10" fill="#fff" stroke="#222"/>
+    <path d="M10 26 Q32 17 54 26 L47 21 H17 Z" fill="#1f5a4a"/>
+    <rect x="23" y="13" width="18" height="9" fill="#1f2a2a" stroke="#d4a017"/>
+    <path d="M16 15 Q32 6 48 15 L42 8 H22 Z" fill="#1f5a4a" stroke="#f5c518" stroke-width="1"/>
+    <g fill="#f5c518"><path d="M20 9 q-3 -5 1 -8 q1 4 2 6z"/><path d="M44 9 q3 -5 -1 -8 q-1 4 -2 6z"/>
+    <rect x="25" y="16" width="14" height="2"/><rect x="21" y="28" width="22" height="1.5"/><rect x="17" y="40" width="30" height="1.5"/></g>
+    <g fill="#222"><rect x="21" y="42" width="4" height="3"/><rect x="30" y="42" width="4" height="3"/><rect x="39" y="42" width="4" height="3"/></g>`,
+};
+
+function houseIconSvg(id) {
+  const body = HOUSE_ICON_SVG[id] || HOUSE_ICON_SVG.basic;
+  return `<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" aria-hidden="true">${body}</svg>`;
+}
+
 function openHouseShop() {
   S.phase = 'shop';
   showScreen('screen-shop');
@@ -946,11 +1006,12 @@ function renderHouseShop() {
     const swatch = document.createElement('div');
     swatch.className = 'shop-swatch';
     swatch.setAttribute('aria-hidden', 'true');
-    for (const c of skin.swatch) {
-      const chip = document.createElement('span');
-      chip.className = 'shop-swatch-chip';
-      chip.style.background = c;
-      swatch.appendChild(chip);
+    swatch.innerHTML = houseIconSvg(skin.id);
+    if (selected === skin.id || owned.has(skin.id) || skin.price > 0) {
+      const badge = document.createElement('span');
+      badge.className = 'shop-badge ' + (selected === skin.id ? 'is-eq' : owned.has(skin.id) ? 'is-own' : 'is-lock');
+      badge.textContent = selected === skin.id ? '装備中' : owned.has(skin.id) ? '所持' : '🔒';
+      swatch.appendChild(badge);
     }
 
     const info = document.createElement('div');
