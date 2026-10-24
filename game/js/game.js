@@ -9,15 +9,15 @@ import {
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
   HOUSE_SKINS, getHouseSkin, preloadTextures,
-} from './house.js?v=20261024030015';
-import { NetSession, QuickMatch, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20261024030015';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20261024030015';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20261024030015';
-import { hitBattleCounter, loadBattleCount } from './stats.js?v=20261024030015';
+} from './house.js?v=20261025062311';
+import { NetSession, QuickMatch, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20261025062311';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay } from './ui.js?v=20261025062311';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20261025062311';
+import { hitBattleCounter, loadBattleCount } from './stats.js?v=20261025062311';
 
-export const GAME_VERSION = '2026-10-24 03:00:15';
-export const GAME_VERSION_BUST = '20261024030015';
-export const GAME_BUILD_TIME = 1792778415000;
+export const GAME_VERSION = '2026-10-25 06:23:11';
+export const GAME_VERSION_BUST = '20261025062311';
+export const GAME_BUILD_TIME = 1792876991000;
 
 const blueprint = createBlueprint();
 
