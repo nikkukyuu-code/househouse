@@ -1,3 +1,5 @@
+import { drawInterior } from './interior.js?v=20261025074554';
+
 /**
  * トリックハウスバトル — House layout, placement, and rendering helpers
  */
@@ -2774,67 +2776,9 @@ export function drawHouse(ctx, blueprint, houseData, floor, opts = {}) {
     }
   }
 
-  // Soft rugs in room centers (house feel; richer borders at higher skins)
   const th = themeForFloor(floor, skinId);
-  const rugCells = [
-    [2, 2], [6, 2], [10, 2],
-    [2, 6], [6, 6], [10, 6],
-  ];
-  const rugTier = ({ basic: 0, cottage: 1, mansion: 2, villa: 3, castle_keep: 4, osaka: 5 })[skinId] || 0;
-  for (const [rx, ry] of rugCells) {
-    if (blueprint[floor][ry][rx] !== T.FLOOR) continue;
-    const rpx = ox + rx * cellSize;
-    const rpy = oy + ry * cellSize;
-    const inset = rugTier >= 5 ? 0.1 : 0.15;
-    const rx0 = rpx + cellSize * inset;
-    const ry0 = rpy + cellSize * inset;
-    const rw = cellSize * (1 - inset * 2);
-    const rh = cellSize * (1 - inset * 2);
-    const rugImg = getTex(rugTier >= 3 ? 'rug' : 'furn_rug_cozy') || getTex('rug');
-    if (rugImg) {
-      ctx.save();
-      const rr = cellSize * (rugTier >= 4 ? 0.06 : 0.08);
-      ctx.beginPath();
-      ctx.moveTo(rx0 + rr, ry0);
-      ctx.arcTo(rx0 + rw, ry0, rx0 + rw, ry0 + rh, rr);
-      ctx.arcTo(rx0 + rw, ry0 + rh, rx0, ry0 + rh, rr);
-      ctx.arcTo(rx0, ry0 + rh, rx0, ry0, rr);
-      ctx.arcTo(rx0, ry0, rx0 + rw, ry0, rr);
-      ctx.closePath();
-      ctx.clip();
-      ctx.globalAlpha = rugTier >= 5 ? 0.92 : rugTier >= 2 ? 0.8 : 0.65;
-      ctx.drawImage(rugImg, rx0, ry0, rw, rh);
-      ctx.restore();
-      if (rugTier >= 2) {
-        ctx.strokeStyle = rugTier >= 5 ? (th.badge || '#d4af37') : 'rgba(255,255,255,0.22)';
-        ctx.lineWidth = rugTier >= 5 ? 1.5 : 1;
-        ctx.strokeRect(rx0 + 2, ry0 + 2, rw - 4, rh - 4);
-      }
-    } else {
-      ctx.fillStyle = rugTier >= 5
-        ? th.rug.replace(/0\.\d+/g, '0.38')
-        : rugTier >= 3
-          ? th.rug.replace(/0\.\d+/g, '0.32')
-          : th.rug;
-      const rr = cellSize * (rugTier >= 4 ? 0.06 : 0.08);
-      ctx.beginPath();
-      ctx.moveTo(rx0 + rr, ry0);
-      ctx.arcTo(rx0 + rw, ry0, rx0 + rw, ry0 + rh, rr);
-      ctx.arcTo(rx0 + rw, ry0 + rh, rx0, ry0 + rh, rr);
-      ctx.arcTo(rx0, ry0 + rh, rx0, ry0, rr);
-      ctx.arcTo(rx0, ry0, rx0 + rw, ry0, rr);
-      ctx.closePath();
-      ctx.fill();
-      if (rugTier >= 2) {
-        ctx.strokeStyle = rugTier >= 5 ? (th.badge || '#d4af37') : 'rgba(255,255,255,0.22)';
-        ctx.lineWidth = rugTier >= 5 ? 1.5 : 1;
-        ctx.strokeRect(rx0 + 2, ry0 + 2, rw - 4, rh - 4);
-      }
-    }
-  }
-
-  // Decorative furniture (visual only — walk/place unchanged)
-  drawRoomFurniture(ctx, blueprint, floor, ox, oy, cellSize, skinId);
+  // Room-aware interior decor (cached, cosmetic only — never reads traps/chest)
+  drawInterior(ctx, blueprint, floor, ox, oy, cellSize, skinId);
 
   // Cosmetic skin ornaments (visual only)
   drawSkinOrnaments(ctx, blueprint, floor, ox, oy, cellSize, skin);
