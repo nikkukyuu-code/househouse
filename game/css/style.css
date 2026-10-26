@@ -1184,6 +1184,8 @@ a.btn.link-btn {
 #app-version { display: none; } /* duplicate of meta-version */
 #meta-visits { color: #fff; font-variant-numeric: tabular-nums; }
 #meta-battles { color: #ffd68a; font-variant-numeric: tabular-nums; white-space: nowrap; }
+#meta-battles:not([hidden]):has(.bc-breakdown) { display: contents; }
+#meta-battles .bc-breakdown { flex: 0 0 100%; text-align: center; font-size: 0.82em; opacity: 0.9; white-space: nowrap; line-height: 1.1; }
 #game-meta [hidden] { display: none !important; }
 #app { padding-bottom: 34px; }
 .build-stamp { display: none; }
@@ -2116,3 +2118,7 @@ html, body, #app { height: var(--app-h, 100dvh); }
 #screen-shop .btn-col { margin-top: 0 !important; }
 #screen-shop #btn-shop-back { min-height: clamp(34px, 5.5dvh, 44px); }
 #screen-tutorial .scroll-hint-wrap { max-width: 340px; }
+
+/* bc mode breakdown on its own small line: footer grows a little only when it is shown */
+:root:has(#meta-battles:not([hidden]) .bc-breakdown) { --meta-h: calc(42px + env(safe-area-inset-bottom, 0px)); }
+:root:has(#meta-battles:not([hidden]) .bc-breakdown) #game-meta { flex-wrap: wrap; row-gap: 0; align-content: center; }
