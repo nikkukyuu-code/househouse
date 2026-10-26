@@ -91,6 +91,12 @@ export async function loadBattleCount(el) {
     }
     el.hidden = false;
     if (sep) sep.hidden = false;
+    // footer may need 2–3 lines on narrow phones: reserve exactly its real height (never clipped)
+    const foot = document.getElementById('game-meta');
+    if (foot) requestAnimationFrame(() => {
+      const h = Math.ceil(foot.getBoundingClientRect().height);
+      if (h > 0) document.documentElement.style.setProperty('--meta-h', h + 'px');
+    });
   };
   paint();
   const [n, ...ms] = await Promise.all([getCount(NS_KEY), ...BATTLE_MODES.map((m) => getCount(modeKey(m.id)))]);

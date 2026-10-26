@@ -2121,4 +2121,5 @@ html, body, #app { height: var(--app-h, 100dvh); }
 
 /* bc mode breakdown on its own small line: footer grows a little only when it is shown */
 :root:has(#meta-battles:not([hidden]) .bc-breakdown) { --meta-h: calc(42px + env(safe-area-inset-bottom, 0px)); }
-:root:has(#meta-battles:not([hidden]) .bc-breakdown) #game-meta { flex-wrap: wrap; row-gap: 0; align-content: center; }
+:root:has(#meta-battles:not([hidden]) .bc-breakdown) #game-meta { flex-wrap: wrap; row-gap: 0; align-content: center; height: auto; min-height: 0; overflow: visible; padding-top: 2px; padding-bottom: calc(2px + env(safe-area-inset-bottom, 0px)); }
+#meta-battles .bc-breakdown { white-space: normal; }
