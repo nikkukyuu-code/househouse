@@ -57,6 +57,7 @@ function hitKey(key, lastKey) {
  * mode: 'pvp' | 'com'. Hits the total key and the mode key. Never throws.
  */
 export function hitBattleCounter(mode) {
+    try { if (window.__nkVisitBattle) window.__nkVisitBattle(); } catch (_) {}
   hitKey(NS_KEY, BATTLE_LAST_KEY);
   if (BATTLE_MODES.some((m) => m.id === mode)) hitKey(modeKey(mode), modeLastKey(mode));
 }
