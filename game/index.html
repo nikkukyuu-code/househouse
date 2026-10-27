@@ -1,12 +1,37 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
+<script>
+/* 人らしい訪問 (nikkukyuu/househouse-human): 1タブ1回だけ・記録のみ（表示なし）。ボット除外、表示中に5秒滞在 or 操作で記録。 */
+(function () {
+  try {
+    if (navigator.webdriver || /bot|crawl|spider|slurp|headless|lighthouse|pagespeed|preview|facebookexternalhit|bingpreview|phantom|puppeteer|playwright|selenium/i.test(navigator.userAgent || '')) return;
+    var SK = 'nkHuman:househouse';
+    if (sessionStorage.getItem(SK)) return;
+    var done = false, t = null, EV = ['pointerdown', 'touchstart', 'keydown', 'scroll', 'wheel'];
+    function hit(k) { fetch('https://abacus.jasoncameron.dev/hit/nikkukyuu/' + k + '?_=' + Date.now(), { cache: 'no-store', mode: 'cors' }).catch(function () {}); }
+    function fire() {
+      if (done || document.visibilityState !== 'visible') return;
+      done = true; clearTimeout(t);
+      EV.forEach(function (e) { removeEventListener(e, onAct, true); });
+      try { if (sessionStorage.getItem(SK)) return; sessionStorage.setItem(SK, '1'); } catch (e) { return; }
+      hit('househouse-human');
+      
+    }
+    function onAct(e) { if (e.isTrusted !== false) fire(); }
+    function arm() { clearTimeout(t); if (!done && document.visibilityState === 'visible') t = setTimeout(fire, 5000); }
+    EV.forEach(function (e) { addEventListener(e, onAct, { capture: true, passive: true }); });
+    document.addEventListener('visibilitychange', arm);
+    arm();
+  } catch (e) {}
+})();
+</script>
   <meta charset="UTF-8" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E%F0%9F%8F%A0%3C/text%3E%3C/svg%3E" />
 <!--nk-autoupdate--><script>
 /* 自動更新: 新しい版が公開されたら、安全なとき（タイトル画面など・試合中でない）だけ自動で読み込み直す。記録(localStorage)には触れない。 */
 (function () {
-  var PAGE_LABEL = '2026-10-26 19:18:20';
+  var PAGE_LABEL = '2026-10-27 10:54:07';
   var URL = '/househouse/version.json', KEY = 'nkReloadFor:househouse', EVERY = 60;
   function safe() { try { return !!(document.querySelector('#screen-title.active') && !(document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName))); } catch (e) { return false; } }
   var busy = false;
@@ -34,7 +59,7 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta name="theme-color" content="#120e18" />
   <title>トリックハウスバトル</title>
-  <link rel="stylesheet" href="css/style.css?v=20261026191820" />
+  <link rel="stylesheet" href="css/style.css?v=20261027105407" />
 <link rel="apple-touch-icon" href="/househouse/apple-touch-icon.png" />
 <meta name="apple-mobile-web-app-title" content="ハウスバトル" />
 </head>
@@ -317,7 +342,7 @@
   </footer>
 
   <script type="module">
-    import { init } from './js/game.js?v=20261026191820';
+    import { init } from './js/game.js?v=20261027105407';
     init().catch((e) => {
       console.error(e);
       const n = document.getElementById('peer-note');
