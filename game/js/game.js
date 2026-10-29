@@ -9,15 +9,15 @@ import {
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
   HOUSE_SKINS, getHouseSkin, preloadTextures,
-} from './house.js?v=20261029123950';
-import { NetSession, QuickMatch, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20261029123950';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay, attachScrollHint } from './ui.js?v=20261029123950';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20261029123950';
-import { hitBattleCounter, loadBattleCount } from './stats.js?v=20261029123950';
+} from './house.js?v=20261029212240';
+import { NetSession, QuickMatch, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20261029212240';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay, attachScrollHint } from './ui.js?v=20261029212240';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20261029212240';
+import { hitBattleCounter, loadBattleCount } from './stats.js?v=20261029212240';
 
-export const GAME_VERSION = '2026-10-29 12:39:50';
-export const GAME_VERSION_BUST = '20261029123950';
-export const GAME_BUILD_TIME = 1793245190000;
+export const GAME_VERSION = '2026-10-29 21:22:40';
+export const GAME_VERSION_BUST = '20261029212240';
+export const GAME_BUILD_TIME = 1793276560000;
 
 const blueprint = createBlueprint();
 
@@ -3465,6 +3465,7 @@ function bindControls() {
   bindTap($('btn-share-code'), () => {
     const code = $('room-code-display').textContent.trim();
     if (!/^\d{6}$/.test(code) || !navigator.share) return;
+    try { window.__nkVisitShare && window.__nkVisitShare(); } catch (_) {}
     navigator.share({ title: 'トリックハウスバトル', text: 'トリックハウスバトルで対戦しよう！「部屋に入る」でコード ' + code + ' を入力してね', url: 'https://nikkukyuu-code.github.io/househouse/game/' }).catch(() => {});
   });
   bindTap($('btn-join'), () => { unlockAudio(); sfx('tap'); showJoinLobby(); });
