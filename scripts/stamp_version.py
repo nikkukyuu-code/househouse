@@ -19,3 +19,9 @@ for p in list((ROOT / 'game').rglob('*.js')) + list((ROOT / 'game').rglob('*.htm
 for p in [ROOT / 'index.html', ROOT / 'game/index.html']: au.set_label(p, label)
 au.write_json(ROOT / 'version.json', label, ms)
 print(ms, v, label)
+# static visible labels (meta-version span / site-meta)
+for p in [ROOT / 'index.html', ROOT / 'game/index.html']:
+    s = p.read_text()
+    s2 = re.sub(r'(<span id="meta-version">)[^<]*(</span>)', rf'\g<1>{label}\g<2>', s)
+    s2 = re.sub(r'(id="site-meta"[^>]*>バージョン )[0-9: -]+', rf'\g<1>{label}', s2)
+    if s2 != s: p.write_text(s2)
