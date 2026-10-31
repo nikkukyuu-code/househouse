@@ -488,7 +488,7 @@ a.btn.link-btn {
   position: relative;
   display: inline-block;
   color: #554444;
-  width: 0.95em;
+  width: auto;
 }
 .heart.half .heart-half-fill {
   position: absolute;
