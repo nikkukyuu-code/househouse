@@ -1,4 +1,4 @@
-import { drawInterior } from './interior.js?v=20261031101456';
+import { drawInterior } from './interior.js?v=20261031105843';
 
 /**
  * トリックハウスバトル — House layout, placement, and rendering helpers

@@ -2118,3 +2118,19 @@ html, body, #app { height: var(--app-h, 100dvh); }
 :root:has(#meta-battles:not([hidden]) .bc-breakdown) { --meta-h: calc(42px + env(safe-area-inset-bottom, 0px)); }
 :root:has(#meta-battles:not([hidden]) .bc-breakdown) #game-meta { flex-wrap: wrap; row-gap: 0; align-content: center; height: auto; min-height: 0; overflow: visible; padding-top: 2px; padding-bottom: calc(2px + env(safe-area-inset-bottom, 0px)); }
 #meta-battles .bc-breakdown { white-space: normal; }
+
+/* narrow phones: long translated shop descriptions must fit without inner scroll */
+@media (max-width: 340px) {
+  #screen-shop .shop-list { gap: 4px; }
+  #screen-shop .shop-item { gap: 2px 5px; padding: 4px 5px; }
+  #screen-shop .shop-swatch { width: clamp(34px, 6.4dvh, 48px); height: clamp(34px, 6.4dvh, 48px); }
+  #screen-shop .shop-item-desc { font-size: 0.58rem; line-height: 1.18; }
+  #screen-shop .shop-item-name { font-size: 0.72rem; }
+  #screen-shop .shop-item-actions .btn { min-height: 26px; }
+}
+/* name and price on separate rows so long translated names never overlap the price */
+#screen-shop .shop-swatch { grid-row: 1 / span 2; grid-column: 1; }
+#screen-shop .shop-item-name { grid-row: 1; align-self: end; margin: 0; overflow-wrap: anywhere; }
+#screen-shop .shop-item-price { grid-row: 2; align-self: start; margin: 0; }
+#screen-shop .shop-item-desc { grid-row: 3; grid-column: 1 / -1; }
+#screen-shop .shop-item-actions { grid-row: 4; grid-column: 1 / -1; }
