@@ -27,12 +27,12 @@
 })();
 </script>
   <meta charset="UTF-8" />
-<script>window.NK_I18N_CFG={"base": "../", "anchors": [[".title-logo .logo-top-row", "prepend"]], "css": ".title-logo .logo-top-row{padding-top:11px}"};</script><script src="../i18n/i18n.js?v=20261031105843"></script>
+<script>window.NK_I18N_CFG={"base": "../", "anchors": [[".title-logo .logo-top-row", "prepend"]], "css": ".title-logo .logo-top-row{padding-top:11px}"};</script><script src="../i18n/i18n.js?v=20261103214714"></script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E%F0%9F%8F%A0%3C/text%3E%3C/svg%3E" />
 <!--nk-autoupdate--><script>
 /* 自動更新: 新しい版が公開されたら、安全なとき（タイトル画面など・試合中でない）だけ自動で読み込み直す。記録(localStorage)には触れない。 */
 (function () {
-  var PAGE_LABEL = '2026-10-31 10:58:43';
+  var PAGE_LABEL = '2026-11-03 21:47:14';
   var URL = '/househouse/version.json', KEY = 'nkReloadFor:househouse', EVERY = 60;
   function safe() { try { return !!(document.querySelector('#screen-title.active') && !(document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName))); } catch (e) { return false; } }
   var busy = false;
@@ -60,7 +60,7 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta name="theme-color" content="#120e18" />
   <title>トリックハウスバトル</title>
-  <link rel="stylesheet" href="css/style.css?v=20261031105843" />
+  <link rel="stylesheet" href="css/style.css?v=20261103214714" />
 <link rel="apple-touch-icon" href="/househouse/apple-touch-icon.png" />
 <meta name="apple-mobile-web-app-title" content="ハウスバトル" />
 <script>
@@ -81,7 +81,14 @@
     var ref = ''; try { if (document.referrer) { var u = new URL(document.referrer); ref = u.origin + u.pathname; } } catch (e) {}
     var yt = ''; try { yt = sessionStorage.getItem('nkSrcYt') === '1' || /[?&]src=yt(&|$)/.test(location.search) ? 'yt' : ''; } catch (e) {}
     setTimeout(function () { once('nkVL:' + P, { ev: 'load', s: yt, r: ref, wd: navigator.webdriver ? 1 : 0 }); }, 0);
-    window.__nkVisitBattle = function () { send({ ev: 'battle' }) /* 対戦ごと */; };
+    /* 対戦ごと: 開始(ev=battle, b=対戦ID, m=モード) と終了(ev=bend, r=結果)。画面には何も出さない */
+    var bid = null;
+    window.__nkVisitBattle = function (m) {
+      bid = (Math.random().toString(36).slice(2, 8) + Date.now().toString(36)).replace(/[^a-z0-9]/g, '').slice(0, 16);
+      var o = { ev: 'battle', b: bid }; if (m) o.m = String(m).slice(0, 16); send(o);
+    };
+    window.__nkVisitBattleEnd = function (r) { if (!bid) return; var o = { ev: 'bend', b: bid, r: String(r || '').slice(0, 8) }; bid = null; send(o); };
+    addEventListener('pagehide', function () { try { window.__nkVisitBattleEnd('leave'); } catch (e) {} });
     window.__nkVisitShare = function () { send({ ev: 'share' }); }; /* 共有ボタンを押した回数（毎回） */
     var done = false, t = null, EV = ['pointerdown', 'touchstart', 'keydown', 'scroll', 'wheel'];
     function fire() {
@@ -370,7 +377,7 @@
   </div>
 
   <footer id="game-meta" aria-label="バージョンとアクセス数">
-    <span class="ver-pre" style="white-space:nowrap">バージョン <span id="meta-version">2026-10-31 10:58:43</span></span>
+    <span class="ver-pre" style="white-space:nowrap">バージョン <span id="meta-version">2026-11-03 21:47:14</span></span>
     <span id="app-version">2026-09-29 12:46:55</span>
     <span class="meta-sep" aria-hidden="true">｜</span>
     <span id="meta-visits" class="meta-visits"><span class="meta-visits-label">アクセス</span> <img id="meta-visits-badge" alt="access" width="70" height="20" /></span>
@@ -379,7 +386,7 @@
   </footer>
 
   <script type="module">
-    import { init } from './js/game.js?v=20261031105843';
+    import { init } from './js/game.js?v=20261103214714';
     init().catch((e) => {
       console.error(e);
       const n = document.getElementById('peer-note');

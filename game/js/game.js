@@ -9,15 +9,15 @@ import {
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
   HOUSE_SKINS, getHouseSkin, preloadTextures,
-} from './house.js?v=20261031105843';
-import { NetSession, QuickMatch, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20261031105843';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay, attachScrollHint } from './ui.js?v=20261031105843';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20261031105843';
-import { hitBattleCounter, loadBattleCount } from './stats.js?v=20261031105843';
+} from './house.js?v=20261103214714';
+import { NetSession, QuickMatch, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20261103214714';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay, attachScrollHint } from './ui.js?v=20261103214714';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20261103214714';
+import { hitBattleCounter, loadBattleCount } from './stats.js?v=20261103214714';
 
-export const GAME_VERSION = '2026-10-31 10:58:43';
-export const GAME_VERSION_BUST = '20261031105843';
-export const GAME_BUILD_TIME = 1793405259055;
+export const GAME_VERSION = '2026-11-03 21:47:14';
+export const GAME_VERSION_BUST = '20261103214714';
+export const GAME_BUILD_TIME = 1793710034000;
 
 const blueprint = createBlueprint();
 
@@ -2390,6 +2390,7 @@ function drawResultChestReveal(chest, reason) {
 
 /** On ANY loss (宝箱を取られた／体力ゼロなど), show opponent chest location. */
 function showResultScreen(iWon, reasonText) {
+  try { if (window.__nkVisitBattleEnd) window.__nkVisitBattleEnd(iWon ? 'win' : 'lose'); } catch (_) {}
   const overlay = $('result-overlay');
   const title = $('result-title');
   const reasonEl = $('result-reason');
