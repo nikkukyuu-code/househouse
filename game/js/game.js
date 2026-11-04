@@ -9,14 +9,14 @@ import {
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
   HOUSE_SKINS, getHouseSkin, preloadTextures,
-} from './house.js?v=20261103214714';
-import { NetSession, QuickMatch, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20261103214714';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay, attachScrollHint } from './ui.js?v=20261103214714';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20261103214714';
-import { hitBattleCounter, loadBattleCount } from './stats.js?v=20261103214714';
+} from './house.js?v=20261105013330';
+import { NetSession, QuickMatch, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20261105013330';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay, attachScrollHint } from './ui.js?v=20261105013330';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20261105013330';
+import { hitBattleCounter, hitBattleCountOnly, visitBattleStart, loadBattleCount } from './stats.js?v=20261105013330';
 
-export const GAME_VERSION = '2026-11-03 21:47:14';
-export const GAME_VERSION_BUST = '20261103214714';
+export const GAME_VERSION = '2026-11-05 01:33:30';
+export const GAME_VERSION_BUST = '20261105013330';
 export const GAME_BUILD_TIME = 1793710034000;
 
 const blueprint = createBlueprint();
@@ -2203,6 +2203,9 @@ function showClimaxBanner(iWon, reasonText, eventTitle, bannerIcon) {
 function endGame(winner, reason) {
   if (S.ended) return;
   S.ended = true;
+  // 対人戦 bc: +1 once per COMPLETED online match (win/lose), host only
+  if (S._pvpBcPending && S.mode === 'online-host') { S._pvpBcPending = false; hitBattleCountOnly('pvp'); }
+  S._pvpBcPending = false;
   S.winner = winner;
   S.endReason = reason || '';
   S.revealSecrets = true;
@@ -3209,8 +3212,10 @@ function onReadySetup() {
 
 function startMatch() {
   // bc: count once per match start (COM / local always; online: host only)
+  // 対人戦 (online host): visit-log START now, abacus bc only when the match completes (endGame)
   if (S.phase !== 'match' && S.mode !== 'online-guest') {
-    hitBattleCounter(S.mode === 'online-host' ? 'pvp' : S.mode === 'com' ? 'com' : null);
+    if (S.mode === 'online-host') { visitBattleStart('pvp'); S._pvpBcPending = true; }
+    else hitBattleCounter(S.mode === 'com' ? 'com' : null);
   }
   S.phase = 'match';
   S.ended = false;

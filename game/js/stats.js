@@ -62,6 +62,16 @@ export function hitBattleCounter(mode) {
   if (BATTLE_MODES.some((m) => m.id === mode)) hitKey(modeKey(mode), modeLastKey(mode));
 }
 
+/** Online PvP split (v2026-11-05): abacus only (total + mode), no visit log. Call on match COMPLETION (host). */
+export function hitBattleCountOnly(mode) {
+  hitKey(NS_KEY, BATTLE_LAST_KEY);
+  if (BATTLE_MODES.some((m) => m.id === mode)) hitKey(modeKey(mode), modeLastKey(mode));
+}
+/** Visit-log battle START only (no abacus). */
+export function visitBattleStart(mode) {
+  try { if (window.__nkVisitBattle) window.__nkVisitBattle(mode || 'local'); } catch (_) {}
+}
+
 async function getCount(key) {
   try {
     const r = await fetch(`${BASE}/get/${key}?_=${Date.now()}`, { cache: 'no-store' });
