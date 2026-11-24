@@ -9,15 +9,20 @@ import {
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
   HOUSE_SKINS, getHouseSkin, preloadTextures,
-} from './house.js?v=20261105013330';
-import { NetSession, QuickMatch, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20261105013330';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay, attachScrollHint } from './ui.js?v=20261105013330';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20261105013330';
-import { hitBattleCounter, hitBattleCountOnly, visitBattleStart, loadBattleCount } from './stats.js?v=20261105013330';
+} from './house.js?v=20261125044051';
+import { NetSession, QuickMatch, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20261125044051';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay, attachScrollHint } from './ui.js?v=20261125044051';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20261125044051';
+import { hitBattleCounter, hitBattleCountOnly, visitBattleStart, loadBattleCount } from './stats.js?v=20261125044051';
+import {
+  beginComRankMatch, submitComResult, applyComResult, loadStreak, refreshStreakUi,
+  paintResultRank, showAlmostMatchBanner, openRanking, bindRankingUi, installDebugHook,
+  retryPending, formatRankTime,
+} from './ranking.js?v=20261125044051';
 
-export const GAME_VERSION = '2026-11-05 01:33:30';
-export const GAME_VERSION_BUST = '20261105013330';
-export const GAME_BUILD_TIME = 1793710034000;
+export const GAME_VERSION = '2026-11-25 04:40:51';
+export const GAME_VERSION_BUST = '20261125044051';
+export const GAME_BUILD_TIME = 1795549251602;
 
 const blueprint = createBlueprint();
 
@@ -289,7 +294,7 @@ function playFallFx(view, fromFloor, willDrop, delayMs = 900) {
   }, delayMs);
   wrap._fallT2 = setTimeout(() => el.remove(), delayMs + (drop ? FALL_LAND_MS + 30 : 600));
 }
-if (typeof window !== 'undefined' && /[?&]debug=1\b/.test(location.search)) { window.__debugFallFx = playFallFx; window.__hhState = S; window.__hh = { S, T, endGame, startMatch, generateComHouse, dropFromTrap, aiBoostDangerAround, aiFloorUnvisited, FLOORS, tryMove, checkHazards, onTrapHit, isWalkable, tileAt, blueprint: () => blueprint, aiStep }; }
+if (typeof window !== 'undefined' && /[?&]debug=1\b/.test(location.search)) { window.__debugFallFx = playFallFx; window.__hhState = S; window.__hh = { S, T, endGame, startMatch, generateComHouse, dropFromTrap, aiBoostDangerAround, aiFloorUnvisited, FLOORS, tryMove, checkHazards, onTrapHit, isWalkable, tileAt, blueprint: () => blueprint, aiStep, searchClockMs }; installDebugHook(); }
 
 /** Big floor badge + 3-step gauge on each board (match + setup). */
 function updateFloorBadges() {
@@ -2216,6 +2221,29 @@ function endGame(winner, reason) {
   const iWon = winner === 'me';
   // COM matches only: win/loss record → next enemy level (PvP never counted, never shown)
   S._enemyLvChange = S.mode === 'com' ? recordComResult(iWon) : null;
+  if (S.mode === 'com') {
+    searchClockPause();
+    const searchMs = searchClockMs();
+    S._lastSearchMs = searchMs;
+    S._rankLocal = applyComResult(iWon, searchMs);
+    refreshStreakUi();
+    const startP = S._rankStart;
+    S._rankStart = null;
+    (async () => {
+      try { if (startP) await startP; } catch (_) {}
+      try { S._rankServer = await submitComResult(iWon, searchMs); }
+      catch (_) { S._rankServer = { ok: false }; }
+      const ov = document.getElementById('result-overlay');
+      if (ov && ov.classList.contains('show')) {
+        paintResultRank({
+          searchMs,
+          windowMs: S._rankLocal && S._rankLocal.windowMs,
+          isPb: S._rankLocal && S._rankLocal.isPb,
+          server: S._rankServer,
+        }, { won: iWon, com: true });
+      }
+    })();
+  }
   refreshEnemyLvUi();
   // Remaining life → points only on win
   awardMatchPointsFromHp(iWon);
@@ -2430,6 +2458,14 @@ function showResultScreen(iWon, reasonText) {
   }
   if (reasonEl) reasonEl.textContent = '理由：' + reasonText;
   refreshPointsUi(S._pointsGained);
+  const matchAlmost = $('match-almost');
+  if (matchAlmost) { matchAlmost.classList.add('hidden'); matchAlmost.classList.remove('show'); }
+  paintResultRank({
+    searchMs: S._lastSearchMs,
+    windowMs: S._rankLocal && S._rankLocal.windowMs,
+    isPb: S._rankLocal && S._rankLocal.isPb,
+    server: S._rankServer,
+  }, { won: iWon, com: S.mode === 'com' });
   const lvEl = $('result-enemy-lv');
   if (lvEl) {
     const ch = S.mode === 'com' ? S._enemyLvChange : null;
@@ -2842,6 +2878,11 @@ const TUTORIAL_STEPS = [
     body: 'まずは「COM対戦」がおすすめです。\n一人で設計と探索の流れを練習しましょう。\n準備ができたらタイトルへ戻るか、そのままCOMへ進めます。',
     tip: 'オンラインはルームコードで友だちと対戦。',
   },
+  {
+    title: 'ランキング',
+    body: 'COM対戦で3回連続して勝つと、各試合の「探し始めから終わりまで」の時間の合計がランキングに載ります（短いほど上位、ミリ秒単位）。\n4連勝以降は、その連勝の中の直近3勝の合計がいちばん良いものが残ります。負けると連勝はリセット。対人戦は記録されません。',
+    tip: '2連勝すると「あと1勝でランキング挑戦！」と出ます。',
+  },
 ];
 
 let tutorialStep = 0;
@@ -2867,6 +2908,7 @@ function openTutorialFromGame() {
   const tipEl = $('ingame-tip');
   if (tipEl) tipEl.classList.add('hidden');
   S.ingameTipOpen = false;
+  if (S.phase === 'match') searchClockPause();
   openTutorial(true);
 }
 
@@ -2876,6 +2918,7 @@ function leaveTutorial() {
     tutorialReturn = null;
     S.phase = ret.phase;
     showScreen(ret.screen);
+    if (ret.phase === 'match') syncSearchClock();
     const home = $('btn-tutorial-home');
     if (home) home.textContent = '戻る';
     if (ret.phase === 'setup') {
@@ -3021,6 +3064,7 @@ function maybeShowNextTip() {
     if (el) el.classList.remove('hidden');
     S.ingameTipOpen = true;
     S.holdDir = null;
+    syncSearchClock();
     return;
   }
 }
@@ -3036,6 +3080,7 @@ function dismissCurrentTip() {
   const el = $('ingame-tip');
   if (el) el.classList.add('hidden');
   S.ingameTipOpen = false;
+  syncSearchClock();
   maybeShowNextTip();
 }
 
@@ -3047,6 +3092,7 @@ function skipAllIngameTips() {
   const el = $('ingame-tip');
   if (el) el.classList.add('hidden');
   S.ingameTipOpen = false;
+  syncSearchClock();
 }
 
 function hideIngameTipUi() {
@@ -3055,12 +3101,15 @@ function hideIngameTipUi() {
   const el = $('ingame-tip');
   if (el) el.classList.add('hidden');
   S.ingameTipOpen = false;
+  syncSearchClock();
 }
 
 /* ---------- Flow ---------- */
 function goTitle() {
   S.phase = 'title';
   loadBattleCount(document.getElementById('meta-battles'));
+  refreshStreakUi();
+  retryPending();
   tutorialReturn = null;
   hideIngameTipUi();
   cancelQuickMatch();
@@ -3210,6 +3259,28 @@ function onReadySetup() {
   maybeStartOnlineMatch();
 }
 
+
+/* ---------- COM search-time clock (ranking). Excludes tip / help overlays. ---------- */
+function searchClockStart() {
+  if (S.mode !== 'com' || S.ended) return;
+  if (!S._searchRunStart) S._searchRunStart = performance.now();
+}
+function searchClockPause() {
+  if (S._searchRunStart) {
+    S._searchAcc = (S._searchAcc || 0) + (performance.now() - S._searchRunStart);
+    S._searchRunStart = 0;
+  }
+}
+function searchClockMs() {
+  let n = S._searchAcc || 0;
+  if (S._searchRunStart) n += performance.now() - S._searchRunStart;
+  return Math.max(0, Math.round(n));
+}
+function syncSearchClock() {
+  if (S.mode !== 'com' || S.phase !== 'match' || S.ended || S.ingameTipOpen) searchClockPause();
+  else searchClockStart();
+}
+
 function startMatch() {
   // bc: count once per match start (COM / local always; online: host only)
   // 対人戦 (online host): visit-log START now, abacus bc only when the match completes (endGame)
@@ -3298,6 +3369,19 @@ function startMatch() {
   tipQueue = tipQueue.filter((id) => !String(id).startsWith('setup-'));
   enqueueTip('match-start');
   enqueueTip('match-trap');
+
+  S._searchAcc = 0;
+  S._searchRunStart = 0;
+  S._rankStart = null;
+  S._rankServer = null;
+  S._rankLocal = null;
+  S._lastSearchMs = 0;
+  refreshStreakUi();
+  if (S.mode === 'com') {
+    S._rankStart = beginComRankMatch();
+    syncSearchClock();
+    showAlmostMatchBanner();
+  }
 }
 
 /* ---------- Online: 対戦相手を探す (random matchmaking, see net.js QuickMatch) ---------- */
@@ -3579,6 +3663,12 @@ function bindControls() {
     }
   });
   bindTap($('btn-title'), () => goTitle());
+  bindTap($('btn-ranking'), () => {
+    unlockAudio();
+    sfx('tap');
+    openRanking();
+  });
+  bindRankingUi();
   bindTap($('btn-shop'), () => {
     sfx('tap');
     openHouseShop();
@@ -3590,6 +3680,9 @@ function bindControls() {
   const shopList = $('shop-list');
   if (shopList) { shopList.addEventListener('click', onShopListClick); attachScrollHint(shopList); }
   attachScrollHint($('tutorial-card'));
+  refreshStreakUi();
+  retryPending();
+  installDebugHook();
 
   window.addEventListener('resize', () => {
     resizeCanvases();

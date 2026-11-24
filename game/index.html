@@ -27,12 +27,12 @@
 })();
 </script>
   <meta charset="UTF-8" />
-<script>window.NK_I18N_CFG={"base": "../", "anchors": [[".title-logo .logo-top-row", "prepend"]], "css": ".title-logo .logo-top-row{padding-top:11px}"};</script><script src="../i18n/i18n.js?v=20261105013330"></script>
+<script>window.NK_I18N_CFG={"base": "../", "anchors": [[".title-logo .logo-top-row", "prepend"]], "css": ".title-logo .logo-top-row{padding-top:11px}"};</script><script src="../i18n/i18n.js?v=20261125044051"></script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E%F0%9F%8F%A0%3C/text%3E%3C/svg%3E" />
 <!--nk-autoupdate--><script>
 /* 自動更新: 新しい版が公開されたら、安全なとき（タイトル画面など・試合中でない）だけ自動で読み込み直す。記録(localStorage)には触れない。 */
 (function () {
-  var PAGE_LABEL = '2026-11-05 01:33:30';
+  var PAGE_LABEL = '2026-11-25 04:40:51';
   var URL = '/househouse/version.json', KEY = 'nkReloadFor:househouse', EVERY = 60;
   function safe() { try { return !!(document.querySelector('#screen-title.active') && !(document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName))); } catch (e) { return false; } }
   var busy = false;
@@ -60,7 +60,7 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta name="theme-color" content="#120e18" />
   <title>トリックハウスバトル</title>
-  <link rel="stylesheet" href="css/style.css?v=20261105013330" />
+  <link rel="stylesheet" href="css/style.css?v=20261125044051" />
 <link rel="apple-touch-icon" href="/househouse/apple-touch-icon.png" />
 <meta name="apple-mobile-web-app-title" content="ハウスバトル" />
 <script>
@@ -154,12 +154,14 @@
       </h1>
       <div class="title-lv" id="title-lv">
         <p class="tl-row" id="title-lv-com"><b class="tl-tier">COM</b><span class="tl-rate">勝率 --%<small>（0勝0敗）</small></span><span class="tl-lv">敵Lv 1</span></p>
+        <p class="title-streak" id="title-streak">連勝 0</p>
         <p class="tl-note">勝率が上がるほど、敵が強くなります（敵レベル 最高100）</p>
       </div>
       <p class="title-sub">自分の家に罠と宝箱を設置して、<br />お互いの家に行って宝箱を探しだせ！</p>
       <div class="title-points-row"><p class="title-points" id="title-points">ポイント 0</p><button type="button" class="btn btn-ghost btn-compact share-btn" data-share-btn data-share-title="トリックハウスバトル" data-share-text="ブラウザゲーム「トリックハウスバトル」 ほかのゲームもこちらから遊べます">📤 共有</button></div>
       <div class="btn-col">
         <button type="button" class="btn btn-com" id="btn-com">COM対戦 <span class="btn-com-lv" id="btn-com-lv">敵Lv 1</span></button>
+        <button type="button" class="btn btn-rank" id="btn-ranking">🏆 ランキング</button>
         <button type="button" class="btn btn-ghost" id="btn-tutorial">チュートリアル</button>
         <button type="button" class="btn btn-secondary" id="btn-shop">家ショップ</button>
         <div class="online-group" role="group" aria-label="オンライン対戦">
@@ -217,6 +219,50 @@
     </section>
 
     <!-- ロビー -->
+    <section id="screen-ranking" class="screen">
+      <button type="button" class="sub-back" data-back="btn-ranking-back" aria-label="タイトルへ戻る">◀ 戻る</button>
+      <h2 class="rk-heading">🏆 ランキング</h2>
+      <p class="rk-desc">COM対戦で3連勝したときの、探し始めから終わりまでの合計時間（短いほど上位）。対人戦は対象外です。</p>
+      <div class="rk-nick">
+        <label for="rk-nick-input">ニックネーム</label>
+        <div class="rk-nick-row">
+          <input type="text" id="rk-nick-input" maxlength="12" autocomplete="off" enterkeyhint="done" placeholder="名無し" />
+          <button type="button" id="btn-rk-nick-save" class="rk-save">変更</button>
+        </div>
+        <p id="rk-nick-msg" class="rk-nick-msg" role="status" aria-live="polite"></p>
+      </div>
+      <div class="rk-tabs rk-period" role="tablist">
+        <button type="button" class="rk-tab" data-period="day">日間</button>
+        <button type="button" class="rk-tab active" data-period="week">週間</button>
+        <button type="button" class="rk-tab" data-period="month">月間</button>
+        <button type="button" class="rk-tab" data-period="year">年間</button>
+        <button type="button" class="rk-tab" data-period="alltime">歴代</button>
+      </div>
+      <div class="rk-nav">
+        <button type="button" id="btn-rk-prev" class="rk-arrow" aria-label="前の期間">◀</button>
+        <div class="rk-when"><b id="rk-label">―</b><small id="rk-sub">集計中</small></div>
+        <button type="button" id="btn-rk-next" class="rk-arrow" aria-label="次の期間">▶</button>
+      </div>
+      <div id="rk-me" class="rk-me">―</div>
+      <div id="rk-my-medals" class="rk-my-medals"></div>
+      <div id="rk-scroll" class="rk-scroll allow-scroll">
+        <ol id="rk-list" class="rk-list"></ol>
+        <details class="rk-help">
+          <summary>メダルとルール</summary>
+          <div class="rk-help-body">
+            <p>COM対戦に3回連続で勝つと、各試合の「探し始め（探索開始）から試合終了まで」の時間を足した合計が記録されます。短いほど上位です（ミリ秒単位）。</p>
+            <p>4連勝、5連勝と続いたときは、その連勝の中の「直近3勝」の合計がいちばん良いものとして残ります。負けると連勝は0に戻ります。対人戦（ネット・部屋）は記録されません。</p>
+            <p>各期間（日間・週間・月間・年間）の1〜3位に、期間が終わった時点で金・銀・銅メダルが贈られます。週間は日曜0:00〜次の日曜0:00（日本時間）。</p>
+            <div id="rk-medal-sample" class="rk-medal-sample"></div>
+            <p class="rk-medal-legend">数字＝順位（金1・銀2・銅3）、下の札＝期間（日・週・月・年）。</p>
+          </div>
+        </details>
+      </div>
+      <div class="btn-col" style="max-width:280px;margin-top:8px">
+        <button type="button" class="btn btn-ghost" id="btn-ranking-back">タイトルへ</button>
+      </div>
+    </section>
+
     <section id="screen-lobby" class="screen">
       <button type="button" class="sub-back" data-back="btn-lobby-back" aria-label="タイトルへ戻る">◀ 戻る</button>
       <p class="lobby-label">オンライン対戦</p>
@@ -318,6 +364,7 @@
       <div class="match-half bot">
         <div class="match-hud">
           <span class="label">あなたの体力</span>
+          <span class="match-streak" id="match-streak">連勝 0</span>
           <button type="button" class="btn-help btn-help-match" id="btn-help-match" title="遊び方" aria-label="遊び方">？</button>
           <span class="hearts" id="hp-bot"></span>
         </div>
@@ -336,6 +383,8 @@
         </div>
       </div>
 
+      <div id="match-almost" class="almost-banner hidden" aria-live="polite">あと1勝でランキング挑戦！</div>
+
       <div id="end-banner" aria-live="polite">
         <div id="end-banner-chip">決定打</div>
         <div id="end-banner-icon"></div>
@@ -350,12 +399,15 @@
           <p class="result-chest-loc" id="result-chest-loc"></p>
           <canvas id="result-chest-canvas" width="200" height="140"></canvas>
         </div>
+        <div id="result-almost" class="almost-banner hidden" aria-live="polite">あと1勝でランキング挑戦！</div>
         <div id="result-title">勝利！</div>
         <p id="result-reason"></p>
         <p id="result-sub"></p>
         <p id="result-points-gain" class="result-points-gain hidden"></p>
         <p id="result-points" class="result-points">ポイント 0</p>
         <p id="result-enemy-lv" class="result-enemy-lv hidden"></p>
+        <div id="result-rank" class="result-rank hidden"></div>
+        <div id="rank-celebrate" class="rank-celebrate hidden" aria-live="polite"></div>
         <div class="btn-col" style="max-width:260px">
           <button type="button" class="btn btn-primary" id="btn-again">もう一度</button>
           <button type="button" class="btn btn-ghost" id="btn-title">タイトルへ</button>
@@ -377,7 +429,7 @@
   </div>
 
   <footer id="game-meta" aria-label="バージョンとアクセス数">
-    <span class="ver-pre" style="white-space:nowrap">バージョン <span id="meta-version">2026-11-05 01:33:30</span></span>
+    <span class="ver-pre" style="white-space:nowrap">バージョン <span id="meta-version">2026-11-25 04:40:51</span></span>
     <span id="app-version">2026-09-29 12:46:55</span>
     <span class="meta-sep" aria-hidden="true">｜</span>
     <span id="meta-visits" class="meta-visits"><span class="meta-visits-label">アクセス</span> <img id="meta-visits-badge" alt="access" width="70" height="20" /></span>
@@ -386,7 +438,7 @@
   </footer>
 
   <script type="module">
-    import { init } from './js/game.js?v=20261105013330';
+    import { init } from './js/game.js?v=20261125044051';
     init().catch((e) => {
       console.error(e);
       const n = document.getElementById('peer-note');

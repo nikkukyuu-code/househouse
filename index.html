@@ -2,12 +2,12 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-<script>window.NK_I18N_CFG={"base": "", "anchors": [["h1", "prepend"]]};</script><script src="i18n/i18n.js?v=20261105013330"></script>
+<script>window.NK_I18N_CFG={"base": "", "anchors": [["h1", "prepend"]]};</script><script src="i18n/i18n.js?v=20261125044051"></script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E%F0%9F%8F%A0%3C/text%3E%3C/svg%3E" />
 <!--nk-autoupdate--><script>
 /* 自動更新: 新しい版が公開されたら、安全なとき（タイトル画面など・試合中でない）だけ自動で読み込み直す。記録(localStorage)には触れない。 */
 (function () {
-  var PAGE_LABEL = '2026-11-05 01:33:30';
+  var PAGE_LABEL = '2026-11-25 04:40:51';
   var URL = '/househouse/version.json', KEY = 'nkReloadFor:househouse-top', EVERY = 0;
   function safe() { try { return !!(true); } catch (e) { return false; } }
   var busy = false;
@@ -140,7 +140,7 @@
     <p class="lead"><strong>自分の家に罠と宝箱を設置して、お互いの家に行って宝箱を探すゲーム</strong>です。爆弾や落とし穴で相手を邪魔しながら、先に宝箱を見つけた方が勝ち。</p>
     <p class="tagline">スマホ向け・タッチ操作／COM対戦・ネット対戦あり</p>
 
-    <a class="play" href="game/?v=20261105013330">今すぐ遊ぶ</a>
+    <a class="play" href="game/?v=20261125044051">今すぐ遊ぶ</a>
 
     <div class="save-banner" role="note">
       <strong>⚠ 記録（ポイント・持っている家・選んだ家・COMが覚えた場所など）はこの端末に保存されています。</strong>記録が消えることがあります：
@@ -197,7 +197,20 @@
           <li><span class="num">3</span>「準備完了」で対戦スタート</li>
           <li><span class="num">4</span>ネット対戦は「対戦相手を探す」で自動マッチ、知り合いとは「部屋を作る」→ 6桁の数字を相手に伝える</li>
           <li><span class="num">5</span>ポイントは<strong>COM対戦で勝った時だけ</strong>もらえます（残りライフ1つ＝1ポイント）。<strong>対人戦（ネット対戦・部屋での対戦）ではポイントは入りません</strong></li>
+          <li><span class="num">6</span>ランキングは<strong>COM対戦で3回連続して勝ったとき</strong>の記録です。各試合の「探し始め（探索開始）から終わりまで」の時間を足した合計（ミリ秒単位）で、短いほど上位。4連勝以降は、その連勝の中の直近3勝の合計がいちばん良いものが残ります。負けると連勝は0に戻ります。対人戦の記録は載りません。</li>
         </ol>
+      </div>
+    </section>
+
+    <section>
+      <h2>ランキング</h2>
+      <div class="card">
+        <ul>
+          <li>タイトルの「🏆 ランキング」から、日間・週間・月間・年間・歴代の順位を見られます（自分の順位は色付きで表示）。</li>
+          <li>記録は COM 3連勝の探索時間合計。連勝数はタイトル・対戦中・結果画面に表示されます。</li>
+          <li>2連勝すると「あと1勝でランキング挑戦！」の演出が出ます。記録が登録されたとき、自己ベストを更新したとき、上位に入ったときにはお祝い演出と順位が出ます。</li>
+          <li>各期間の終了時、1〜3位に金・銀・銅メダルが贈られます。</li>
+        </ul>
       </div>
     </section>
 
@@ -216,9 +229,9 @@
       </div>
     </section>
 
-    <a class="play" href="game/?v=20261105013330">ゲームを始める</a>
+    <a class="play" href="game/?v=20261125044051">ゲームを始める</a>
     <p style="margin-top:14px;text-align:center;font-size:0.85rem;"><a href="https://freegame-mugen.jp/cms/mt-cp.cgi?__mode=view&amp;blog_id=1&amp;id=13413" target="_blank" rel="noopener">フリーゲーム夢現</a></p>
-    <p id="site-meta" style="margin-top:18px;text-align:center;color:#887868;font-size:0.8rem;">バージョン 2026-11-05 01:33:30</p>
+    <p id="site-meta" style="margin-top:18px;text-align:center;color:#887868;font-size:0.8rem;">バージョン 2026-11-25 04:40:51</p>
   </main>
 </body>
 </html>
