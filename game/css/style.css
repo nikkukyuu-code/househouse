@@ -2214,6 +2214,7 @@ html, body, #app { height: var(--app-h, 100dvh); }
   gap: 6px; min-height: 0; overflow: hidden;
 }
 #screen-ranking.active { display: flex; }
+#screen-ranking > :not(.rk-scroll):not(.scroll-hint-wrap) { flex-shrink: 0; } /* 行が多いときに見出し・タブ・説明が押しつぶされて見切れないよう、縮むのは一覧だけにする */
 #screen-ranking .sub-back { position: sticky; top: 0; align-self: flex-start; z-index: 5; }
 .rk-heading { margin: 0 0 0 44px; text-align: left; font-size: clamp(1.05rem, 4.2vw, 1.3rem); color: #ffe08a; }
 .rk-desc { margin: 0; font-size: 0.78rem; line-height: 1.4; color: #dcc9a0; text-align: left; }
@@ -2252,7 +2253,7 @@ html, body, #app { height: var(--app-h, 100dvh); }
 }
 .rk-row.mine { background: rgba(255, 224, 138, .16); box-shadow: inset 0 0 0 1px #e8c15a; border-radius: 8px; }
 .rk-pos { width: 2em; text-align: right; color: #e8c15a; font-variant-numeric: tabular-nums; }
-.rk-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rk-name { flex: 1; min-width: 0; overflow-wrap: anywhere; word-break: break-word; } /* 12文字の幅広い名前も省略せず折り返して全部見せる */
 .rk-score { font-variant-numeric: tabular-nums; color: #fff3c2; white-space: nowrap; }
 .rk-years { color: #cbb892; font-weight: 600; }
 .rk-help { margin: 10px 0 16px; color: #dcc9a0; font-size: 0.78rem; }
@@ -2264,7 +2265,7 @@ html, body, #app { height: var(--app-h, 100dvh); }
 .rk-medals-none { font-size: 0.72rem; color: #a89870; }
 
 @media (max-height: 600px) {
-  .rk-desc { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .rk-desc { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .result-rank { font-size: 0.7rem; }
   #result-overlay .almost-banner { padding: 5px 10px; font-size: 0.8rem; margin-bottom: 3px; }
 }

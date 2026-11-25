@@ -2,8 +2,8 @@
  * トリックハウスバトル — online ranking client (COM 3-win search-time, lower is better).
  * NEW localStorage keys only (never rename existing progress keys). Each has a -bak copy.
  */
-import { sealScore } from './seal.js?v=20261125044051';
-import { $, showScreen, attachScrollHint } from './ui.js?v=20261125044051';
+import { sealScore } from './seal.js?v=20261126032732';
+import { $, showScreen, attachScrollHint } from './ui.js?v=20261126032732';
 
 const PROD_API = 'https://house-ranking.nikkukyuu.workers.dev';
 const TEST_API = 'https://house-ranking-test.nikkukyuu.workers.dev';
@@ -403,7 +403,9 @@ function setRkMsg(text, kind) {
   el.className = 'rk-nick-msg' + (kind ? ' ' + kind : '');
 }
 
+let rkSeq = 0; // 最新の描画だけが画面を更新する（ニックネーム変更前に飛んだ古い応答が、変更後の画面を古い名前で上書きしないように）
 async function renderRanking() {
+  const seq = ++rkSeq;
   const label = $('rk-label');
   const sub = $('rk-sub');
   const list = $('rk-list');
@@ -419,6 +421,7 @@ async function renderRanking() {
     b.classList.toggle('active', b.dataset.period === period);
   });
   const r = await fetchRanking(period, key);
+  if (seq !== rkSeq) return; // もっと新しい描画が始まっている（古い応答は捨てる）
   if (!r.ok) {
     list.innerHTML = `<li class="rk-err">${r.message || '読み込みに失敗しました'}</li>`;
     if (meBox) meBox.textContent = '―';
@@ -429,7 +432,8 @@ async function renderRanking() {
     if (meBox) meBox.textContent = '―';
     return;
   }
-  const myId = rankIdentity().id;
+  const meId = rankIdentity();
+  const myId = meId.id;
   list.innerHTML = '';
   if (!r.top || !r.top.length) {
     const li = document.createElement('li');
@@ -442,7 +446,8 @@ async function renderRanking() {
       li.className = 'rk-row' + (row.id === myId ? ' mine' : '');
       const years = row.years && row.years.length ? ` <small class="rk-years">${row.years.join(', ')}</small>` : '';
       li.innerHTML = `<span class="rk-pos">${row.rank}</span><span class="rk-name"></span><span class="rk-score">${formatRankTime(row.ms)}</span>${years}`;
-      li.querySelector('.rk-name').textContent = row.nickname || DEFAULT_NICK;
+      // 自分の行は端末の（サーバー確定済み）最新名を使う
+      li.querySelector('.rk-name').textContent = (row.id === myId && meId.nickname ? meId.nickname : row.nickname) || DEFAULT_NICK;
       list.appendChild(li);
     });
   }
@@ -454,6 +459,7 @@ async function renderRanking() {
   const shelf = $('rk-my-medals');
   if (shelf && myId) {
     const med = await fetchMedals([myId]);
+    if (seq !== rkSeq) return;
     shelf.innerHTML = '';
     if (med.ok && med.medals && med.medals[myId]) shelf.appendChild(medalShelf(med.medals[myId], { scale: 1.05 }));
   }

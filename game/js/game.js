@@ -9,20 +9,20 @@ import {
   validateHouse, getSpawn, tileAt, drawHouse, drawPlayer, drawTrapSprite, drawChestSprite,
   floorLabel, COLORS, generateComHouse, parseHouse,
   HOUSE_SKINS, getHouseSkin, preloadTextures,
-} from './house.js?v=20261125044051';
-import { NetSession, QuickMatch, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20261125044051';
-import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay, attachScrollHint } from './ui.js?v=20261125044051';
-import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20261125044051';
-import { hitBattleCounter, hitBattleCountOnly, visitBattleStart, loadBattleCount } from './stats.js?v=20261125044051';
+} from './house.js?v=20261126032732';
+import { NetSession, QuickMatch, loadPeerJS, isPeerAvailable, isValidRoomCode, normalizeRoomCode } from './net.js?v=20261126032732';
+import { $, showScreen, setStatus, heartsHtml, bindHold, bindTap, lockTouch, flashOverlay, attachScrollHint } from './ui.js?v=20261126032732';
+import { unlockAudio, loadMutePref, setMuted, isMuted, play as sfx } from './sound.js?v=20261126032732';
+import { hitBattleCounter, hitBattleCountOnly, visitBattleStart, loadBattleCount } from './stats.js?v=20261126032732';
 import {
   beginComRankMatch, submitComResult, applyComResult, loadStreak, refreshStreakUi,
   paintResultRank, showAlmostMatchBanner, openRanking, bindRankingUi, installDebugHook,
   retryPending, formatRankTime,
-} from './ranking.js?v=20261125044051';
+} from './ranking.js?v=20261126032732';
 
-export const GAME_VERSION = '2026-11-25 04:40:51';
-export const GAME_VERSION_BUST = '20261125044051';
-export const GAME_BUILD_TIME = 1795549251602;
+export const GAME_VERSION = '2026-11-26 03:27:32';
+export const GAME_VERSION_BUST = '20261126032732';
+export const GAME_BUILD_TIME = 1795631252244;
 
 const blueprint = createBlueprint();
 
